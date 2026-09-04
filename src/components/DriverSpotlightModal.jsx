@@ -1,19 +1,26 @@
 import React from 'react';
 import { X, Star, ShieldCheck, Award, MapPin, CheckCircle, Languages, ThumbsUp, Target } from 'lucide-react';
 import { SteeringWheel } from './Icons';
+import useScrollLock from '../utils/useScrollLock';
 
 export default function DriverSpotlightModal({ driver, onClose, onBookDriver }) {
+  useScrollLock(Boolean(driver));
+
   if (!driver) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden touch-none overscroll-contain">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md touch-none overscroll-contain"
         onClick={onClose}
+        onTouchMove={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       />
 
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto text-slate-100">
+      <div className="relative bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto text-slate-100">
         
         {/* Header Photo Banner */}
         <div className="relative h-48 bg-gradient-to-r from-amber-500 to-amber-700 p-6 flex items-end">

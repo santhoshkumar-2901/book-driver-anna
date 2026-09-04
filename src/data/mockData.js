@@ -17,10 +17,10 @@ export const BANGALORE_AREAS = [
 ];
 
 export const LOCAL_STATS = [
-  { label: "Verified Driver Annas", value: "1,800+" },
-  { label: "Trips Completed", value: "250,000+" },
-  { label: "Customer Rating", value: "4.95 / 5" },
-  { label: "Bangalore Hubs Covered", value: "25+" }
+  { label: "Bengaluru Service Zones", value: "15 Hubs" },
+  { label: "Average Dispatch", value: "15-20 Min" },
+  { label: "Driver Verification", value: "Police Verified" },
+  { label: "Cancellation Fee", value: "₹0 (Zero)" }
 ];
 
 export const OUTSTATION_DESTINATIONS = [
@@ -69,12 +69,15 @@ export const BOOK_DRIVER_TRIP_TYPES = [
     badge: 'Highway & Hill Getaways',
     subtitle: 'Outstation trips across South India',
     description: 'Planning a road trip to Coorg, Nandi Hills, Chikmagalur or Mysore? Book an experienced outstation Anna for safe highway driving.',
-    pricing: 'Starts @ ₹1,199 / 12 hrs',
-    outstationPackages: ['Round trip 12hr', 'Round trip 24hr', 'Round trip 46hr', 'Round trip 72hr'],
+    pricing: 'Starts @ ₹1,199',
+    outstationPackages: [
+      'Round trip 12hr', 'Round trip 24hr', 'Round trip 46hr', 'Round trip 72hr',
+      'One Way (Up to 150 km)', 'One Way (Up to 300 km)', 'One Way (Up to 500 km)', 'One Way Custom Drop'
+    ],
     features: [
-      'Packages: Round trip 12hr, 24hr, 46hr, 72hr',
+      'Trip Options: Round Trip (12hr-72hr) & One Way Drop',
       'Ghat road & hill driving specialists',
-      'Includes driver food allowance guidelines',
+      'Includes driver return/food allowance guidelines',
       'Night allowance included after 10 PM'
     ]
   }
@@ -325,3 +328,174 @@ export const BANGALORE_TESTIMONIALS = [
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
   }
 ];
+
+export const DRIVING_CLASSES = [
+  {
+    id: "class-beginner",
+    name: "Beginner Comprehensive Course",
+    badge: "Most Popular for Fresh Learners",
+    duration: "15 Days (1 hr / day)",
+    daysCount: 15,
+    pricing: "₹5,999 all-inclusive",
+    basePrice: 5999,
+    description: "From zero driving experience to total confidence on Bangalore roads. Covers basics, traffic navigation, flyovers, and reverse parking.",
+    transmission: "Manual or Automatic",
+    carOptions: ["Anna's Dual-Control Car", "Your Own Car"],
+    features: [
+      "Clutch, steering & gear coordination",
+      "Bangalore peak traffic & signal navigation",
+      "Parallel, reverse & basement ramp parking",
+      "Flyover incline & hill-hold technique",
+      "RTO Learner & Driving License assistance"
+    ],
+    popularFor: "Freshers & First-Time Car Owners"
+  },
+  {
+    id: "class-refresher",
+    name: "City Confidence & Refresher",
+    badge: "Overcome Traffic Fear",
+    duration: "7 Days (1 hr / day)",
+    daysCount: 7,
+    pricing: "₹3,499 all-inclusive",
+    basePrice: 3499,
+    description: "Have a driving license but feel anxious driving in Silk Board jams or tight Bangalore alleys? Our patient Annas build your confidence.",
+    transmission: "Manual or Automatic",
+    carOptions: ["Your Own Car", "Anna's Dual-Control Car"],
+    features: [
+      "Bumper-to-bumper crawl & clutch control",
+      "Lane discipline on Outer Ring Road & Expressways",
+      "Mall basement & tight street parking",
+      "Night driving & high-beam management",
+      "Defensive driving tactics for two-wheelers"
+    ],
+    popularFor: "License Holders Who Lack Confidence"
+  },
+  {
+    id: "class-own-car",
+    name: "Learn in Your Own Car",
+    badge: "Doorstep Personalized Training",
+    duration: "7 Days (1.5 hrs / day)",
+    daysCount: 7,
+    pricing: "₹2,999 all-inclusive",
+    basePrice: 2999,
+    description: "Nothing beats mastering the exact car you drive daily. Anna comes to your home and teaches you on your personal vehicle and exact daily routes.",
+    transmission: "Manual or Automatic",
+    carOptions: ["Your Own Personal Car"],
+    features: [
+      "Your exact home-to-office daily route practice",
+      "Your apartment's narrow basement parking ramp",
+      "Personalized speed & blind-spot coaching",
+      "Familiarity with your car's dimensions & turning radius",
+      "Doorstep pickup & drop every morning/evening"
+    ],
+    popularFor: "New Car Owners Familiarizing with Their Vehicle"
+  },
+  {
+    id: "class-automatic",
+    name: "Automatic Car Specialization",
+    badge: "AMT / CVT / DCT Masterclass",
+    duration: "7 Days (1 hr / day)",
+    daysCount: 7,
+    pricing: "₹3,999 all-inclusive",
+    basePrice: 3999,
+    description: "Switched from manual to automatic? Learn seamless accelerator control, creep function, paddle shifters, and downhill engine braking.",
+    transmission: "Automatic Only",
+    carOptions: ["Anna's Dual-Control Automatic", "Your Own Automatic Car"],
+    features: [
+      "Strict single-foot pedal discipline",
+      "Creep mode mastery in traffic jams",
+      "Hill-start assist & electronic parking brake",
+      "Sport mode & highway overtaking techniques",
+      "Fuel-efficient city driving methods"
+    ],
+    popularFor: "Drivers Switching to Modern Automatics & EVs"
+  }
+];
+
+export const DRIVING_CLASS_HIGHLIGHTS = [
+  { label: "Dual-Control Safety", value: "Certified Cars" },
+  { label: "Personalized Training", value: "1-on-1 with Anna" },
+  { label: "Doorstep Pickup", value: "Across Bangalore" },
+  { label: "Timings", value: "Flexible 6 AM - 8 PM" }
+];
+
+// Default Registered Driver Partners Fleet (for testing & demo)
+export const DEFAULT_REGISTERED_DRIVERS = [
+  {
+    id: "DRV-1001",
+    name: "Manjunath Gowda",
+    phone: "+91 98860 12345",
+    dlNumber: "KA-04-2021-0098745",
+    vehicleType: "Manual & Automatic Cars",
+    area: "Indiranagar",
+    experienceYears: "12 Years",
+    rating: 4.98,
+    trips: 3420,
+    status: "Active",
+    earningsToday: 2450,
+    isOnline: true,
+    createdAt: "2026-08-15"
+  },
+  {
+    id: "DRV-1002",
+    name: "Venkatesh Prasad",
+    phone: "+91 98450 67890",
+    dlNumber: "KA-05-2020-0081234",
+    vehicleType: "Automatic Luxury & SUVs",
+    area: "Koramangala",
+    experienceYears: "9 Years",
+    rating: 4.95,
+    trips: 2890,
+    status: "Active",
+    earningsToday: 1800,
+    isOnline: true,
+    createdAt: "2026-08-20"
+  },
+  {
+    id: "DRV-1003",
+    name: "Suresh Kumar",
+    phone: "+91 99002 55667",
+    dlNumber: "KA-01-2019-0043120",
+    vehicleType: "All Cars & Heavy Sedans",
+    area: "Whitefield",
+    experienceYears: "14 Years",
+    rating: 4.96,
+    trips: 4150,
+    status: "Active",
+    earningsToday: 2100,
+    isOnline: true,
+    createdAt: "2026-08-22"
+  },
+  {
+    id: "DRV-1004",
+    name: "Raghavendra Rao",
+    phone: "+91 97410 33445",
+    dlNumber: "KA-03-2022-0077889",
+    vehicleType: "Manual Hatchback & Sedans",
+    area: "Jayanagar",
+    experienceYears: "7 Years",
+    rating: 4.92,
+    trips: 1940,
+    status: "Active",
+    earningsToday: 1650,
+    isOnline: true,
+    createdAt: "2026-08-28"
+  },
+  {
+    id: "DRV-1005",
+    name: "Chandra Shekar",
+    phone: "+91 98801 99881",
+    dlNumber: "KA-51-2021-0065432",
+    vehicleType: "Electric & Automatic Cars",
+    area: "HSR Layout",
+    experienceYears: "6 Years",
+    rating: 4.94,
+    trips: 1620,
+    status: "Active",
+    earningsToday: 1950,
+    isOnline: true,
+    createdAt: "2026-09-01"
+  }
+];
+
+

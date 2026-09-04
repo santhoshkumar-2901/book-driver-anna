@@ -2,7 +2,7 @@ import React from 'react';
 import { Car, MapPin, Phone, Mail, Clock, ShieldCheck, Heart, ArrowRight, Zap } from 'lucide-react';
 import { BANGALORE_AREAS } from '../data/mockData';
 
-export default function Footer({ setActivePage, openBookingModal }) {
+export default function Footer({ setActivePage, openBookingModal, openCancelModal, clientUser, onLogout }) {
   const navigateTo = (pageId) => {
     setActivePage(pageId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -18,26 +18,24 @@ export default function Footer({ setActivePage, openBookingModal }) {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateTo('home')}>
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-bold shadow-lg shadow-amber-500/20">
-                <Car className="w-6 h-6 stroke-[2.2]" />
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-400 text-slate-950 font-bold shrink-0">
+                <Car className="w-5 h-5 stroke-[2.2]" />
               </div>
-              <span className="font-extrabold text-2xl text-white font-['Outfit']">
+              <span className="font-bold text-xl text-white font-['Outfit']">
                 Book Driver <span className="text-amber-400">Anna</span>
               </span>
             </div>
 
-            <p className="text-slate-400 text-sm leading-relaxed max-w-md">
-              Namma Bengaluru's most trusted on-demand driver and vehicle booking platform. 
-              Whether navigating Silk Board traffic, returning safely from a night out in Indiranagar, 
-              or taking a weekend trip to Coorg—our verified Annas are at your service 24x7.
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-md">
+              Bengaluru's on-demand driver and vehicle booking platform. Verified private drivers for personal vehicles, sanitized commercial car rentals, and doorstep driving lessons.
             </p>
 
-            <div className="flex items-center gap-3 pt-2">
-              <span className="bg-amber-400/10 text-amber-400 border border-amber-400/20 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" /> 100% Background Verified
+            <div className="flex items-center gap-3 pt-1">
+              <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Police Verified Drivers
               </span>
-              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> 15 Min Pickup
+              <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-400" /> 15-20 Min Dispatch
               </span>
             </div>
           </div>
@@ -103,19 +101,16 @@ export default function Footer({ setActivePage, openBookingModal }) {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <button onClick={() => navigateTo('home')} className="hover:text-white transition-colors">Home</button>
+                <button onClick={() => navigateTo('home')} className="hover:text-white transition-colors cursor-pointer">Home</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('services')} className="hover:text-white transition-colors">Services (Driver & Vehicle)</button>
+                <button onClick={() => navigateTo('services')} className="hover:text-white transition-colors cursor-pointer">Services (Driver & Vehicle)</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('about')} className="hover:text-white transition-colors">About Us</button>
+                <button onClick={() => navigateTo('about')} className="hover:text-white transition-colors cursor-pointer">About Us</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('contact')} className="hover:text-white transition-colors">Contact & Support</button>
-              </li>
-              <li>
-                <button onClick={() => openBookingModal('driver')} className="text-amber-400 font-semibold hover:underline">Instant Booking Widget</button>
+                <button onClick={() => navigateTo('contact')} className="hover:text-white transition-colors cursor-pointer">Contact & Support</button>
               </li>
             </ul>
           </div>

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { Car, PhoneCall, Menu, X, ShieldCheck, MapPin, Sparkles } from 'lucide-react';
+import { Car, PhoneCall, Menu, X, ShieldCheck, MapPin, GraduationCap, Ban, LogOut, User } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 
-export default function Navbar({ activePage, setActivePage, openBookingModal }) {
+export default function Navbar({ 
+  activePage, 
+  setActivePage, 
+  openBookingModal, 
+  openCancelModal, 
+  clientUser, 
+  onLogout,
+  onOpenProfile
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -19,53 +27,65 @@ export default function Navbar({ activePage, setActivePage, openBookingModal }) 
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80 transition-all">
-      {/* Top Banner - Namma Bengaluru Pride */}
-      <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-red-600 text-slate-950 font-semibold text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-inner">
-        <span className="bg-slate-950 text-amber-400 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider">Namma Bangalore #1</span>
-        <span>Trusted Local Driver & Vehicle Rentals across Indiranagar, Whitefield, Koramangala & All Bengaluru!</span>
-        <span className="hidden md:inline-flex items-center gap-1 font-bold ml-2 underline cursor-pointer" onClick={() => openBookingModal('driver')}>
-          <Sparkles className="w-3 h-3" /> Quick Book Anna
-        </span>
+    <header className="sticky top-0 z-40 bg-slate-950 border-b border-slate-800 transition-all">
+      {/* Top Utility Bar */}
+      <div className="bg-slate-900 border-b border-slate-800/80 text-xs py-1 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-slate-300">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-medium">24/7 Dispatch active across 15 Bengaluru zones</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-4 text-slate-400">
+            <a href="tel:+919886012345" className="hover:text-amber-400 transition-colors flex items-center gap-1.5 font-medium">
+              <PhoneCall className="w-3.5 h-3.5 text-amber-400" />
+              <span>Helpline: +91 98860 12345</span>
+            </a>
+            <span className="text-slate-700">|</span>
+            <button 
+              onClick={openCancelModal}
+              className="hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Cancel Booking (No Fee)
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16">
 
           {/* Brand Logo */}
           <div
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-3 cursor-pointer group shrink-0"
           >
-            <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
-              <Car className="w-7 h-7 stroke-[2.2]" />
-              <div className="absolute -bottom-1 -right-1 bg-red-600 text-white rounded-full p-0.5 border border-slate-900">
-                <ShieldCheck className="w-3.5 h-3.5" />
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">
+              <Car className="w-5 h-5 stroke-[2.2]" />
+              <div className="absolute -bottom-1 -right-1 bg-red-600 text-white rounded-full p-0.5 border border-slate-950">
+                <ShieldCheck className="w-3 h-3" />
               </div>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-2xl tracking-tight text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
-                  Book Driver <span className="text-amber-400">Anna</span>
-                </span>
+              <div className="font-bold text-lg sm:text-xl tracking-tight text-white font-['Outfit']">
+                Book Driver <span className="text-amber-400">Anna</span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-red-400 inline" /> Namma Bengaluru Services
+              <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-red-400 inline" /> Bengaluru Verified Drivers
               </p>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-slate-800">
+          <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => {
               const isActive = activePage === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${isActive
-                      ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${isActive
+                      ? 'text-amber-400 bg-amber-400/10 font-semibold'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
                     }`}
                 >
                   {item.label}
@@ -75,41 +95,59 @@ export default function Navbar({ activePage, setActivePage, openBookingModal }) 
           </nav>
 
           {/* Action CTAs */}
-          <div className="hidden lg:flex items-center gap-4">
-            <a
-              href="tel:+919886012345"
-              className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-amber-400 transition-colors px-3 py-2 rounded-lg bg-slate-900 border border-slate-800"
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+
+            {/* Cancel Booking Quick Button */}
+            <button
+              onClick={openCancelModal}
+              className="hidden xl:flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              title="Lookup and manage your booking"
             >
-              <PhoneCall className="w-4 h-4 text-amber-400 animate-pulse" />
-              <div>
-                <div className="text-[10px] text-slate-500 uppercase leading-none">24x7 Helpline</div>
-                <div className="font-bold text-slate-200">+91 98860 12345</div>
+              <Ban className="w-3.5 h-3.5 text-slate-400" />
+              <span>Cancel Booking</span>
+            </button>
+
+            {/* Book Now CTA */}
+            <button
+              onClick={() => openBookingModal('driver')}
+              className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              Book a Driver
+            </button>
+
+            {/* Client User Profile Pill & Logout */}
+            {clientUser && (
+              <div className="flex items-center gap-1.5 pl-2 sm:pl-3 border-l border-slate-800">
+                <button 
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="flex items-center gap-1.5 sm:gap-2 py-1 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-colors cursor-pointer"
+                  title={`View profile for ${clientUser.name}`}
+                >
+                  <div className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
+                    {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <span className="hidden sm:inline-block text-xs font-medium text-white max-w-[90px] truncate">
+                    {clientUser.name ? clientUser.name.split(' ')[0] : 'Client'}
+                  </span>
+                </button>
+                <button
+                  onClick={onLogout}
+                  title="Sign Out"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-            </a>
+            )}
 
-            <button
-              onClick={() => openBookingModal('driver')}
-              className="relative inline-flex items-center justify-center px-6 py-2.5 text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 rounded-full shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 active:scale-95 transition-all duration-200"
-            >
-              Book Now
-            </button>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={() => openBookingModal('driver')}
-              className="px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 rounded-full shadow-md"
-            >
-              Book Now
-            </button>
-
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-300 hover:text-white bg-slate-900 border border-slate-800"
+              className="p-2 rounded-lg text-slate-300 hover:text-white bg-slate-900 border border-slate-800 lg:hidden cursor-pointer shrink-0"
               aria-label="Toggle Navigation Menu"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -117,14 +155,14 @@ export default function Navbar({ activePage, setActivePage, openBookingModal }) 
 
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-slate-950/95 backdrop-blur-xl border-b border-slate-800 px-4 pt-3 pb-6 animate-in slide-in-from-top duration-200">
-          <div className="flex flex-col gap-2">
+        <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-4 pt-3 pb-6">
+          <div className="flex flex-col gap-1.5">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`text-left px-4 py-3 rounded-xl text-base font-semibold transition-colors ${activePage === item.id
-                    ? 'bg-amber-400 text-slate-950 font-bold'
+                className={`text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
+                    ? 'bg-amber-400/10 text-amber-400 font-semibold'
                     : 'text-slate-200 hover:bg-slate-900'
                   }`}
               >
@@ -132,16 +170,48 @@ export default function Navbar({ activePage, setActivePage, openBookingModal }) 
               </button>
             ))}
 
-            <div className="pt-3 border-t border-slate-800 flex flex-col gap-3 mt-2">
+            {clientUser && (
+              <div 
+                onClick={() => {
+                  if (onOpenProfile) onOpenProfile();
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between mt-2 cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
+                    {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">
+                      {clientUser.name}
+                    </div>
+                    <div className="text-[11px] text-slate-400">{clientUser.phone} • {clientUser.area}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-2.5 py-1 rounded-md text-xs font-medium text-red-400 hover:bg-red-500/10 flex items-center gap-1"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
+                </button>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 flex flex-col gap-2 mt-2">
               <button
                 onClick={() => {
                   openBookingModal('driver');
                   setMobileMenuOpen(false);
                 }}
-                className="w-full py-3 text-center text-slate-950 font-bold bg-amber-400 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                className="w-full py-2.5 text-center text-slate-950 font-semibold bg-amber-400 hover:bg-amber-300 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
               >
                 <SteeringWheel className="w-4 h-4 text-slate-950" />
-                <span>Book Driver Anna</span>
+                <span>Book a Driver</span>
               </button>
 
               <button
@@ -149,17 +219,39 @@ export default function Navbar({ activePage, setActivePage, openBookingModal }) 
                   openBookingModal('vehicle');
                   setMobileMenuOpen(false);
                 }}
-                className="w-full py-3 text-center text-slate-100 font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-center gap-2"
+                className="w-full py-2.5 text-center text-slate-200 font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
               >
                 <Car className="w-4 h-4 text-amber-400" />
-                <span>Book a Vehicle</span>
+                <span>Rent a Vehicle</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  openBookingModal('class');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2.5 text-center text-slate-200 font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
+              >
+                <GraduationCap className="w-4 h-4 text-emerald-400" />
+                <span>Driving Classes</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  openCancelModal();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2 text-center text-slate-400 hover:text-white border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-xs transition-colors"
+              >
+                <Ban className="w-3.5 h-3.5 text-slate-400" />
+                <span>Cancel / Manage Booking</span>
               </button>
 
               <a
                 href="tel:+919886012345"
-                className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-amber-400 bg-slate-900 rounded-xl border border-amber-500/20"
+                className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-amber-400 bg-slate-900/50 rounded-lg border border-slate-800"
               >
-                <PhoneCall className="w-4 h-4" /> Call 24x7 Helpline: +91 98860 12345
+                <PhoneCall className="w-3.5 h-3.5" /> Helpline: +91 98860 12345
               </a>
             </div>
           </div>

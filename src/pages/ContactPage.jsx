@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  Phone, Mail, MapPin, Clock, Send, MessageSquare, CheckCircle2, 
-  HelpCircle, ChevronDown, ChevronUp, Sparkles, Building2 
+  Phone, Mail, MapPin, Clock, Send, CheckCircle2, 
+  HelpCircle, ChevronDown, ChevronUp, Building2 
 } from 'lucide-react';
 import { BANGALORE_AREAS } from '../data/mockData';
 
@@ -30,119 +30,124 @@ export default function ContactPage({ openBookingModal }) {
   const hubs = [
     { name: "Indiranagar Flagship HQ", address: "#42, 100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038", phone: "+91 98860 12345" },
     { name: "Koramangala Hub", address: "#18, 80 Feet Road, 4th Block, Koramangala, Bengaluru 560034", phone: "+91 98860 54321" },
-    { name: "Whitefield IT Hub", address: "Ground Floor, ITPL Main Road, Whitefield, Bengaluru 560066", phone: "+91 98860 67890" },
+    { name: "Whitefield Hub", address: "Ground Floor, ITPL Main Road, Whitefield, Bengaluru 560066", phone: "+91 98860 67890" },
     { name: "Electronic City Kiosk", address: "Phase 1 Gate 2, Hosur Road, Electronic City, Bengaluru 560100", phone: "+91 98860 99887" }
   ];
 
   const faqs = [
     {
-      q: "How fast will Driver Anna arrive at my location in Bangalore?",
-      a: "Our Annas are stationed at 25+ local hubs across Bangalore (Indiranagar, Koramangala, Whitefield, HSR, Hebbal). Average dispatch time is just 15 to 20 minutes!"
+      q: "How fast will a driver arrive at my location in Bangalore?",
+      a: "Our driver partners are distributed across 15 operational hubs across Bengaluru. Average arrival time is between 15 to 25 minutes depending on traffic conditions."
     },
     {
-      q: "Can I book a driver for late night party return in Indiranagar / Koramangala?",
-      a: "Yes! Our Night Party Driver service operates 24x7. Our drivers undergo strict breathalyzer tests before driving your vehicle safely to your residence."
+      q: "Can I book a driver for late-night party returns?",
+      a: "Yes. Our night service operates 24/7. Drivers adhere to strict conduct rules and breathalyzer verification for late-night drives."
     },
     {
       q: "Are fuel and toll charges included in vehicle rentals?",
-      a: "For driver-driven rental vehicles, fuel is included in per-km packages. Toll charges (such as Airport Elevated Expressway or NICE Road) are paid directly as per actual receipts."
+      a: "For vehicle rentals with drivers, fuel is included in standard daily packages. Road tolls (such as NICE Road or Airport Expressway) are paid directly based on official receipts."
     },
     {
-      q: "What if I need to cancel my booking?",
-      a: "We offer zero cancellation fee if cancelled up to 30 minutes before pickup time."
+      q: "What is the cancellation policy?",
+      a: "We offer zero cancellation fees when cancelled at least 30 minutes before the scheduled pickup time."
     },
     {
-      q: "Are the drivers familiar with luxury automatic cars?",
-      a: "Yes, our Annas are experienced with all transmission types, including manual, AMT, CVT, DSG, and luxury automatic vehicles like Mercedes, BMW, Audi & Volvo."
+      q: "Are the drivers experienced with luxury and automatic cars?",
+      a: "Yes. All driver partners are evaluated on manual, automatic, AMT, and luxury vehicle transmissions."
     }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
       
-      {/* Header Banner */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs font-bold border border-amber-400/20">
-          <MessageSquare className="w-3.5 h-3.5" /> 24/7 Customer Support
+      {/* Header */}
+      <div className="space-y-3 max-w-2xl">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-400 text-xs font-medium">
+          <Phone className="w-3.5 h-3.5 text-amber-400" /> Customer Support Desk
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-white font-['Outfit']">
-          Get in Touch With <span className="text-amber-400">Book Driver Anna</span>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white font-['Outfit']">
+          Contact & Support
         </h1>
-        <p className="text-slate-300 text-base leading-relaxed">
-          Have questions about driver packages, monthly rentals, or corporate partnerships? 
-          Reach out to our Indiranagar team anytime!
+        <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          Reach our Bengaluru operations desk for driver reservations, corporate contracts, or service inquiries.
         </p>
       </div>
 
       {/* Main Grid: Form + Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Contact Form (7 cols) */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 relative">
+        {/* Contact Form */}
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 space-y-4">
           
-          <h3 className="text-2xl font-extrabold text-white font-['Outfit'] mb-1">
-            Send Us a Message
-          </h3>
-          <p className="text-xs text-slate-400 mb-6">
-            Fill in your details below and our Bangalore desk will respond within 15 minutes.
-          </p>
+          <div>
+            <h3 className="text-lg font-bold text-white font-['Outfit']">
+              Send an Inquiry
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Submit your message and our dispatch desk will respond promptly.
+            </p>
+          </div>
 
           {submitted ? (
-            <div className="p-8 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-center space-y-3 animate-in zoom-in-95">
-              <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-full flex items-center justify-center mx-auto font-bold">
-                <CheckCircle2 className="w-8 h-8" />
+            <div className="p-6 bg-slate-950 border border-slate-800 rounded-lg text-center space-y-2">
+              <div className="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
-              <h4 className="text-xl font-bold text-white font-['Outfit']">Message Received!</h4>
+              <h4 className="text-base font-bold text-white">Inquiry Received</h4>
               <p className="text-xs text-slate-300">
-                Thank you {formData.name || 'valued customer'}. Our team will call or WhatsApp you at {formData.phone || 'your phone'} shortly.
+                Thank you, {formData.name || 'valued customer'}. Our team will contact you at {formData.phone || 'your phone number'} shortly.
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Your Full Name *</label>
+                  <label htmlFor="contact-name" className="block text-xs font-medium text-slate-300 mb-1">Full Name *</label>
                   <input
+                    id="contact-name"
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Ramesh Kumar"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number (WhatsApp) *</label>
+                  <label htmlFor="contact-phone" className="block text-xs font-medium text-slate-300 mb-1">Phone Number *</label>
                   <input
+                    id="contact-phone"
                     type="tel"
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="e.g. 9886012345"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+                  <label htmlFor="contact-email" className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
                   <input
+                    id="contact-email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="e.g. name@example.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Bangalore Pickup Area</label>
+                  <label htmlFor="contact-area" className="block text-xs font-medium text-slate-300 mb-1">Bengaluru Area</label>
                   <select
+                    id="contact-area"
                     value={formData.area}
                     onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                   >
                     {BANGALORE_AREAS.map((a, i) => (
                       <option key={i} value={a}>{a}</option>
@@ -152,100 +157,102 @@ export default function ContactPage({ openBookingModal }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Subject</label>
+                <label htmlFor="contact-subject" className="block text-xs font-medium text-slate-300 mb-1">Subject</label>
                 <select
+                  id="contact-subject"
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                 >
                   <option value="General Inquiry">General Booking Inquiry</option>
                   <option value="Book Driver">Hourly / Outstation Driver Request</option>
                   <option value="Book Vehicle">Car Rental Inquiry</option>
                   <option value="Monthly Driver">Monthly / Corporate Contract</option>
-                  <option value="Become Driver Partner">Become a Driver Anna (Join Us)</option>
+                  <option value="Become Driver Partner">Driver Partner Application</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Your Message or Requirements</label>
+                <label htmlFor="contact-message" className="block text-xs font-medium text-slate-300 mb-1">Message or Requirements *</label>
                 <textarea
+                  id="contact-message"
                   rows={4}
                   required
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  placeholder="Tell us your travel details, vehicle model, or date..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400"
+                  placeholder="Provide trip details, date, or specific inquiries..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-amber-400 transition-colors"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Send className="w-4 h-4" />
-                <span>Submit Inquiry to Anna Team</span>
+                <Send className="w-3.5 h-3.5" />
+                <span>Submit Inquiry</span>
               </button>
             </form>
           )}
 
         </div>
 
-        {/* Contact Info Cards (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* Contact Info Cards */}
+        <div className="lg:col-span-5 space-y-5">
           
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-            <h4 className="text-lg font-bold text-white font-['Outfit'] border-l-2 border-amber-400 pl-2.5">
-              Direct Contact Hotlines
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h4 className="text-sm font-bold text-white">
+              Direct Contact Lines
             </h4>
 
-            <div className="space-y-4 text-xs text-slate-300">
-              <a href="tel:+919886012345" className="flex items-start gap-3 p-3 bg-slate-950 rounded-2xl border border-slate-800 hover:border-amber-400 transition-colors">
-                <div className="p-2 bg-amber-400 text-slate-950 rounded-xl">
+            <div className="space-y-3 text-xs text-slate-300">
+              <a href="tel:+919886012345" className="flex items-start gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+                <div className="p-2 bg-amber-400/10 text-amber-400 rounded-md">
                   <Phone className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">24x7 Booking Helpline</div>
-                  <div className="text-sm font-extrabold text-white">+91 98860 12345</div>
-                  <div className="text-[10px] text-emerald-400">Instant Phone & WhatsApp</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">24x7 Helpline</div>
+                  <div className="text-sm font-bold text-white">+91 98860 12345</div>
+                  <div className="text-[11px] text-slate-400">Direct phone & WhatsApp</div>
                 </div>
               </a>
 
-              <a href="mailto:support@bookdriveranna.com" className="flex items-start gap-3 p-3 bg-slate-950 rounded-2xl border border-slate-800 hover:border-amber-400 transition-colors">
-                <div className="p-2 bg-amber-400 text-slate-950 rounded-xl">
+              <a href="mailto:support@bookdriveranna.com" className="flex items-start gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+                <div className="p-2 bg-amber-400/10 text-amber-400 rounded-md">
                   <Mail className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Official Support Email</div>
-                  <div className="text-sm font-extrabold text-white">support@bookdriveranna.com</div>
-                  <div className="text-[10px] text-slate-400">Fast response within 1 hour</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Support Email</div>
+                  <div className="text-sm font-bold text-white">support@bookdriveranna.com</div>
+                  <div className="text-[11px] text-slate-400">Response within 2-4 hours</div>
                 </div>
               </a>
 
-              <div className="flex items-start gap-3 p-3 bg-slate-950 rounded-2xl border border-slate-800">
-                <div className="p-2 bg-amber-400 text-slate-950 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <div className="p-2 bg-amber-400/10 text-amber-400 rounded-md">
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Operating Hours</div>
-                  <div className="text-sm font-extrabold text-white">24 Hours / 7 Days a Week</div>
-                  <div className="text-[10px] text-slate-400">Night drivers active till 4 AM</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Operating Hours</div>
+                  <div className="text-sm font-bold text-white">24 Hours / 7 Days a Week</div>
+                  <div className="text-[11px] text-slate-400">Night shift drivers active 24/7</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Local Hubs List */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3">
-            <h4 className="text-lg font-bold text-white font-['Outfit'] border-l-2 border-amber-400 pl-2.5">
-              Bengaluru Offices & Hubs
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+            <h4 className="text-sm font-bold text-white">
+              Bengaluru Dispatch Hubs
             </h4>
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {hubs.map((hub, idx) => (
-                <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-                  <div className="font-bold text-amber-400 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5" /> {hub.name}
+                <div key={idx} className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-xs">
+                  <div className="font-semibold text-white flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-400" /> {hub.name}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1">{hub.address}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{hub.address}</div>
                 </div>
               ))}
             </div>
@@ -256,34 +263,34 @@ export default function ContactPage({ openBookingModal }) {
       </div>
 
       {/* FAQS SECTION */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
-        <div className="text-center space-y-2 max-w-xl mx-auto">
-          <span className="bg-amber-400/10 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/20 uppercase tracking-wider">
-            <HelpCircle className="w-3.5 h-3.5 inline mr-1" /> Got Questions?
-          </span>
-          <h2 className="text-3xl font-extrabold text-white font-['Outfit']">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 space-y-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
             Frequently Asked Questions
           </h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            Key details regarding booking, safety standards, and pricing
+          </p>
         </div>
 
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="space-y-2.5">
           {faqs.map((faq, idx) => {
             const isOpen = openFaq === idx;
             return (
               <div 
                 key={idx} 
-                className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden transition-colors"
+                className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden transition-colors"
               >
                 <button
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full p-4 text-left font-bold text-xs sm:text-sm text-white flex items-center justify-between gap-4"
+                  className="w-full p-3.5 text-left font-semibold text-xs sm:text-sm text-white flex items-center justify-between gap-4 cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   {isOpen ? <ChevronUp className="w-4 h-4 text-amber-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
                 </button>
 
                 {isOpen && (
-                  <div className="px-4 pb-4 text-xs text-slate-300 border-t border-slate-800/60 pt-3 leading-relaxed">
+                  <div className="px-3.5 pb-3.5 text-xs text-slate-300 border-t border-slate-800/60 pt-2.5 leading-relaxed">
                     {faq.a}
                   </div>
                 )}
