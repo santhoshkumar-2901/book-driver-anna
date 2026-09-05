@@ -7,7 +7,9 @@
  * - Graceful fallback handling
  */
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api` 
+  : '/api';
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
@@ -33,9 +35,31 @@ async function request(endpoint, options = {}) {
 
   try {
     const res = await fetch(url, config);
-    const data = await res.json().catch(() => ({}));
+    const contentType = res.headers.get('content-type') || '';
+    
+    let data = {};
+    let rawText = '';
+    if (contentType.includes('application/json')) {
+      data = await res.json().catch(() => ({}));
+    } else {
+      rawText = await res.text().catch(() => '');
+    }
 
     if (!res.ok) {
+      // Check if this is a proxy failure (e.g. Vite proxy ECONNREFUSED 127.0.0.1:5000 or gateway 502/503/504)
+      const isProxyOrGatewayError = 
+        (res.status === 502 || res.status === 503 || res.status === 504) ||
+        (res.status === 500 && (!data.error || rawText.includes('ECONNREFUSED') || rawText.includes('proxy error')));
+
+      if (isProxyOrGatewayError) {
+        console.warn(`[API CLIENT] Backend server offline or proxy failed (HTTP ${res.status}). Falling back to local offline mode.`);
+        const networkErr = new Error('Backend server is offline. Please start the backend service on port 5000.');
+        networkErr.code = 'NETWORK_ERROR';
+        networkErr.status = res.status;
+        networkErr.data = data;
+        throw networkErr;
+      }
+
       const errorMsg = data.error?.message || `HTTP ${res.status}: ${res.statusText}`;
       const err = new Error(errorMsg);
       err.code = data.error?.code || 'API_ERROR';
@@ -47,10 +71,11 @@ async function request(endpoint, options = {}) {
     return data;
   } catch (err) {
     // If server is unreachable (offline / static build without proxy), log and rethrow
-    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+    if (err.name === 'TypeError' && (err.message.includes('fetch') || err.message.includes('NetworkError') || err.message.includes('Failed to fetch'))) {
       console.warn(`[API CLIENT] Backend server offline at ${url}. Falling back.`);
-      const networkErr = new Error('Cannot connect to server. Please ensure the backend service is running.');
+      const networkErr = new Error('Cannot connect to server. Please ensure the backend service is running on port 5000.');
       networkErr.code = 'NETWORK_ERROR';
+      networkErr.status = 0;
       throw networkErr;
     }
     throw err;

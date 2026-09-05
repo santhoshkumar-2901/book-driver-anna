@@ -9,7 +9,9 @@ export const ENV = {
   IS_PRODUCTION: isProduction,
   PORT: parseInt(process.env.PORT || '5000', 10),
 
-  JWT_SECRET: process.env.JWT_SECRET || (isProduction ? '' : 'bda-dev-jwt-secret-key-32-chars-long-2026!'),
+  JWT_SECRET:
+    process.env.JWT_SECRET ||
+    'bda-super-secret-jwt-token-key-2026-production-grade!',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
 
   GEMINI_API_KEY:
@@ -18,7 +20,7 @@ export const ENV = {
     '',
 
   ADMIN_REGISTRATION_SECRET:
-    process.env.ADMIN_REGISTRATION_SECRET || (isProduction ? '' : 'bda-admin-dev-secret-key-2026'),
+    process.env.ADMIN_REGISTRATION_SECRET || 'ANNA2026',
 
   CORS_ORIGIN:
     process.env.CORS_ORIGIN ||

@@ -1,3 +1,6 @@
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,6 +10,10 @@ import { ALLOWED_ORIGINS } from './config/security.js';
 import { seedDatabase } from './db/seed.js';
 import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, '../dist');
 
 // Import route modules
 import authRouter from './routes/auth.js';
@@ -76,7 +83,19 @@ app.use('/api/drivers', driversRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/chat', chatRouter);
 
-// 7. 404 and Centralized Error Handling
+// 7. Serve Production Frontend Static Assets (if dist exists)
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.use((req, res, next) => {
+    // If request is a GET and does not target /api, serve the SPA entrypoint
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distDir, 'index.html'));
+    }
+    next();
+  });
+}
+
+// 8. 404 and Centralized Error Handling for API routes
 app.use(notFoundHandler);
 app.use(errorHandler);
 
