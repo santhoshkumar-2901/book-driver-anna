@@ -3,27 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-surface-base: #020617; /* slate-950 */
+    --color-surface-card: #0f172a; /* slate-900 */
+    --color-surface-subtle: #1e293b; /* slate-800 */
+    --color-border-subtle: #1e293b;
+    --color-border-strong: #334155;
+    --color-brand-primary: #f59e0b; /* amber-500 */
+    --color-brand-hover: #d97706; /* amber-600 */
+  }
+
   body {
-    @apply bg-slate-950 text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950;
+    @apply bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Accessible focus defaults */
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible,
-  button:focus-visible {
-    @apply outline-none ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950;
+  /* Accessible visible focus for keyboard navigation */
+  :focus-visible {
+    @apply outline-none ring-2 ring-amber-500/70 ring-offset-2 ring-offset-slate-950;
   }
 }
 
-/* Scrollbar styling */
+/* Restrained, functional scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #020617;
+  background: #090d16;
 }
 ::-webkit-scrollbar-thumb {
   background: #1e293b;
@@ -31,4 +38,37 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
+}
+
+@layer components {
+  /* Standard Button Variants */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm bg-amber-500 text-slate-950 hover:bg-amber-400 active:bg-amber-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm bg-transparent text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-700 transition-colors cursor-pointer;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-medium text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm bg-red-600/15 text-red-400 hover:bg-red-600/25 border border-red-500/30 transition-colors cursor-pointer;
+  }
+
+  /* Standard Input Base */
+  .input-base {
+    @apply w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/50 transition-colors;
+  }
+
+  /* Standard Card Shell */
+  .card-surface {
+    @apply bg-slate-900 border border-slate-800 rounded-xl transition-colors;
+  }
 }

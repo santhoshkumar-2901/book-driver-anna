@@ -185,34 +185,34 @@ export default function UserProfileModal({
       }}
     >
       <div 
-        className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl shadow-black/80 relative overflow-hidden overscroll-contain touch-pan-y"
+        className="bg-slate-900 border border-slate-800 rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-xl relative overflow-hidden overscroll-contain touch-pan-y"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Modal Header Bar */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-5 py-4 shrink-0 bg-slate-900/90 backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4 shrink-0 bg-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-base flex items-center justify-center shrink-0">
               {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-extrabold text-white font-['Outfit'] truncate max-w-[200px] sm:max-w-[280px]">
+                <h3 className="text-base font-bold text-white font-['Outfit'] truncate max-w-[200px] sm:max-w-[280px]">
                   {clientUser.name}
                 </h3>
-                <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                  Verified
+                <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded font-medium">
+                  Verified Client
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Customer ID: <span className="font-mono text-slate-300 font-bold">{clientUser.id || 'CLI-USER'}</span> • Bengaluru
+                Customer ID: <span className="font-mono text-slate-300">{clientUser.id || 'CLI-USER'}</span> • Bengaluru Urban
               </p>
             </div>
           </div>
 
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
             title="Close Profile"
           >
             <X className="w-4 h-4" />
@@ -220,14 +220,14 @@ export default function UserProfileModal({
         </div>
 
         {/* Sub-Tab Navigation Bar */}
-        <div className="flex items-center gap-2 p-3 border-b border-slate-800/80 bg-slate-950/60 shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-2 p-3 border-b border-slate-800 bg-slate-950 shrink-0 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('details')}
-            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'details'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-slate-800 text-white font-bold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
             <User className="w-3.5 h-3.5" />
@@ -237,10 +237,10 @@ export default function UserProfileModal({
           <button
             type="button"
             onClick={() => setActiveTab('bookings')}
-            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'bookings'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-slate-800 text-white font-bold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -250,14 +250,14 @@ export default function UserProfileModal({
           <button
             type="button"
             onClick={() => setActiveTab('perks')}
-            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'perks'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-slate-800 text-white font-bold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            <Award className="w-3.5 h-3.5" />
-            <span>Bangalore Benefits</span>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Policies & Support</span>
           </button>
         </div>
 
@@ -280,22 +280,22 @@ export default function UserProfileModal({
               
               {/* Quick Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-2xl">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Total Rides</div>
-                  <div className="text-lg font-extrabold text-white mt-0.5">{userBookings.length} Trips</div>
-                  <div className="text-[10px] text-emerald-400 font-semibold">Across Bengaluru</div>
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Rides</div>
+                  <div className="text-base font-bold text-white mt-0.5">{userBookings.length} Trips</div>
+                  <div className="text-[10px] text-slate-400">Bengaluru Urban</div>
                 </div>
 
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-2xl">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Primary Hub</div>
-                  <div className="text-lg font-extrabold text-amber-400 mt-0.5 truncate">{clientUser.area || 'Indiranagar'}</div>
-                  <div className="text-[10px] text-slate-400 font-semibold">Home Locality</div>
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Primary Hub</div>
+                  <div className="text-base font-bold text-slate-200 mt-0.5 truncate">{clientUser.area || 'Indiranagar'}</div>
+                  <div className="text-[10px] text-slate-400">Registered Locality</div>
                 </div>
 
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-2xl col-span-2 sm:col-span-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Account Tier</div>
-                  <div className="text-lg font-extrabold text-emerald-400 mt-0.5">Gold Commuter</div>
-                  <div className="text-[10px] text-slate-400 font-semibold">Verified Client</div>
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg col-span-2 sm:col-span-1">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Account Status</div>
+                  <div className="text-base font-bold text-emerald-400 mt-0.5">Active Client</div>
+                  <div className="text-[10px] text-slate-400">Verified Mobile</div>
                 </div>
               </div>
 
@@ -507,53 +507,53 @@ export default function UserProfileModal({
           )}
 
           {/* =============================================================== */}
-          {/* TAB 3: BANGALORE BENEFITS                                       */}
+          {/* TAB 3: SERVICE POLICIES & SUPPORT                               */}
           {/* =============================================================== */}
           {activeTab === 'perks' && (
             <div className="space-y-4">
-              <div className="bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-950 border border-amber-500/20 rounded-2xl p-4 space-y-2">
+              <div className="card-surface p-4 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span className="font-extrabold text-white text-sm">Verified Bengaluru Customer Privileges</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="font-bold text-white text-sm">Customer Commitments & Trip Policies</span>
                 </div>
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  As a registered customer on Book Driver Anna, your bookings are prioritized with our highest-rated Anna drivers across all 25+ Bangalore hubs.
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  All bookings on Book Driver Anna adhere to standard urban transit standards across Bengaluru.
                 </p>
               </div>
 
               <div className="space-y-2.5">
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-xl flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-md bg-slate-900 border border-slate-800 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="font-bold text-white text-xs">Zero Penalty Guarantee</div>
+                    <div className="font-semibold text-white text-xs">Zero Advance Cancellation Fee</div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Change in plans? Cancel driver, vehicle rental, or driving class bookings with 0 penalty anytime before Anna arrives.
+                      Need to reschedule or cancel? You can cancel driver, vehicle, or driving class bookings with ₹0 penalty anytime prior to driver dispatch.
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-xl flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-md bg-slate-900 border border-slate-800 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
                     <Phone className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="font-bold text-white text-xs">24x7 Priority Bangalore Helpline</div>
+                    <div className="font-semibold text-white text-xs">24/7 Bengaluru Dispatch Support</div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Direct phone & WhatsApp support with local Bengaluru coordinators at <a href="tel:+919886012345" className="text-amber-400 font-bold hover:underline font-mono">+91 98860 12345</a>.
+                      Direct phone assistance with our Indiranagar operations team at <a href="tel:+919886012345" className="text-amber-500 font-mono hover:underline">+91 98860 12345</a>.
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-xl flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-md bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
                     <Car className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="font-bold text-white text-xs">Dedicated Doorstep Pickup</div>
+                    <div className="font-semibold text-white text-xs">Verified Doorstep Dispatch</div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Anna arrives on time at your apartment, villa, or office across Indiranagar, Koramangala, Whitefield, HSR, Electronic City and all BBMP limits.
+                      Drivers reach your apartment, residence, or office across all 25+ Bangalore localities with proper photo ID and DL verification.
                     </p>
                   </div>
                 </div>
@@ -564,7 +564,7 @@ export default function UserProfileModal({
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="p-4 border-t border-slate-800/80 flex items-center justify-between gap-3 shrink-0 bg-slate-900/90">
+        <div className="p-4 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0 bg-slate-900">
           <button
             type="button"
             onClick={() => {
@@ -573,25 +573,23 @@ export default function UserProfileModal({
                 onClose();
               }
             }}
-            className="py-2 px-3 sm:px-4 rounded-xl bg-slate-950 hover:bg-red-500/15 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            className="btn-danger py-2 px-3 text-xs"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                if (openBookingModal) openBookingModal('driver');
-              }}
-              className="py-2 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold shadow-md shadow-amber-400/20 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <SteeringWheel className="w-3.5 h-3.5" />
-              <span>Book Driver Anna</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (openBookingModal) openBookingModal('driver');
+            }}
+            className="btn-primary py-2 px-4 text-xs"
+          >
+            <SteeringWheel className="w-3.5 h-3.5" />
+            <span>Book Driver Anna</span>
+          </button>
         </div>
 
       </div>

@@ -17,10 +17,10 @@ export const BANGALORE_AREAS = [
 ];
 
 export const LOCAL_STATS = [
-  { label: "Bengaluru Service Zones", value: "15 Hubs" },
-  { label: "Average Dispatch", value: "15-20 Min" },
-  { label: "Driver Verification", value: "Police Verified" },
-  { label: "Cancellation Fee", value: "₹0 (Zero)" }
+  { label: "Bengaluru Hubs Covered", value: "25+ Hubs" },
+  { label: "Average Dispatch Time", value: "15–20 Mins" },
+  { label: "Background & Police Clearance", value: "100% Verified" },
+  { label: "Advance Cancellation Fee", value: "₹0 Penalty" }
 ];
 
 export const OUTSTATION_DESTINATIONS = [

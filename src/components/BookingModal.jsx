@@ -291,35 +291,35 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-hidden touch-none overscroll-contain">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/80 transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity touch-none overscroll-contain"
         onClick={onClose}
         onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Modal Card */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-xl z-10 my-auto flex flex-col max-h-[92vh] sm:max-h-[90vh] overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-xl z-10 animate-in zoom-in-95 duration-150 my-auto flex flex-col max-h-[90vh] overscroll-contain touch-auto">
         
         {/* Header bar */}
         <div className="bg-slate-900 border-b border-slate-800 px-5 py-4 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-800 text-amber-400 rounded-lg">
+            <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 flex items-center justify-center shrink-0">
               {bookingCategory === 'class' ? <GraduationCap className="w-5 h-5" /> : (bookingCategory === 'vehicle' ? <Car className="w-5 h-5" /> : <SteeringWheel className="w-5 h-5" />)}
             </div>
             <div>
               <h2 className="font-bold text-base sm:text-lg font-['Outfit'] leading-tight">
-                {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? 'Vehicle Rental Reservation' : 'Book a Driver')}
+                {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? 'Vehicle Fleet Reservation' : 'Book Personal Driver Anna')}
               </h2>
-              <p className="text-xs text-slate-400">
-                Bengaluru Reservation Form
+              <p className="text-[11px] text-slate-400">
+                Direct dispatch service across Bengaluru Urban
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close booking modal"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+            aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -338,8 +338,8 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
              ========================================================================= */}
           {bookingCategory === 'driver' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2.5">
-                Trip Option
+              <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> Select Driver Trip Option
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 
@@ -1038,9 +1038,9 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
           {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            className="w-full py-3 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="btn-primary w-full py-3.5 text-base justify-center"
           >
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-5 h-5" />
             <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total})</span>
           </button>
 

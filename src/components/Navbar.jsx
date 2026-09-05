@@ -15,9 +15,9 @@ export default function Navbar({
 
   const navItems = [
     { id: 'home', label: 'Home' },
-    { id: 'services', label: 'Services' },
-    { id: 'about', label: 'About Us' },
-    { id: 'contact', label: 'Contact' },
+    { id: 'services', label: 'Services & Rates' },
+    { id: 'about', label: 'About & Standards' },
+    { id: 'contact', label: 'Contact & Hubs' },
   ];
 
   const handleNavClick = (pageId) => {
@@ -27,50 +27,63 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950 border-b border-slate-800 transition-all">
+    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
       {/* Top Utility Bar */}
-      <div className="bg-slate-900 border-b border-slate-800/80 text-xs py-1 px-4 sm:px-6 lg:px-8">
+      <div className="bg-slate-900/80 border-b border-slate-800/80 text-slate-300 text-xs py-1.5 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-300">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-medium">24/7 Dispatch active across 15 Bengaluru zones</span>
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-slate-400">Bengaluru Service Desk:</span>
+            <span className="text-slate-200 font-medium">On-Demand Drivers, Fleet Rentals & Academy</span>
           </div>
-          <div className="hidden sm:flex items-center gap-4 text-slate-400">
-            <a href="tel:+919886012345" className="hover:text-amber-400 transition-colors flex items-center gap-1.5 font-medium">
-              <PhoneCall className="w-3.5 h-3.5 text-amber-400" />
-              <span>Helpline: +91 98860 12345</span>
+
+          <div className="hidden sm:flex items-center gap-4 text-[11px]">
+            <a 
+              href="tel:+919886012345" 
+              className="flex items-center gap-1.5 text-slate-300 hover:text-amber-400 transition-colors"
+            >
+              <PhoneCall className="w-3 h-3 text-amber-500" />
+              <span>24/7 Helpline: +91 98860 12345</span>
             </a>
             <span className="text-slate-700">|</span>
             <button 
-              onClick={openCancelModal}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
+              onClick={() => openBookingModal('class')}
+              className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer flex items-center gap-1"
             >
-              Cancel Booking (No Fee)
+              <GraduationCap className="w-3 h-3 text-amber-500" />
+              <span>Driving Classes</span>
+            </button>
+            <span className="text-slate-700">|</span>
+            <button 
+              onClick={openCancelModal}
+              className="text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+            >
+              Manage / Cancel
             </button>
           </div>
         </div>
       </div>
 
+      {/* Main Navigation Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 sm:h-18">
 
           {/* Brand Logo */}
           <div
             onClick={() => handleNavClick('home')}
             className="flex items-center gap-3 cursor-pointer group shrink-0"
           >
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">
-              <Car className="w-5 h-5 stroke-[2.2]" />
-              <div className="absolute -bottom-1 -right-1 bg-red-600 text-white rounded-full p-0.5 border border-slate-950">
-                <ShieldCheck className="w-3 h-3" />
-              </div>
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm shrink-0">
+              <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <div className="font-bold text-lg sm:text-xl tracking-tight text-white font-['Outfit']">
-                Book Driver <span className="text-amber-400">Anna</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-lg sm:text-xl tracking-tight text-white font-['Outfit']">
+                  Book Driver <span className="text-amber-500">Anna</span>
+                </span>
               </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-red-400 inline" /> Bengaluru Verified Drivers
+              <p className="text-[10px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
+                <MapPin className="w-2.5 h-2.5 text-slate-500 inline" /> Bengaluru Urban
               </p>
             </div>
           </div>
@@ -83,10 +96,11 @@ export default function Navbar({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${isActive
-                      ? 'text-amber-400 bg-amber-400/10 font-semibold'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
-                    }`}
+                  className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                    isActive
+                      ? 'bg-slate-800 text-white font-semibold'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+                  }`}
                 >
                   {item.label}
                 </button>
@@ -94,57 +108,58 @@ export default function Navbar({
             })}
           </nav>
 
-          {/* Action CTAs */}
+          {/* Header Action Items */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
 
-            {/* Cancel Booking Quick Button */}
+            {/* Cancel Booking Quick Link (Desktop) */}
             <button
               onClick={openCancelModal}
-              className="hidden xl:flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-              title="Lookup and manage your booking"
+              className="hidden xl:inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 px-3 py-2 rounded-lg hover:bg-slate-900 transition-colors cursor-pointer"
             >
-              <Ban className="w-3.5 h-3.5 text-slate-400" />
-              <span>Cancel Booking</span>
+              <Ban className="w-3.5 h-3.5 text-slate-500" />
+              <span>Cancel Trip</span>
             </button>
 
-            {/* Book Now CTA */}
+            {/* Book a Driver Primary Button */}
             <button
               onClick={() => openBookingModal('driver')}
-              className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-sm transition-colors cursor-pointer"
+              className="btn-primary"
             >
-              Book a Driver
+              <SteeringWheel className="w-4 h-4" />
+              <span>Book a Driver</span>
             </button>
 
-            {/* Client User Profile Pill & Logout */}
+            {/* User Profile Pill & Logout (if logged in) */}
             {clientUser && (
               <div className="flex items-center gap-1.5 pl-2 sm:pl-3 border-l border-slate-800">
                 <button 
                   type="button"
                   onClick={onOpenProfile}
-                  className="flex items-center gap-1.5 sm:gap-2 py-1 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-colors cursor-pointer"
-                  title={`View profile for ${clientUser.name}`}
+                  className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer"
+                  title={`Account: ${clientUser.name} (${clientUser.phone})`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-amber-500 font-bold text-xs flex items-center justify-center shrink-0">
                     {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
                   </div>
-                  <span className="hidden sm:inline-block text-xs font-medium text-white max-w-[90px] truncate">
-                    {clientUser.name ? clientUser.name.split(' ')[0] : 'Client'}
+                  <span className="hidden sm:inline-block text-xs font-semibold text-slate-200 max-w-[100px] truncate">
+                    {clientUser.name ? clientUser.name.split(' ')[0] : 'Account'}
                   </span>
                 </button>
                 <button
                   onClick={onLogout}
                   title="Sign Out"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+                  className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  aria-label="Sign Out"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
             )}
 
-            {/* Mobile Menu Button */}
+            {/* Mobile / Tablet Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-300 hover:text-white bg-slate-900 border border-slate-800 lg:hidden cursor-pointer shrink-0"
+              className="p-2 rounded-lg text-slate-400 hover:text-white bg-slate-900 border border-slate-800 lg:hidden cursor-pointer shrink-0"
               aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -153,107 +168,99 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Mobile Drawer Navigation */}
+      {/* Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-4 pt-3 pb-6">
-          <div className="flex flex-col gap-1.5">
+        <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-4 pt-3 pb-6 space-y-3">
+          <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
-                    ? 'bg-amber-400/10 text-amber-400 font-semibold'
-                    : 'text-slate-200 hover:bg-slate-900'
-                  }`}
+                className={`text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  activePage === item.id
+                    ? 'bg-slate-800 text-white font-semibold'
+                    : 'text-slate-300 hover:bg-slate-900'
+                }`}
               >
                 {item.label}
               </button>
             ))}
+          </div>
 
-            {clientUser && (
-              <div 
+          {clientUser && (
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <button 
                 onClick={() => {
                   if (onOpenProfile) onOpenProfile();
                   setMobileMenuOpen(false);
                 }}
-                className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between mt-2 cursor-pointer"
+                className="flex items-center gap-2.5 text-left text-xs text-slate-200 hover:text-amber-400 transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
-                    {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-white">
-                      {clientUser.name}
-                    </div>
-                    <div className="text-[11px] text-slate-400">{clientUser.phone} • {clientUser.area}</div>
-                  </div>
+                <div className="w-7 h-7 rounded-full bg-slate-800 text-amber-500 font-bold text-xs flex items-center justify-center">
+                  {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="px-2.5 py-1 rounded-md text-xs font-medium text-red-400 hover:bg-red-500/10 flex items-center gap-1"
-                >
-                  <LogOut className="w-3.5 h-3.5" /> Sign Out
-                </button>
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-slate-800 flex flex-col gap-2 mt-2">
+                <div>
+                  <div className="font-semibold">{clientUser.name}</div>
+                  <div className="text-[11px] text-slate-400">{clientUser.phone}</div>
+                </div>
+              </button>
               <button
                 onClick={() => {
-                  openBookingModal('driver');
+                  onLogout();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full py-2.5 text-center text-slate-950 font-semibold bg-amber-400 hover:bg-amber-300 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
+                className="btn-danger py-1 px-2.5 text-xs"
               >
-                <SteeringWheel className="w-4 h-4 text-slate-950" />
-                <span>Book a Driver</span>
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
               </button>
-
-              <button
-                onClick={() => {
-                  openBookingModal('vehicle');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full py-2.5 text-center text-slate-200 font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
-              >
-                <Car className="w-4 h-4 text-amber-400" />
-                <span>Rent a Vehicle</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  openBookingModal('class');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full py-2.5 text-center text-slate-200 font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
-              >
-                <GraduationCap className="w-4 h-4 text-emerald-400" />
-                <span>Driving Classes</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  openCancelModal();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full py-2 text-center text-slate-400 hover:text-white border border-slate-800 rounded-lg flex items-center justify-center gap-2 text-xs transition-colors"
-              >
-                <Ban className="w-3.5 h-3.5 text-slate-400" />
-                <span>Cancel / Manage Booking</span>
-              </button>
-
-              <a
-                href="tel:+919886012345"
-                className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-amber-400 bg-slate-900/50 rounded-lg border border-slate-800"
-              >
-                <PhoneCall className="w-3.5 h-3.5" /> Helpline: +91 98860 12345
-              </a>
             </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
+            <button
+              onClick={() => {
+                openBookingModal('driver');
+                setMobileMenuOpen(false);
+              }}
+              className="btn-primary w-full"
+            >
+              <SteeringWheel className="w-4 h-4" />
+              <span>Book a Driver Anna</span>
+            </button>
+
+            <button
+              onClick={() => {
+                openBookingModal('vehicle');
+                setMobileMenuOpen(false);
+              }}
+              className="btn-secondary w-full"
+            >
+              <Car className="w-4 h-4 text-amber-500" />
+              <span>Rent a Vehicle</span>
+            </button>
+
+            <button
+              onClick={() => {
+                openBookingModal('class');
+                setMobileMenuOpen(false);
+              }}
+              className="btn-outline w-full"
+            >
+              <GraduationCap className="w-4 h-4 text-amber-500" />
+              <span>Driving Classes</span>
+            </button>
+
+            <button
+              onClick={() => {
+                openCancelModal();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full py-2 text-center text-xs text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span>Cancel or Modify Booking</span>
+            </button>
           </div>
         </div>
       )}

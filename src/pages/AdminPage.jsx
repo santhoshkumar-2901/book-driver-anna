@@ -1017,6 +1017,9 @@ export default function AdminPage({ onReturnToClient }) {
   if (!isAdminLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+        
+        {/* Background Decorative Glow */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header Bar with Search Bar Address Display */}
         <header className="max-w-5xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4 relative z-10">

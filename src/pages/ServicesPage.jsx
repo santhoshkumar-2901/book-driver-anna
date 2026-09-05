@@ -39,52 +39,52 @@ export default function ServicesPage({ openBookingModal }) {
       
       {/* Header Banner */}
       <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs font-bold border border-amber-400/20">
-          <Sparkles className="w-3.5 h-3.5" /> Namma Bengaluru Services
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
+          <span>Bengaluru City & Outstation Tariff Card</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-white font-['Outfit']">
-          Book Driver Anna & Vehicle Rentals
+        <h1 className="text-3xl sm:text-4xl font-bold text-white font-['Outfit']">
+          Services, Fleet & Official Rates
         </h1>
-        <p className="text-slate-300 text-base leading-relaxed">
-          Choose from <span className="text-amber-400 font-semibold">Book a Driver</span>, <span className="text-amber-400 font-semibold">Book a Vehicle</span>, or learn driving with certified instructors in our <span className="text-amber-400 font-semibold">Driving Classes</span>.
+        <p className="text-slate-400 text-sm leading-relaxed max-w-2xl mx-auto">
+          Clear, upfront pricing with no hidden charges. Select a service category below to view packages and reserve your booking.
         </p>
 
         {/* Primary Service Selector */}
-        <div className="inline-flex p-1.5 bg-slate-900 rounded-2xl border border-slate-800 shrink-0 mt-4 overflow-x-auto max-w-full">
+        <div className="inline-flex p-1 bg-slate-950 rounded-lg border border-slate-800 shrink-0 mt-4 overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveServiceTab('driver')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
               activeServiceTab === 'driver'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                ? 'bg-amber-500 text-slate-950 font-bold'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <SteeringWheel className="w-4 h-4" />
-            <span>Book a Driver</span>
+            <span>Driver Services</span>
           </button>
 
           <button
             onClick={() => setActiveServiceTab('vehicle')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
               activeServiceTab === 'vehicle'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                ? 'bg-amber-500 text-slate-950 font-bold'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Car className="w-4 h-4" />
-            <span>Book a Vehicle</span>
+            <span>Rental Fleet</span>
           </button>
 
           <button
             onClick={() => setActiveServiceTab('class')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-extrabold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
               activeServiceTab === 'class'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                ? 'bg-amber-500 text-slate-950 font-bold'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <GraduationCap className="w-4 h-4" />
-            <span>Driving Classes</span>
+            <span>Driving Academy</span>
           </button>
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function ServicesPage({ openBookingModal }) {
       {activeServiceTab === 'driver' && (
         <div className="space-y-12 animate-in fade-in duration-300">
           
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
@@ -127,7 +127,7 @@ export default function ServicesPage({ openBookingModal }) {
             {/* ONE WAY TRIP */}
             <div 
               onClick={() => handleOpenDriverOptionForm('one-way')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
+              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -175,7 +175,7 @@ export default function ServicesPage({ openBookingModal }) {
             {/* ROUND TRIP */}
             <div 
               onClick={() => handleOpenDriverOptionForm('round-trip')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
+              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -226,7 +226,7 @@ export default function ServicesPage({ openBookingModal }) {
             {/* OUTSTATION */}
             <div 
               onClick={() => handleOpenDriverOptionForm('outstation')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
+              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -285,7 +285,7 @@ export default function ServicesPage({ openBookingModal }) {
       {activeServiceTab === 'vehicle' && (
         <div className="space-y-10 animate-in fade-in duration-300">
           
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
                 <Car className="w-4 h-4" /> Book a Vehicle Section
@@ -334,7 +334,7 @@ export default function ServicesPage({ openBookingModal }) {
               <div 
                 key={veh.id}
                 onClick={() => handleOpenVehicleForm(veh)}
-                className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-xl overflow-hidden flex flex-col justify-between transition-all duration-300 group cursor-pointer shadow-xl hover:shadow-amber-400/10"
+                className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl overflow-hidden flex flex-col justify-between transition-all duration-300 group cursor-pointer shadow-xl hover:shadow-amber-400/10"
               >
                 <div>
                   <div className="relative h-56 overflow-hidden bg-slate-950">
@@ -411,7 +411,7 @@ export default function ServicesPage({ openBookingModal }) {
         <div className="space-y-12 animate-in fade-in duration-300">
           
           {/* Section Header */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
@@ -451,7 +451,7 @@ export default function ServicesPage({ openBookingModal }) {
             {DRIVING_CLASSES.map((cls) => (
               <div 
                 key={cls.id}
-                className="bg-slate-900 border border-slate-800 hover:border-amber-400/50 rounded-xl overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                className="bg-slate-900 border border-slate-800 hover:border-amber-400/50 rounded-3xl overflow-hidden shadow-xl transition-all duration-300 flex flex-col justify-between group"
               >
                 <div className="p-6 space-y-4">
                   {/* Top Badges */}
@@ -519,7 +519,7 @@ export default function ServicesPage({ openBookingModal }) {
           </div>
 
           {/* Why Learn With Anna Feature Box */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 space-y-4">
+          <div className="bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-600/10 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-4">
             <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
               <ShieldCheck className="w-4 h-4" /> The Driver Anna Promise
             </div>
@@ -546,7 +546,7 @@ export default function ServicesPage({ openBookingModal }) {
       )}
 
       {/* FOOTER CALLOUT */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-4">
         <h3 className="text-2xl font-bold text-white font-['Outfit']">
           Need custom corporate or wedding driving arrangements?
         </h3>

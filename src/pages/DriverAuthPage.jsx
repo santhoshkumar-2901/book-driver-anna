@@ -220,18 +220,23 @@ export default function DriverAuthPage({
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto font-sans selection:bg-emerald-400 selection:text-slate-950">
       
+      {/* Background Ambience & Grid */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
+
       {/* Top Header Bar */}
-      <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 flex items-center justify-between shrink-0">
+      <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-emerald-500 text-slate-950 font-bold shrink-0">
+          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20 shrink-0">
             <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <div className="font-bold text-lg sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">
+            <div className="font-extrabold text-lg sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">
               Book Driver <span className="text-emerald-400">Anna</span>
             </div>
-            <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
-              <Award className="w-2.5 h-2.5 text-emerald-400 inline" /> Driver Partner Portal
+            <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+              <Award className="w-2.5 h-2.5 text-emerald-400 inline" /> Driver Partner Fleet Portal
             </p>
           </div>
         </div>
@@ -240,7 +245,7 @@ export default function DriverAuthPage({
           <button
             type="button"
             onClick={onChangeRole}
-            className="text-xs font-medium text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            className="text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
           >
             <span>← Change Role</span>
           </button>
@@ -248,21 +253,21 @@ export default function DriverAuthPage({
       </header>
 
       {/* Central Auth Container */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 overflow-y-auto">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
         <div className="w-full max-w-md my-auto">
 
           {/* Card Wrapper */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 shadow-sm">
+          <div className="bg-slate-900/90 border border-slate-800 hover:border-emerald-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300">
             
             {/* Header / Mode Switcher */}
-            <div className="text-center space-y-1 mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+            <div className="text-center space-y-1 mb-3">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
                 {authMode === 'login' ? 'Driver Partner Sign In' : 'Register as Driver Anna'}
               </h1>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
                 {authMode === 'login' 
                   ? 'Sign in to access your Bengaluru trip dashboard & daily earnings.' 
-                  : 'Register to drive customer vehicles with structured daily payouts.'}
+                  : 'Join 1,800+ verified drivers. Drive Bangalore cars with assured payouts.'}
               </p>
             </div>
 
@@ -382,7 +387,7 @@ export default function DriverAuthPage({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <span>Verifying driver credentials...</span>
@@ -571,7 +576,7 @@ export default function DriverAuthPage({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
+                  className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <span>Registering driver profile...</span>

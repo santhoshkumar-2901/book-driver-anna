@@ -208,43 +208,8 @@ export default function ClientAuthPage({
           onLoginSuccess(sessionData);
         }, 500);
       } else {
-        // For new client convenience, if they enter a valid email and password min 6 chars, allow instant account activation
-        if (loginIdentifier.includes('@') && loginPassword.length >= 4) {
-          const autoName = loginIdentifier.split('@')[0];
-          const formattedName = autoName.charAt(0).toUpperCase() + autoName.slice(1);
-          const newUser = {
-            id: 'CLI-' + Math.floor(1000 + Math.random() * 9000),
-            name: formattedName,
-            email: loginIdentifier.trim(),
-            phone: '+91 98860 12345',
-            area: 'Bangalore Central',
-            password: loginPassword,
-            createdAt: new Date().toISOString()
-          };
-
-          const updated = [...registeredUsers, newUser];
-          localStorage.setItem('bda_registered_clients', JSON.stringify(updated));
-
-          const sessionData = {
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-            phone: newUser.phone,
-            area: newUser.area,
-            token: 'bda_tok_' + Date.now(),
-            loggedInAt: new Date().toISOString()
-          };
-          localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
-          
-          setSuccessMessage(`Account activated! Welcome to Book Driver Anna, ${newUser.name}!`);
-          setTimeout(() => {
-            setIsLoading(false);
-            onLoginSuccess(sessionData);
-          }, 600);
-        } else {
-          setIsLoading(false);
-          setErrorMessage('Account not found with this email/phone. Please click "Sign Up" to create a new client account!');
-        }
+        setIsLoading(false);
+        setErrorMessage('Invalid email/phone or password. Please verify your credentials or register.');
       }
     }, 500);
   };
@@ -376,18 +341,23 @@ export default function ClientAuthPage({
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto font-sans selection:bg-amber-400 selection:text-slate-950">
       
+      {/* Background Ambience & Grid */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
+
       {/* Top Header Bar */}
-      <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 flex items-center justify-between shrink-0">
+      <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-amber-400 text-slate-950 font-bold shrink-0">
+          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
             <Car className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <div className="font-bold text-lg sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">
+            <div className="font-extrabold text-lg sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">
               Book Driver <span className="text-amber-400">Anna</span>
             </div>
-            <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
-              <MapPin className="w-2.5 h-2.5 text-red-400 inline" /> Bengaluru Services
+            <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-0.5">
+              <MapPin className="w-2.5 h-2.5 text-red-400 inline" /> Namma Bengaluru Services
             </p>
           </div>
         </div>
@@ -396,7 +366,7 @@ export default function ClientAuthPage({
           <button
             type="button"
             onClick={onChangeRole}
-            className="text-xs font-medium text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            className="text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
           >
             <span>← Change Role</span>
           </button>
@@ -404,21 +374,21 @@ export default function ClientAuthPage({
       </header>
 
       {/* Central Auth Container */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 overflow-y-auto">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
         <div className="w-full max-w-md my-auto">
 
           {/* Card Wrapper */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 shadow-sm">
+          <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300">
             
             {/* Header / Mode Switcher */}
-            <div className="text-center space-y-1 mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+            <div className="text-center space-y-1 mb-3">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
                 {authMode === 'login' ? 'Sign In to Your Account' : 'Create Client Account'}
               </h1>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
                 {authMode === 'login' 
                   ? 'Access verified drivers, vehicle rentals & driving classes across Bengaluru.' 
-                  : 'Create an account to book drivers, rent vehicles, or enroll in classes.'}
+                  : 'Join thousands of Bengalureans enjoying stress-free rides and doorstep classes.'}
               </p>
             </div>
 
@@ -538,7 +508,7 @@ export default function ClientAuthPage({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <span>Verifying credentials...</span>
@@ -701,7 +671,7 @@ export default function ClientAuthPage({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
+                  className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <span>Creating your account...</span>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Car, MapPin, Phone, Mail, Clock, ShieldCheck, Heart, ArrowRight, Zap } from 'lucide-react';
+import { Car, MapPin, Phone, Mail, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
+import { SteeringWheel } from './Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 
 export default function Footer({ setActivePage, openBookingModal, openCancelModal, clientUser, onLogout }) {
@@ -9,133 +10,126 @@ export default function Footer({ setActivePage, openBookingModal, openCancelModa
   };
 
   return (
-    <footer className="bg-slate-950 border-t border-slate-800/80 pt-16 pb-12 text-slate-400">
+    <footer className="bg-slate-950 border-t border-slate-800 pt-12 pb-8 text-slate-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Top Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-slate-800/80">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-10 border-b border-slate-800">
           
           {/* Brand Info */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateTo('home')}>
-              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-400 text-slate-950 font-bold shrink-0">
-                <Car className="w-5 h-5 stroke-[2.2]" />
+          <div className="lg:col-span-2 space-y-3">
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigateTo('home')}>
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm">
+                <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xl text-white font-['Outfit']">
-                Book Driver <span className="text-amber-400">Anna</span>
+                Book Driver <span className="text-amber-500">Anna</span>
               </span>
             </div>
 
-            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-md">
-              Bengaluru's on-demand driver and vehicle booking platform. Verified private drivers for personal vehicles, sanitized commercial car rentals, and doorstep driving lessons.
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
+              On-demand verified acting drivers, rental fleet vehicles, and professional driving instruction across Bengaluru Urban.
             </p>
 
-            <div className="flex items-center gap-3 pt-1">
-              <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Police Verified Drivers
-              </span>
-              <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> 15-20 Min Dispatch
-              </span>
+            <div className="flex items-center gap-2 text-xs text-slate-400 pt-1">
+              <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Police Verified</span>
+              <span>•</span>
+              <span>₹0 Cancellation Fee</span>
+              <span>•</span>
+              <span>24/7 Dispatch</span>
             </div>
           </div>
 
           {/* Our Services */}
-          <div className="space-y-3">
-            <h4 className="text-white font-bold text-base font-['Outfit'] border-l-2 border-amber-400 pl-2.5">
-              Our Services
+          <div className="space-y-2.5">
+            <h4 className="text-white font-semibold text-sm font-['Outfit'] border-l-2 border-amber-500 pl-2">
+              Services
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-1.5 text-xs">
               <li>
                 <button 
                   onClick={() => openBookingModal('driver')} 
-                  className="hover:text-amber-400 transition-colors flex items-center gap-1.5 group"
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                  Hourly Driver in City
+                  Hourly In-City Driver
                 </button>
               </li>
               <li>
                 <button 
                   onClick={() => openBookingModal('driver')} 
-                  className="hover:text-amber-400 transition-colors flex items-center gap-1.5 group"
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                  Night Party Driver (Indiranagar/Kora)
+                  Night Party Driver
                 </button>
               </li>
               <li>
                 <button 
                   onClick={() => openBookingModal('driver')} 
-                  className="hover:text-amber-400 transition-colors flex items-center gap-1.5 group"
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                  Outstation Driver (Coorg, Mysore)
+                  Outstation Highway Driver
                 </button>
               </li>
               <li>
                 <button 
                   onClick={() => openBookingModal('vehicle')} 
-                  className="hover:text-amber-400 transition-colors flex items-center gap-1.5 group"
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                  Book Sedan / Swift Dzire
+                  Rental Fleet (Sedan & SUV)
                 </button>
               </li>
               <li>
                 <button 
-                  onClick={() => openBookingModal('vehicle')} 
-                  className="hover:text-amber-400 transition-colors flex items-center gap-1.5 group"
+                  onClick={() => openBookingModal('class')} 
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                  Book Innova Crysta SUV
+                  Driving Academy Lessons
                 </button>
               </li>
             </ul>
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-3">
-            <h4 className="text-white font-bold text-base font-['Outfit'] border-l-2 border-amber-400 pl-2.5">
-              Quick Navigation
+          <div className="space-y-2.5">
+            <h4 className="text-white font-semibold text-sm font-['Outfit'] border-l-2 border-amber-500 pl-2">
+              Navigation
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-1.5 text-xs">
               <li>
                 <button onClick={() => navigateTo('home')} className="hover:text-white transition-colors cursor-pointer">Home</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('services')} className="hover:text-white transition-colors cursor-pointer">Services (Driver & Vehicle)</button>
+                <button onClick={() => navigateTo('services')} className="hover:text-white transition-colors cursor-pointer">Services & Official Rates</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('about')} className="hover:text-white transition-colors cursor-pointer">About Us</button>
+                <button onClick={() => navigateTo('about')} className="hover:text-white transition-colors cursor-pointer">Screening Standards</button>
               </li>
               <li>
-                <button onClick={() => navigateTo('contact')} className="hover:text-white transition-colors cursor-pointer">Contact & Support</button>
+                <button onClick={() => navigateTo('contact')} className="hover:text-white transition-colors cursor-pointer">Contact & Hubs</button>
+              </li>
+              <li>
+                <button onClick={openCancelModal} className="hover:text-red-400 transition-colors cursor-pointer">Manage / Cancel Trip</button>
               </li>
             </ul>
           </div>
 
-          {/* Bangalore HQ Info */}
-          <div className="space-y-3">
-            <h4 className="text-white font-bold text-base font-['Outfit'] border-l-2 border-amber-400 pl-2.5">
+          {/* Bengaluru Dispatch Info */}
+          <div className="space-y-2.5">
+            <h4 className="text-white font-semibold text-sm font-['Outfit'] border-l-2 border-amber-500 pl-2">
               Bengaluru Office
             </h4>
-            <div className="space-y-2.5 text-xs text-slate-300">
+            <div className="space-y-2 text-xs text-slate-300">
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <span>#42, 100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, KA 560038</span>
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span className="text-slate-400">#42, 100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038</span>
               </div>
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-amber-400 shrink-0" />
-                <a href="tel:+919886012345" className="hover:text-amber-400 font-semibold">+91 98860 12345</a>
+                <Phone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <a href="tel:+919886012345" className="hover:text-white font-mono">+91 98860 12345</a>
               </div>
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-                <a href="mailto:support@bookdriveranna.com" className="hover:text-amber-400">support@bookdriveranna.com</a>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-emerald-400 font-medium">24 Hours / 365 Days Active</span>
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <a href="mailto:support@bookdriveranna.com" className="hover:text-white text-slate-400">support@bookdriveranna.com</a>
               </div>
             </div>
           </div>
@@ -143,26 +137,26 @@ export default function Footer({ setActivePage, openBookingModal, openCancelModa
         </div>
 
         {/* Coverage Tags across Bangalore */}
-        <div className="py-6 border-b border-slate-800/80">
-          <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">
-            Serving All Bangalore Hubs & Tech Parks:
+        <div className="py-5 border-b border-slate-800">
+          <div className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-2">
+            Localities Covered:
           </div>
           <div className="flex flex-wrap gap-1.5">
             {BANGALORE_AREAS.map((area, index) => (
-              <span key={index} className="text-xs bg-slate-900 text-slate-400 px-2.5 py-1 rounded-md border border-slate-800 hover:border-slate-700 hover:text-slate-200 transition-colors flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-amber-400" /> {area}
+              <span key={index} className="text-[11px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
+                {area}
               </span>
             ))}
           </div>
         </div>
 
         {/* Bottom copyright */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Book Driver Anna Technologies Pvt Ltd. Made with <Heart className="w-3.5 h-3.5 text-red-500 inline fill-red-500 mx-0.5" /> in Namma Bengaluru.</p>
-          <div className="flex items-center gap-6">
-            <span className="hover:text-slate-300 cursor-pointer">Privacy Policy</span>
-            <span className="hover:text-slate-300 cursor-pointer">Terms of Service</span>
-            <span className="hover:text-slate-300 cursor-pointer">Driver Safety Standards</span>
+        <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <p>© {new Date().getFullYear()} Book Driver Anna. All rights reserved. Operating in Bengaluru Urban.</p>
+          <div className="flex items-center gap-4">
+            <span className="hover:text-slate-400 cursor-pointer">Privacy</span>
+            <span className="hover:text-slate-400 cursor-pointer">Terms</span>
+            <span className="hover:text-slate-400 cursor-pointer">Safety Policy</span>
           </div>
         </div>
 

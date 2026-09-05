@@ -1,11 +1,11 @@
 import React from 'react';
 import { 
   Car, ShieldCheck, MapPin, Clock, Star, 
-  ArrowRight, PhoneCall, CheckCircle2, Compass, GraduationCap, User
+  ArrowRight, CheckCircle2, Compass, Phone, GraduationCap, User
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
-import { FEATURED_DRIVERS, LOCAL_STATS, OUTSTATION_DESTINATIONS, DRIVING_CLASSES } from '../data/mockData';
+import { FEATURED_DRIVERS, LOCAL_STATS, OUTSTATION_DESTINATIONS } from '../data/mockData';
 
 export default function HomePage({ 
   setActivePage, 
@@ -15,18 +15,18 @@ export default function HomePage({
   onOpenProfile
 }) {
   return (
-    <div className="space-y-14 pb-16">
+    <div className="space-y-12 pb-16">
 
-      {/* Authenticated Member Bar */}
+      {/* Logged-In User Account Summary Strip */}
       {clientUser && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
           <div 
             onClick={onOpenProfile}
-            className="bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl p-3 sm:p-4 flex items-center justify-between gap-3 transition-colors cursor-pointer"
-            title="Click to view account and active bookings"
+            className="card-surface p-3 sm:p-4 flex items-center justify-between gap-3 transition-colors hover:border-slate-700 cursor-pointer"
+            title="Click to view your profile and trip history"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 font-bold text-sm flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm flex items-center justify-center shrink-0">
                 {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="min-w-0">
@@ -39,10 +39,10 @@ export default function HomePage({
                     Verified Account
                   </span>
                 </div>
-                <div className="text-xs text-slate-400 truncate flex items-center gap-2 mt-0.5">
-                  <span>{clientUser.phone}</span>
+                <div className="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
+                  <span className="font-mono text-slate-300">{clientUser.phone}</span>
                   <span>•</span>
-                  <span>{clientUser.area || 'Indiranagar'}</span>
+                  <span className="text-slate-400">{clientUser.area || 'Indiranagar'}</span>
                 </div>
               </div>
             </div>
@@ -53,336 +53,336 @@ export default function HomePage({
                 e.stopPropagation();
                 if (onOpenProfile) onOpenProfile();
               }}
-              className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1.5 shrink-0"
+              className="btn-secondary py-1.5 px-3 text-xs shrink-0"
             >
               <User className="w-3.5 h-3.5" />
-              <span>View Profile</span>
+              <span>Manage Account</span>
             </button>
           </div>
         </div>
       )}
       
-      {/* Hero Section */}
-      <section className="pt-8 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center space-y-5">
+      {/* HERO SECTION */}
+      <section className="pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto space-y-8">
           
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>On-Demand Driver Services across Bengaluru</span>
+          <div className="text-center space-y-4 max-w-3xl mx-auto">
+            {/* Status Label */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>On-Demand Transit Services across Bengaluru</span>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-white font-['Outfit'] tracking-tight leading-tight">
+              Professional Drivers & Vehicle Rentals in Bengaluru
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-sm sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto">
+              Hire background-checked personal drivers for your car, rent reliable fleet vehicles, 
+              or enroll in practical driving lessons across all major Bangalore localities.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+              <button
+                onClick={() => openBookingModal('driver')}
+                className="btn-primary"
+              >
+                <SteeringWheel className="w-4 h-4" />
+                <span>Book a Driver</span>
+              </button>
+
+              <button
+                onClick={() => openBookingModal('vehicle')}
+                className="btn-secondary"
+              >
+                <Car className="w-4 h-4 text-amber-500" />
+                <span>Rent a Vehicle</span>
+              </button>
+
+              <button
+                onClick={() => openBookingModal('class')}
+                className="btn-outline"
+              >
+                <GraduationCap className="w-4 h-4 text-amber-500" />
+                <span>Driving Classes</span>
+              </button>
+            </div>
+
+            {/* Service Guarantees */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
+              <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Police Verified Drivers</span>
+              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-amber-500" /> ₹0 Advance Cancellation Fee</span>
+              <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> 25+ Hubs Across Bengaluru</span>
+            </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white font-['Outfit'] tracking-tight leading-tight">
-            Professional Drivers & Car Rentals in Bengaluru
-          </h1>
-
-          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Hire police-verified drivers for your personal vehicle, rent commercial cars for outstation getaways, or enroll in 1-on-1 doorstep driving classes.
-          </p>
-
-          {/* Action CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <button
-              onClick={() => openBookingModal('driver')}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-sm shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <SteeringWheel className="w-4 h-4 text-slate-950" />
-              <span>Book a Driver</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => openBookingModal('vehicle')}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-medium text-sm border border-slate-800 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Car className="w-4 h-4 text-amber-400" />
-              <span>Rent a Vehicle</span>
-            </button>
-
-            <button
-              onClick={() => openBookingModal('class')}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-medium text-sm border border-slate-800 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <GraduationCap className="w-4 h-4 text-emerald-400" />
-              <span>Driving Classes</span>
-            </button>
+          {/* FARE ESTIMATOR WIDGET */}
+          <div className="max-w-4xl mx-auto">
+            <PriceEstimator openBookingModal={openBookingModal} />
           </div>
 
-          {/* Trust Assurances */}
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-5 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-400" /> Police-Verified Drivers</span>
-            <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-amber-400" /> Zero Cancellation Fee</span>
-            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-slate-400" /> All 15 Bangalore Zones</span>
-          </div>
-
-        </div>
-
-        {/* Fare Estimator Component */}
-        <div className="mt-10 max-w-5xl mx-auto">
-          <PriceEstimator openBookingModal={openBookingModal} />
         </div>
       </section>
 
-      {/* Operational Highlights Grid */}
+      {/* OPERATIONAL METRICS STRIP */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+        <div className="card-surface p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
           {LOCAL_STATS.map((stat, idx) => (
             <div key={idx} className="space-y-1">
-              <div className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">{stat.value}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-white font-['Outfit']">{stat.value}</div>
               <div className="text-xs text-slate-400">{stat.label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Core Services Section */}
+      {/* CORE SERVICES GRID */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-slate-800 pb-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
-              Service Offerings
-            </h2>
-            <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-              Choose the right transportation solution for your schedule and vehicle
-            </p>
-          </div>
-          <button
-            onClick={() => setActivePage('services')}
-            className="text-xs font-semibold text-amber-400 hover:underline flex items-center gap-1 cursor-pointer w-fit"
-          >
-            View Full Rate Card <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+        <div>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Service Catalog
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white font-['Outfit'] mt-1">
+            Built for Bangalore Commutes & Travel
+          </h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Driver Service */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col justify-between space-y-5">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-400/10 text-amber-400 flex items-center justify-center">
-                <SteeringWheel className="w-5 h-5" />
+          {/* SERVICE 1: BOOK A DRIVER */}
+          <div className="card-surface p-6 flex flex-col justify-between space-y-5">
+            <div className="space-y-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold">
+                <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
               </div>
+
               <div>
-                <h3 className="text-lg font-bold text-white">Hire a Driver for Your Car</h3>
+                <h3 className="text-lg font-bold text-white font-['Outfit']">
+                  On-Demand Driver Anna
+                </h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Professional drivers for in-city hourly trips, airport transfers, late-night party returns, or outstation road trips.
+                  Hire an acting driver for your personal vehicle. Ideal for traffic commutes, airport drops, party returns, or outstation tours.
                 </p>
               </div>
 
-              <div className="pt-2">
-                <div className="text-xs font-medium text-amber-400 mb-2">Starting at ₹199 for 2 hours</div>
-                <ul className="space-y-1.5 text-xs text-slate-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>In-City Hourly: 2hr, 4hr, 8hr, 12hr packages</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>One-Way Drops: Airport and city transit</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Outstation Trips: Mysore, Coorg, Ooty</span>
-                  </li>
-                </ul>
+              <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>Hourly In-City:</span>
+                  <span className="font-semibold text-white">From ₹199 / 2 hrs</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Airport Transfer:</span>
+                  <span className="font-semibold text-white">₹899 flat</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Outstation Driver:</span>
+                  <span className="font-semibold text-white">From ₹1,199 / day</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Gear Compatibility:</span>
+                  <span className="text-slate-400">Manual, AMT, Automatic, EV</span>
+                </div>
               </div>
             </div>
 
-            <button
-              onClick={() => openBookingModal('driver')}
-              className="w-full py-2.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Book a Driver</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Vehicle Rental Service */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col justify-between space-y-5">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                <Car className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Vehicle Rentals with Driver</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Clean, well-maintained commercial vehicles ranging from 4-seater Sedans to 12-seater Tempo Travellers and buses.
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <div className="text-xs font-medium text-amber-400 mb-2">Starting at ₹1,999 / day</div>
-                <ul className="space-y-1.5 text-xs text-slate-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Sedans: Dzire & Etios (From ₹1,999/day)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>SUVs: Innova Crysta (From ₹3,499/day)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Group Travel: 12-seater Tempos & Coaches</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <button
-              onClick={() => openBookingModal('vehicle')}
-              className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-xs border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Rent a Vehicle</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Driving Classes Service */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col justify-between space-y-5">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Doorstep Driving Instruction</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  1-on-1 practical coaching at your doorstep. Choose between dual-control training vehicles or practice in your personal car.
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <div className="text-xs font-medium text-amber-400 mb-2">Starting at ₹2,999 all-inclusive</div>
-                <ul className="space-y-1.5 text-xs text-slate-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>15-Day Beginner Foundation Course</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>7-Day In-City Traffic Refresher</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Personal Car Route Training</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <button
-              onClick={() => openBookingModal('class')}
-              className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-xs border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Enroll in Driving Class</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* Driving Classes Grid */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
-                Doorstep Driving Programs
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Structured courses tailored for new learners and license holders seeking confidence
-              </p>
-            </div>
-            <button
-              onClick={() => openBookingModal('class')}
-              className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs transition-colors shrink-0 cursor-pointer"
-            >
-              Enroll Now
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {DRIVING_CLASSES.map((cls) => (
-              <div 
-                key={cls.id}
-                onClick={() => openBookingModal('class', { selectedClassId: cls.id })}
-                className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-lg p-4 transition-colors cursor-pointer flex flex-col justify-between"
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                onClick={() => openBookingModal('driver')}
+                className="btn-primary flex-1 text-xs"
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-amber-400">₹{cls.basePrice}</span>
-                    <span className="text-[10px] text-slate-400">{cls.duration}</span>
-                  </div>
-                  <h3 className="font-bold text-white text-sm">{cls.name}</h3>
-                  <p className="text-xs text-slate-400 line-clamp-2">{cls.description}</p>
+                <span>Book Driver</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setActivePage('services')}
+                className="btn-ghost text-xs"
+              >
+                Rates
+              </button>
+            </div>
+          </div>
+
+          {/* SERVICE 2: VEHICLE RENTALS */}
+          <div className="card-surface p-6 flex flex-col justify-between space-y-5">
+            <div className="space-y-4">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center font-bold">
+                <Car className="w-5 h-5 text-amber-500 stroke-[2.2]" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-white font-['Outfit']">
+                  Fleet Vehicle Rentals
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Rent commercial fleet vehicles with verified drivers. Perfect for airport pickups, family functions, corporate transit, and outstation trips.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>Compact Sedan (Dzire):</span>
+                  <span className="font-semibold text-white">₹1,999 / day</span>
                 </div>
-                <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-amber-400 font-medium">
-                  <span>Enroll</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between">
+                  <span>7-Seater SUV (Innova):</span>
+                  <span className="font-semibold text-white">₹3,499 / day</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>12-Seater Tempo:</span>
+                  <span className="font-semibold text-white">₹5,499 / day</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Sanitization & Fuel:</span>
+                  <span className="text-slate-400">Commercial permit & clean cabin</span>
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                onClick={() => openBookingModal('vehicle')}
+                className="btn-secondary flex-1 text-xs"
+              >
+                <span>Rent Vehicle</span>
+                <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
+              </button>
+              <button
+                onClick={() => setActivePage('services')}
+                className="btn-ghost text-xs"
+              >
+                Fleet
+              </button>
+            </div>
           </div>
+
+          {/* SERVICE 3: DRIVING ACADEMY */}
+          <div className="card-surface p-6 flex flex-col justify-between space-y-5">
+            <div className="space-y-4">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center font-bold">
+                <GraduationCap className="w-5 h-5 text-amber-500 stroke-[2.2]" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-white font-['Outfit']">
+                  Driving Academy
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Learn driving with certified instructors at your doorstep. Practice in dual-control training cars or refine daily commute routes in your personal vehicle.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>Beginner Course (15 Days):</span>
+                  <span className="font-semibold text-white">₹5,999 all-inc</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Personal Car Refresher:</span>
+                  <span className="font-semibold text-white">₹2,999 (7 Days)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Automatic Specialist:</span>
+                  <span className="font-semibold text-white">₹3,999 (10 Days)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Pickup:</span>
+                  <span className="text-slate-400">Doorstep across Bengaluru</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                onClick={() => openBookingModal('class')}
+                className="btn-outline flex-1 text-xs"
+              >
+                <span>Enroll in Class</span>
+                <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
+              </button>
+              <button
+                onClick={() => setActivePage('services')}
+                className="btn-ghost text-xs"
+              >
+                Syllabus
+              </button>
+            </div>
+          </div>
+
         </div>
       </section>
 
-      {/* Featured Verified Drivers */}
+      {/* VERIFIED DRIVER PARTNERS SPOTLIGHT */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-slate-800 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Quality Standards
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white font-['Outfit'] mt-0.5">
               Verified Driver Partners
             </h2>
-            <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-              Experienced, background-verified professionals fluent in regional languages
+            <p className="text-slate-400 text-xs mt-1">
+              Police verified, background-cleared, with minimum 5+ years of city and highway experience.
             </p>
           </div>
+
           <button
             onClick={() => setActivePage('about')}
-            className="text-xs font-semibold text-amber-400 hover:underline flex items-center gap-1 cursor-pointer w-fit"
+            className="text-xs font-semibold text-amber-500 hover:text-amber-400 transition-colors flex items-center gap-1 self-start sm:self-auto"
           >
-            Verification Standards <ArrowRight className="w-3.5 h-3.5" />
+            Driver verification standards <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {FEATURED_DRIVERS.map((driver) => (
             <div 
               key={driver.id} 
-              className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4"
+              className="card-surface p-4 flex flex-col justify-between hover:border-slate-700 transition-colors"
             >
               <div className="space-y-3">
-                <img 
-                  src={driver.avatar} 
-                  alt={driver.name} 
-                  className="w-full h-40 rounded-lg object-cover"
-                />
+                <div className="relative rounded-lg overflow-hidden bg-slate-950 aspect-[4/3]">
+                  <img 
+                    src={driver.avatar} 
+                    alt={driver.name} 
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2 left-2 bg-slate-950/90 text-slate-200 text-[10px] font-semibold px-2 py-0.5 rounded border border-slate-800">
+                    {driver.badge}
+                  </span>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm text-white">{driver.name}</h3>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-amber-400">
-                      <Star className="w-3 h-3 fill-amber-400" /> {driver.rating}
+                    <div className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
+                      <Star className="w-3 h-3 fill-amber-500" /> {driver.rating}
                     </div>
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">{driver.experience}</div>
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    Specialty: {driver.specialty}
+                  <div className="text-[11px] text-slate-300 mt-1 font-medium">
+                    {driver.trips} verified trips
                   </div>
                 </div>
+
+                <p className="text-xs text-slate-400 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 line-clamp-2">
+                  "{driver.tagline}"
+                </p>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex gap-2">
+              <div className="pt-3 border-t border-slate-800 mt-3 flex gap-2">
                 <button
                   onClick={() => openDriverSpotlight(driver)}
-                  className="flex-1 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-800 transition-colors"
+                  className="btn-ghost flex-1 py-1.5 text-xs"
                 >
-                  Profile
+                  Details
                 </button>
                 <button
                   onClick={() => openBookingModal('driver')}
-                  className="flex-1 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold transition-colors"
+                  className="btn-primary py-1.5 px-3 text-xs"
                 >
                   Book
                 </button>
@@ -392,69 +392,76 @@ export default function HomePage({
         </div>
       </section>
 
-      {/* Outstation Trips */}
+      {/* POPULAR OUTSTATION ROUTES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="border-b border-slate-800 pb-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
-            Common Outstation Destinations
+        <div>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Highway & Intercity
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white font-['Outfit'] mt-0.5">
+            Popular Outstation Routes From Bengaluru
           </h2>
-          <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-            Round-trip and one-way driver rates for popular weekend routes from Bengaluru
+          <p className="text-slate-400 text-xs mt-1">
+            Experienced highway drivers for single drops or round trips across Karnataka, Kerala & Tamil Nadu.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {OUTSTATION_DESTINATIONS.slice(0, 4).map((dest, idx) => (
-            <div key={idx} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+            <div key={idx} className="card-surface p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-white">{dest.name}</span>
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="font-bold text-base text-white font-['Outfit']">{dest.name}</span>
+                <span className="text-xs font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
                   {dest.distance}
                 </span>
               </div>
               <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" /> Approx. {dest.driveTime}
+                <Clock className="w-3.5 h-3.5 text-amber-500" /> Approx: {dest.driveTime}
               </div>
-              <div className="text-xs text-slate-400 flex items-center gap-1">
+              <div className="text-xs text-slate-300 flex items-center gap-1.5">
                 <Compass className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {dest.popularFor}
               </div>
               <button
                 onClick={() => openBookingModal('driver')}
-                className="w-full py-1.5 bg-slate-950 hover:bg-slate-800 text-slate-200 hover:text-white font-medium text-xs rounded-lg border border-slate-800 transition-colors"
+                className="btn-outline w-full py-1.5 text-xs mt-1"
               >
-                Book Outstation Driver
+                Book Route Driver
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Direct Contact & Support Bar */}
+      {/* SUPPORT & HELPLINE SECTION */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-1 text-center md:text-left">
-            <h3 className="text-lg sm:text-xl font-bold text-white font-['Outfit']">
-              Need immediate driver assistance or a custom itinerary?
+        <div className="card-surface p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-slate-800">
+          <div className="space-y-1.5 text-center md:text-left">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              24/7 Dispatch Desk
+            </span>
+            <h3 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+              Need assistance booking a driver or fleet vehicle?
             </h3>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Our dispatch desk operates 24 hours a day across Indiranagar, Koramangala, Whitefield, and Electronic City.
+            <p className="text-slate-400 text-xs sm:text-sm">
+              Our dispatch coordinators are available round the clock across Indiranagar, Koramangala, Whitefield, and Electronic City.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <a
-              href="tel:+919886012345"
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-medium text-xs rounded-lg border border-slate-700 flex items-center gap-2 transition-colors"
-            >
-              <PhoneCall className="w-4 h-4 text-amber-400" />
-              <span>+91 98860 12345</span>
-            </a>
+          <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
             <button
               onClick={() => openBookingModal('driver')}
-              className="py-2.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+              className="btn-primary"
             >
-              Book a Driver
+              <SteeringWheel className="w-4 h-4" />
+              <span>Book a Driver</span>
             </button>
+            <a
+              href="tel:+919886012345"
+              className="btn-secondary"
+            >
+              <Phone className="w-4 h-4 text-amber-500" />
+              <span>+91 98860 12345</span>
+            </a>
           </div>
         </div>
       </section>
