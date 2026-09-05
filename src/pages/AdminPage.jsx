@@ -1229,12 +1229,12 @@ export default function AdminPage({ onReturnToClient }) {
   // VIEW 2: LOGGED-IN ADMIN DASHBOARD (WITH SIDEBAR)
   // =========================================================================
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row max-w-full overflow-x-hidden">
       
       {/* --------------------------------------------------------------------- */}
-      {/* SIDEBAR NAVIGATION (STICKY AT VIEWPORT HEIGHT) */}
+      {/* DESKTOP SIDEBAR NAVIGATION (STICKY AT VIEWPORT HEIGHT) */}
       {/* --------------------------------------------------------------------- */}
-      <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 md:h-screen md:sticky md:top-0">
+      <aside className="hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col shrink-0 md:h-screen md:sticky md:top-0">
         
         {/* Sidebar Header */}
         <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0">
@@ -1401,9 +1401,135 @@ export default function AdminPage({ onReturnToClient }) {
       </aside>
 
       {/* --------------------------------------------------------------------- */}
+      {/* MOBILE ADMIN TOP NAVIGATION & TAB STRIP (< md) */}
+      {/* --------------------------------------------------------------------- */}
+      <div className="md:hidden sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shrink-0">
+        {/* Mobile Header Bar */}
+        <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-400/20 shrink-0">
+              <Car className="w-4 h-4 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="font-extrabold text-xs text-white font-['Outfit'] leading-tight">
+                Driver <span className="text-amber-400">Anna</span>
+              </div>
+              <div className="text-[8px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-0.5">
+                <ShieldCheck className="w-2.5 h-2.5" /> Admin
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions (Admin Initials, Return to Site, Logout) */}
+          <div className="flex items-center gap-1.5">
+            <div className="w-7 h-7 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-400 font-extrabold text-[10px] flex items-center justify-center shrink-0" title={loggedInAdminName}>
+              {loggedInAdminName.charAt(0)}
+            </div>
+            <button
+              onClick={onReturnToClient}
+              title="Return to Client Site"
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+            <button
+              onClick={handleLogout}
+              title="Admin Logout"
+              className="p-1.5 rounded-lg bg-slate-950 text-red-400 hover:text-red-300 border border-slate-800 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Horizontal Scrollable Tab Strip */}
+        <div className="px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'dashboard'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('for-driver')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'for-driver'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
+            }`}
+          >
+            <SteeringWheel className="w-3.5 h-3.5" />
+            <span>Driver</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              activeTab === 'for-driver' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {driverBookings.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('for-vehicle')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'for-vehicle'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
+            }`}
+          >
+            <Car className="w-3.5 h-3.5" />
+            <span>Vehicle</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              activeTab === 'for-vehicle' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {vehicleBookings.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('for-class')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'for-class'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Class</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              activeTab === 'for-class' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {classEnrollments.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'users'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Users</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              activeTab === 'users' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {registeredUsers.length + registeredDrivers.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* --------------------------------------------------------------------- */}
       {/* MAIN ADMIN DASHBOARD CONTENT */}
       {/* --------------------------------------------------------------------- */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-6 lg:p-10 overflow-y-auto max-w-full overflow-x-hidden">
         
         {/* TAB 1: DASHBOARD */}
         {activeTab === 'dashboard' && (
@@ -1629,7 +1755,7 @@ export default function AdminPage({ onReturnToClient }) {
                   />
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto">
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar">
                   {['All', 'Pending', 'Assigned', 'Cancelled'].map((st) => (
                     <button
                       key={st}
@@ -1879,7 +2005,7 @@ export default function AdminPage({ onReturnToClient }) {
                   />
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto">
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar">
                   {['All', 'Pending', 'Confirmed', 'Dispatched', 'Cancelled'].map((st) => (
                     <button
                       key={st}
@@ -2894,18 +3020,12 @@ export default function AdminPage({ onReturnToClient }) {
             {/* Modal 1: Add Client Modal */}
             {isAddUserModalOpen && (
               <div 
-                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden touch-none overscroll-contain"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden overscroll-contain"
                 onClick={(e) => {
                   if (e.target === e.currentTarget) setIsAddUserModalOpen(false);
                 }}
-                onTouchMove={(e) => {
-                  if (e.target === e.currentTarget) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
               >
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 max-w-md w-full max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y space-y-5 shadow-2xl relative">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 max-w-md w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y space-y-5 shadow-2xl relative">
                   
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div className="flex items-center gap-2.5">
@@ -3030,18 +3150,12 @@ export default function AdminPage({ onReturnToClient }) {
             {/* Modal 2: Add Driver Anna Modal */}
             {isAddDriverModalOpen && (
               <div 
-                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden touch-none overscroll-contain"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden overscroll-contain"
                 onClick={(e) => {
                   if (e.target === e.currentTarget) setIsAddDriverModalOpen(false);
                 }}
-                onTouchMove={(e) => {
-                  if (e.target === e.currentTarget) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
               >
-                <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-5 sm:p-8 max-w-md w-full max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y space-y-5 shadow-2xl relative">
+                <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-5 sm:p-8 max-w-md w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y space-y-5 shadow-2xl relative">
                   
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div className="flex items-center gap-2.5">
@@ -3237,19 +3351,13 @@ export default function AdminPage({ onReturnToClient }) {
       {/* ========================================================================= */}
       {userToDelete && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden touch-none overscroll-contain"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-hidden overscroll-contain"
           onClick={(e) => {
             if (e.target === e.currentTarget) handleCloseDeleteUserModal();
           }}
-          onTouchMove={(e) => {
-            if (e.target === e.currentTarget) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
         >
           <div 
-            className="bg-slate-900 border border-red-500/40 rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl shadow-red-950/60 relative overflow-hidden overscroll-contain touch-pan-y"
+            className="bg-slate-900 border border-red-500/40 rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl shadow-red-950/60 relative overflow-hidden overscroll-contain touch-pan-y"
             onClick={(e) => e.stopPropagation()}
           >
             

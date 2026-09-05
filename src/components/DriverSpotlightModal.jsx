@@ -9,18 +9,14 @@ export default function DriverSpotlightModal({ driver, onClose, onBookDriver }) 
   if (!driver) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
         onClick={onClose}
-        onTouchMove={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
       />
 
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto text-slate-100">
+      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-lg max-h-[92dvh] sm:max-h-[92vh] overflow-y-auto shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto text-slate-100">
         
         {/* Header Photo Banner */}
         <div className="relative h-48 bg-gradient-to-r from-amber-500 to-amber-700 p-6 flex items-end">

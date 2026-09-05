@@ -27,17 +27,17 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
+    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 max-w-full overflow-x-hidden">
       {/* Top Utility Bar */}
-      <div className="bg-slate-900/80 border-b border-slate-800/80 text-slate-300 text-xs py-1.5 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+      <div className="bg-slate-900/80 border-b border-slate-800/80 text-slate-300 text-xs py-1.5 px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4 overflow-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs min-w-0 truncate">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-slate-400">Bengaluru Service Desk:</span>
-            <span className="text-slate-200 font-medium">On-Demand Drivers, Fleet Rentals & Academy</span>
+            <span className="text-slate-400 shrink-0">Bengaluru Desk:</span>
+            <span className="text-slate-200 font-medium truncate">Drivers, Rentals & Driving Academy</span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-4 text-[11px]">
+          <div className="hidden sm:flex items-center gap-4 text-[11px] shrink-0">
             <a 
               href="tel:+919886012345" 
               className="flex items-center gap-1.5 text-slate-300 hover:text-amber-400 transition-colors"
@@ -65,25 +65,25 @@ export default function Navbar({
       </div>
 
       {/* Main Navigation Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-15 sm:h-18 gap-2">
 
           {/* Brand Logo */}
           <div
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-3 cursor-pointer group shrink-0"
+            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group shrink-0 min-w-0"
           >
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm shrink-0">
-              <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm shrink-0">
+              <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-lg sm:text-xl tracking-tight text-white font-['Outfit']">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base sm:text-xl tracking-tight text-white font-['Outfit'] whitespace-nowrap">
                   Book Driver <span className="text-amber-500">Anna</span>
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
-                <MapPin className="w-2.5 h-2.5 text-slate-500 inline" /> Bengaluru Urban
+              <p className="text-[10px] text-slate-400 font-medium tracking-wide flex items-center gap-1 truncate">
+                <MapPin className="w-2.5 h-2.5 text-slate-500 inline shrink-0" /> Bengaluru Urban
               </p>
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function Navbar({
           </nav>
 
           {/* Header Action Items */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
 
             {/* Cancel Booking Quick Link (Desktop) */}
             <button
@@ -120,10 +120,10 @@ export default function Navbar({
               <span>Cancel Trip</span>
             </button>
 
-            {/* Book a Driver Primary Button */}
+            {/* Book a Driver Primary Button - Desktop & Tablet */}
             <button
               onClick={() => openBookingModal('driver')}
-              className="btn-primary"
+              className="btn-primary hidden sm:inline-flex py-2 px-3.5 text-xs sm:text-sm"
             >
               <SteeringWheel className="w-4 h-4" />
               <span>Book a Driver</span>
@@ -131,27 +131,27 @@ export default function Navbar({
 
             {/* User Profile Pill & Logout (if logged in) */}
             {clientUser && (
-              <div className="flex items-center gap-1.5 pl-2 sm:pl-3 border-l border-slate-800">
+              <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-3 border-l border-slate-800">
                 <button 
                   type="button"
                   onClick={onOpenProfile}
-                  className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer"
                   title={`Account: ${clientUser.name} (${clientUser.phone})`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-amber-500 font-bold text-xs flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-amber-500 font-bold text-[10px] sm:text-xs flex items-center justify-center shrink-0">
                     {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
                   </div>
-                  <span className="hidden sm:inline-block text-xs font-semibold text-slate-200 max-w-[100px] truncate">
+                  <span className="hidden md:inline-block text-xs font-semibold text-slate-200 max-w-[90px] truncate">
                     {clientUser.name ? clientUser.name.split(' ')[0] : 'Account'}
                   </span>
                 </button>
                 <button
                   onClick={onLogout}
                   title="Sign Out"
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                   aria-label="Sign Out"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             )}

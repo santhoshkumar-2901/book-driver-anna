@@ -4,12 +4,12 @@ import { SteeringWheel } from './Icons';
 
 export default function RoleSelectGate({ onSelectRole }) {
   return (
-    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto font-sans selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-amber-400 selection:text-slate-950 max-w-full">
       
       {/* Background Ambience & Grid */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-0 w-64 sm:w-80 h-64 sm:h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
 
       {/* Top Header Bar */}
@@ -30,18 +30,18 @@ export default function RoleSelectGate({ onSelectRole }) {
       </header>
 
       {/* Central Role Selection Cards */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-3 sm:px-6 py-4 sm:py-6">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-3.5 sm:px-6 py-4 sm:py-6">
         <div className="w-full max-w-4xl my-auto space-y-4 sm:space-y-6">
           
           {/* Section Heading */}
-          <div className="text-center space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
+          <div className="text-center space-y-1.5 px-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5" /> Welcome to Namma Bengaluru Fleet
             </div>
             <h1 className="text-2xl sm:text-4xl font-black text-white font-['Outfit'] tracking-tight">
               Wanna Be a <span className="text-amber-400">Customer</span> or a <span className="text-emerald-400">Driver</span>?
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
+            <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
               Please choose your role to sign in or create an account. You can easily switch roles at any time.
             </p>
           </div>
@@ -50,7 +50,7 @@ export default function RoleSelectGate({ onSelectRole }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             
             {/* OPTION 1: CUSTOMER / USER */}
-            <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-400/60 rounded-3xl p-6 sm:p-7 backdrop-blur-xl shadow-2xl transition-all duration-300 flex flex-col justify-between group relative hover:shadow-amber-500/10">
+            <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-400/60 rounded-2xl sm:rounded-3xl p-5 sm:p-7 backdrop-blur-xl shadow-2xl transition-all duration-300 flex flex-col justify-between group relative hover:shadow-amber-500/10">
               <div className="space-y-4">
                 
                 {/* Top Badge & Icon */}

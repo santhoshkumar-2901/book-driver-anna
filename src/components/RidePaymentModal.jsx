@@ -105,36 +105,35 @@ export default function RidePaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
       {/* Dark Blur Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity"
         onClick={isPaid ? onClose : undefined}
-        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Main Card Container */}
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 text-slate-100 flex flex-col max-h-[92vh] overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 text-slate-100 flex flex-col max-h-[92dvh] sm:max-h-[90vh] my-auto">
         
         {/* =========================================================================
             HEADER: RIDE COMPLETED BANNER
            ========================================================================= */}
-        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 p-3.5 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-              <SteeringWheel className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 p-3 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+              <SteeringWheel className="w-4 h-4 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Trip Completed
                 </span>
-                <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
+                <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono truncate">
                   {rideData.id || rideData.bookingId || "BDA-TRIP-8821"}
                 </span>
               </div>
-              <h2 className="text-base sm:text-lg font-black text-white font-['Outfit'] mt-0.5">
+              <h2 className="text-sm sm:text-lg font-black text-white font-['Outfit'] mt-0.5 truncate">
                 {isPaid ? "Payment Receipt" : "Trip Fare Settlement"}
               </h2>
             </div>
@@ -142,7 +141,7 @@ export default function RidePaymentModal({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>

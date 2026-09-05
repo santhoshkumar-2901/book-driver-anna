@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 let activeModalCount = 0;
 let originalBodyOverflow = '';
 let originalHtmlOverflow = '';
-let originalBodyTouchAction = '';
 
 export function useScrollLock(isOpen) {
   useEffect(() => {
@@ -13,11 +12,9 @@ export function useScrollLock(isOpen) {
     if (activeModalCount === 0) {
       originalBodyOverflow = document.body.style.overflow;
       originalHtmlOverflow = document.documentElement.style.overflow;
-      originalBodyTouchAction = document.body.style.touchAction;
 
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
-      document.body.style.touchAction = 'none';
     }
     activeModalCount++;
 
@@ -27,7 +24,6 @@ export function useScrollLock(isOpen) {
         activeModalCount = 0;
         document.body.style.overflow = originalBodyOverflow;
         document.documentElement.style.overflow = originalHtmlOverflow;
-        document.body.style.touchAction = originalBodyTouchAction;
       }
     };
   }, [isOpen]);

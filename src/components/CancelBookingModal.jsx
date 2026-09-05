@@ -190,28 +190,27 @@ export default function CancelBookingModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
         onClick={handleClose}
-        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Modal Container */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-xl overflow-hidden shadow-xl z-10 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 text-slate-100 overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-xl overflow-hidden shadow-xl z-10 flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-150 text-slate-100 my-auto">
         
         {/* Header */}
-        <div className="p-5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center border border-red-500/20">
-              <Ban className="w-5 h-5" />
+        <div className="p-4 sm:p-5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center border border-red-500/20 shrink-0">
+              <Ban className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white font-['Outfit'] flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-white font-['Outfit'] flex items-center gap-2 truncate">
                 Cancel or Modify Booking
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-[10px] sm:text-xs text-slate-400 truncate">
                 Verified booking lookup with zero cancellation penalty
               </p>
             </div>
@@ -219,7 +218,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
 
           <button 
             onClick={handleClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors"
+            className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors shrink-0"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

@@ -132,38 +132,38 @@ export default function DriverPortalPage({
       )}
 
       {/* Top Navigation Bar */}
-      <header className="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
+      <header className="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md max-w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
           
           {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 shrink-0">
-              <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 shrink-0">
+              <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
-            <div>
-              <div className="font-extrabold text-base sm:text-lg text-white font-['Outfit'] leading-none">
+            <div className="min-w-0">
+              <div className="font-extrabold text-sm sm:text-lg text-white font-['Outfit'] leading-none truncate">
                 Book Driver <span className="text-emerald-400">Anna</span>
               </div>
-              <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
-                <Award className="w-2.5 h-2.5 inline" /> Driver Partner Portal
+              <div className="text-[9px] sm:text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5 truncate">
+                <Award className="w-2.5 h-2.5 inline shrink-0" /> Driver Portal
               </div>
             </div>
           </div>
 
           {/* Right Header Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             
             {/* Online/Offline Duty Toggle Button */}
             <button
               onClick={() => setIsOnline(!isOnline)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border shadow-sm ${
+              className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm ${
                 isOnline
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-              <span>{isOnline ? 'Duty: ONLINE' : 'Duty: OFFLINE'}</span>
+              <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </button>
 
             {/* Switch to Customer Site */}
@@ -180,10 +180,10 @@ export default function DriverPortalPage({
             {/* Logout Button */}
             <button
               onClick={onLogout}
-              className="p-2 rounded-xl text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+              className="p-1.5 sm:p-2 rounded-xl text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shrink-0"
               title="Driver Sign Out"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden md:inline">Sign Out</span>
             </button>
 

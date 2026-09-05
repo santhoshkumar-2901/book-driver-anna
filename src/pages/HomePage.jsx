@@ -19,30 +19,30 @@ export default function HomePage({
 
       {/* Logged-In User Account Summary Strip */}
       {clientUser && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
           <div 
             onClick={onOpenProfile}
-            className="card-surface p-3 sm:p-4 flex items-center justify-between gap-3 transition-colors hover:border-slate-700 cursor-pointer"
+            className="card-surface p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:border-slate-700 cursor-pointer"
             title="Click to view your profile and trip history"
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm flex items-center justify-center shrink-0">
                 {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <span className="text-xs text-slate-400">Welcome,</span>
                   <span className="text-sm font-bold text-white truncate">
                     {clientUser.name}
                   </span>
-                  <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded font-medium">
-                    Verified Account
+                  <span className="text-[9px] sm:text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.5 rounded font-medium shrink-0">
+                    Verified
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
+                <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
                   <span className="font-mono text-slate-300">{clientUser.phone}</span>
                   <span>•</span>
-                  <span className="text-slate-400">{clientUser.area || 'Indiranagar'}</span>
+                  <span className="text-slate-400 truncate">{clientUser.area || 'Indiranagar'}</span>
                 </div>
               </div>
             </div>
@@ -53,7 +53,7 @@ export default function HomePage({
                 e.stopPropagation();
                 if (onOpenProfile) onOpenProfile();
               }}
-              className="btn-secondary py-1.5 px-3 text-xs shrink-0"
+              className="btn-secondary py-1.5 px-3 text-xs w-full sm:w-auto shrink-0 justify-center"
             >
               <User className="w-3.5 h-3.5" />
               <span>Manage Account</span>
@@ -63,32 +63,32 @@ export default function HomePage({
       )}
       
       {/* HERO SECTION */}
-      <section className="pt-8 sm:pt-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <section className="pt-6 sm:pt-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
+          <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
             {/* Status Label */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>On-Demand Transit Services across Bengaluru</span>
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-[11px] sm:text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="truncate">On-Demand Transit Services across Bengaluru</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-white font-['Outfit'] tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-5xl font-extrabold text-white font-['Outfit'] tracking-tight leading-tight">
               Professional Drivers & Vehicle Rentals in Bengaluru
             </h1>
 
             {/* Subtitle */}
-            <p className="text-sm sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-xs sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto">
               Hire background-checked personal drivers for your car, rent reliable fleet vehicles, 
               or enroll in practical driving lessons across all major Bangalore localities.
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-2.5 pt-2 w-full max-w-md sm:max-w-none mx-auto">
               <button
                 onClick={() => openBookingModal('driver')}
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
               >
                 <SteeringWheel className="w-4 h-4" />
                 <span>Book a Driver</span>
@@ -96,7 +96,7 @@ export default function HomePage({
 
               <button
                 onClick={() => openBookingModal('vehicle')}
-                className="btn-secondary"
+                className="btn-secondary w-full sm:w-auto"
               >
                 <Car className="w-4 h-4 text-amber-500" />
                 <span>Rent a Vehicle</span>
@@ -104,7 +104,7 @@ export default function HomePage({
 
               <button
                 onClick={() => openBookingModal('class')}
-                className="btn-outline"
+                className="btn-outline w-full sm:w-auto"
               >
                 <GraduationCap className="w-4 h-4 text-amber-500" />
                 <span>Driving Classes</span>
@@ -112,7 +112,7 @@ export default function HomePage({
             </div>
 
             {/* Service Guarantees */}
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[11px] sm:text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Police Verified Drivers</span>
               <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-amber-500" /> ₹0 Advance Cancellation Fee</span>
               <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> 25+ Hubs Across Bengaluru</span>

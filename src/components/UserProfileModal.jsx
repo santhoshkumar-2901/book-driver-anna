@@ -173,46 +173,40 @@ export default function UserProfileModal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in overflow-hidden touch-none overscroll-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      onTouchMove={(e) => {
-        if (e.target === e.currentTarget) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }}
     >
       <div 
-        className="bg-slate-900 border border-slate-800 rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-xl relative overflow-hidden overscroll-contain touch-pan-y"
+        className="bg-slate-900 border border-slate-800 rounded-xl max-w-xl w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-xl relative overflow-hidden my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Modal Header Bar */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4 shrink-0 bg-slate-900">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-base flex items-center justify-center shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-800 px-4 sm:px-5 py-3.5 sm:py-4 shrink-0 bg-slate-900 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm sm:text-base flex items-center justify-center shrink-0">
               {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white font-['Outfit'] truncate max-w-[200px] sm:max-w-[280px]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-white font-['Outfit'] truncate max-w-[150px] sm:max-w-[280px]">
                   {clientUser.name}
                 </h3>
-                <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded font-medium">
+                <span className="text-[9px] sm:text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.5 rounded font-medium shrink-0">
                   Verified Client
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Customer ID: <span className="font-mono text-slate-300">{clientUser.id || 'CLI-USER'}</span> • Bengaluru Urban
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
+                Customer ID: <span className="font-mono text-slate-300">{clientUser.id || 'CLI-USER'}</span> • Bengaluru
               </p>
             </div>
           </div>
 
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer shrink-0"
             title="Close Profile"
           >
             <X className="w-4 h-4" />
@@ -220,7 +214,7 @@ export default function UserProfileModal({
         </div>
 
         {/* Sub-Tab Navigation Bar */}
-        <div className="flex items-center gap-2 p-3 border-b border-slate-800 bg-slate-950 shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 border-b border-slate-800 bg-slate-950 shrink-0 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('details')}

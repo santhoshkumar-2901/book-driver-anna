@@ -63,16 +63,15 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity"
         onClick={onClose}
-        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Card */}
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-300 my-auto text-slate-100 flex flex-col max-h-[92vh] sm:max-h-[90vh] overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-300 my-auto text-slate-100 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* Banner */}
         <div className={`p-6 text-center relative overflow-hidden shrink-0 ${

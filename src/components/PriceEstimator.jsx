@@ -61,26 +61,26 @@ export default function PriceEstimator({ openBookingModal }) {
   };
 
   return (
-    <div className="card-surface p-5 sm:p-6 shadow-sm">
-      <div className="space-y-6">
+    <div className="card-surface p-4 sm:p-6 shadow-sm">
+      <div className="space-y-5 sm:space-y-6">
         
         {/* Header bar with Service Segment Switcher */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4 sm:pb-5">
           <div>
-            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            <span className="text-slate-400 text-[11px] sm:text-xs font-semibold uppercase tracking-wider">
               Transparent Pricing Engine
             </span>
-            <h3 className="text-xl sm:text-2xl font-bold text-white font-['Outfit'] mt-0.5">
+            <h3 className="text-lg sm:text-2xl font-bold text-white font-['Outfit'] mt-0.5">
               Estimate Ride Fare in Bengaluru
             </h3>
           </div>
 
           {/* Segmented Control */}
-          <div className="inline-flex p-1 bg-slate-950 rounded-lg border border-slate-800 shrink-0">
+          <div className="inline-flex w-full sm:w-auto p-1 bg-slate-950 rounded-lg border border-slate-800 shrink-0">
             <button
               type="button"
               onClick={() => setBookingType('driver')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
                 bookingType === 'driver'
                   ? 'bg-amber-500 text-slate-950 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -93,7 +93,7 @@ export default function PriceEstimator({ openBookingModal }) {
             <button
               type="button"
               onClick={() => setBookingType('vehicle')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
                 bookingType === 'vehicle'
                   ? 'bg-amber-500 text-slate-950 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -215,7 +215,7 @@ export default function PriceEstimator({ openBookingModal }) {
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                     Rental Duration
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       { id: 'hourly', label: 'Half Day (4 hrs)' },
                       { id: 'daily', label: 'Full Day (24 hrs)' },

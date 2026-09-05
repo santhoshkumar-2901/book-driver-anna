@@ -313,44 +313,43 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
         onClick={handleClose}
-        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Modal Container */}
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto flex flex-col max-h-[92vh] overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* =====================================================================
             HEADER BAR
            ===================================================================== */}
-        <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 px-4 sm:px-6 py-3.5 sm:py-4 text-slate-950 flex items-center justify-between shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-slate-950 text-amber-400 rounded-2xl shadow-inner">
-              <SteeringWheel className="w-6 h-6" />
+        <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 px-3.5 sm:px-6 py-3 sm:py-4 text-slate-950 flex items-center justify-between shrink-0 shadow-md gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 bg-slate-950 text-amber-400 rounded-xl sm:rounded-2xl shadow-inner shrink-0">
+              <SteeringWheel className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <h2 className="font-extrabold text-xl font-['Outfit'] leading-tight tracking-tight">
+            <div className="min-w-0">
+              <h2 className="font-extrabold text-sm sm:text-xl font-['Outfit'] leading-tight tracking-tight truncate">
                 Car Driving Class Enrollment Form
               </h2>
-              <p className="text-xs font-semibold text-slate-900/85 flex items-center gap-1.5">
-                <span>Book Driver Anna Driving Academy</span>
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-900/85 flex items-center gap-1 sm:gap-1.5 truncate">
+                <span>Driving Academy</span>
                 <span>•</span>
                 <span className="inline-flex items-center gap-0.5">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Certified Instructors
+                  <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Certified Instructors
                 </span>
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 rounded-xl bg-slate-950/15 hover:bg-slate-950/30 text-slate-950 transition-colors"
+            className="p-1 sm:p-1.5 rounded-xl bg-slate-950/15 hover:bg-slate-950/30 text-slate-950 transition-colors shrink-0"
             title="Close Form"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 

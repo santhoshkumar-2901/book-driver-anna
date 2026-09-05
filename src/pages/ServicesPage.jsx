@@ -35,25 +35,25 @@ export default function ServicesPage({ openBookingModal }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10 sm:space-y-16 max-w-full overflow-x-hidden">
       
       {/* Header Banner */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
+      <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-[11px] sm:text-xs font-medium">
           <span>Bengaluru City & Outstation Tariff Card</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-white font-['Outfit']">
+        <h1 className="text-2xl sm:text-4xl font-bold text-white font-['Outfit']">
           Services, Fleet & Official Rates
         </h1>
-        <p className="text-slate-400 text-sm leading-relaxed max-w-2xl mx-auto">
+        <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-2xl mx-auto">
           Clear, upfront pricing with no hidden charges. Select a service category below to view packages and reserve your booking.
         </p>
 
         {/* Primary Service Selector */}
-        <div className="inline-flex p-1 bg-slate-950 rounded-lg border border-slate-800 shrink-0 mt-4 overflow-x-auto max-w-full">
+        <div className="inline-flex p-1 bg-slate-950 rounded-lg border border-slate-800 shrink-0 mt-4 overflow-x-auto max-w-full no-scrollbar">
           <button
             onClick={() => setActiveServiceTab('driver')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
               activeServiceTab === 'driver'
                 ? 'bg-amber-500 text-slate-950 font-bold'
                 : 'text-slate-400 hover:text-white'
@@ -309,7 +309,7 @@ export default function ServicesPage({ openBookingModal }) {
           </div>
 
           {/* 5 Specific Vehicle Categories Filter Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar max-w-full">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2 flex items-center gap-1">
               <Filter className="w-3.5 h-3.5" /> Filter Category:
             </span>

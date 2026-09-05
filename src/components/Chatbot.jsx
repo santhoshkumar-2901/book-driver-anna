@@ -164,14 +164,14 @@ export default function Chatbot({ openBookingModal }) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 font-sans">
       
       {/* 1. FLOATING CHAT TRIGGER BUTTON */}
       {!isOpen && (
         <div className="relative group">
           {/* Welcome Tooltip Callout */}
           {notificationBubble && (
-            <div className="absolute bottom-16 right-0 mb-2 w-64 p-3 bg-slate-900/95 border border-amber-500/40 rounded-2xl shadow-2xl text-xs text-slate-200 backdrop-blur-md animate-bounce">
+            <div className="absolute bottom-16 right-0 mb-2 w-60 sm:w-64 max-w-[calc(100vw-2.5rem)] p-3 bg-slate-900/95 border border-amber-500/40 rounded-2xl shadow-2xl text-xs text-slate-200 backdrop-blur-md animate-bounce">
               <div className="flex items-start gap-2">
                 <span className="text-lg">🚗</span>
                 <div>
@@ -192,27 +192,27 @@ export default function Chatbot({ openBookingModal }) {
           <button
             onClick={() => setIsOpen(true)}
             aria-label="Open Anna AI Customer Support"
-            className="relative flex items-center gap-3 px-4 py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-bold shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-amber-200/40"
+            className="relative flex items-center gap-2.5 sm:gap-3 px-3.5 py-3 sm:px-4 sm:py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-bold shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-amber-200/40"
           >
             {/* Animated online pulse indicator */}
-            <span className="relative flex h-3 w-3">
+            <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500"></span>
             </span>
 
             <div className="flex items-center gap-2">
-              <SteeringWheel className="w-5 h-5 text-slate-950 animate-spin-slow" />
-              <span className="text-sm font-extrabold tracking-tight">Ask Anna AI</span>
+              <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 animate-spin-slow" />
+              <span className="text-xs sm:text-sm font-extrabold tracking-tight">Ask Anna AI</span>
             </div>
 
-            <Sparkles className="w-4 h-4 text-amber-900 fill-amber-900" />
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-900 fill-amber-900" />
           </button>
         </div>
       )}
 
       {/* 2. CHATBOT WINDOW */}
       {isOpen && (
-        <div className="w-[92vw] sm:w-[410px] h-[580px] max-h-[85vh] bg-slate-950/95 backdrop-blur-2xl border border-amber-500/30 rounded-3xl shadow-2xl shadow-amber-500/20 flex flex-col overflow-hidden animate-fade-in transition-all">
+        <div className="w-[calc(100vw-2rem)] sm:w-[410px] h-[580px] max-h-[82dvh] sm:max-h-[85vh] bg-slate-950/95 backdrop-blur-2xl border border-amber-500/30 rounded-3xl shadow-2xl shadow-amber-500/20 flex flex-col overflow-hidden animate-fade-in transition-all">
           
           {/* A. HEADER */}
           <div className="px-4 py-3.5 bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/40 border-b border-slate-800 flex items-center justify-between">

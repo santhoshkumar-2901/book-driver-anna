@@ -339,25 +339,25 @@ export default function ClientAuthPage({
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto font-sans selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-amber-400 selection:text-slate-950 max-w-full">
       
       {/* Background Ambience & Grid */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
 
       {/* Top Header Bar */}
-      <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
-            <Car className="w-5 h-5 stroke-[2.2]" />
+      <header className="relative z-10 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
+            <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
           </div>
-          <div>
-            <div className="font-extrabold text-lg sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">
+          <div className="min-w-0">
+            <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">
               Book Driver <span className="text-amber-400">Anna</span>
             </div>
-            <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-0.5">
-              <MapPin className="w-2.5 h-2.5 text-red-400 inline" /> Namma Bengaluru Services
+            <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
+              <MapPin className="w-2.5 h-2.5 text-red-400 inline shrink-0" /> Namma Bengaluru Services
             </p>
           </div>
         </div>
@@ -366,9 +366,9 @@ export default function ClientAuthPage({
           <button
             type="button"
             onClick={onChangeRole}
-            className="text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+            className="text-[10px] sm:text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
           >
-            <span>← Change Role</span>
+            <span>← Role</span>
           </button>
         )}
       </header>

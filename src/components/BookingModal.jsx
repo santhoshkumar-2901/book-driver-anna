@@ -288,35 +288,34 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-hidden touch-none overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity touch-none overscroll-contain"
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
         onClick={onClose}
-        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Modal Card */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-xl z-10 animate-in zoom-in-95 duration-150 my-auto flex flex-col max-h-[90vh] overscroll-contain touch-auto">
+      <div className="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-xl z-10 animate-in zoom-in-95 duration-150 my-auto flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* Header bar */}
-        <div className="bg-slate-900 border-b border-slate-800 px-5 py-4 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 flex items-center justify-center shrink-0">
+        <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-5 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 flex items-center justify-center shrink-0">
               {bookingCategory === 'class' ? <GraduationCap className="w-5 h-5" /> : (bookingCategory === 'vehicle' ? <Car className="w-5 h-5" /> : <SteeringWheel className="w-5 h-5" />)}
             </div>
-            <div>
-              <h2 className="font-bold text-base sm:text-lg font-['Outfit'] leading-tight">
+            <div className="min-w-0">
+              <h2 className="font-bold text-sm sm:text-lg font-['Outfit'] leading-tight truncate">
                 {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? 'Vehicle Fleet Reservation' : 'Book Personal Driver Anna')}
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 Direct dispatch service across Bengaluru Urban
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer shrink-0 ml-2"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -406,7 +405,7 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
               <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                 <Car className="w-3.5 h-3.5" /> Select Vehicle Option (Sedan, SUV, 12, 24, 32 Seater)
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {[
                   { id: 'Sedan', label: 'Sedan', cap: '4 Seater', price: '₹1,999' },
                   { id: 'SUV', label: 'SUV', cap: '6-7 Seater', price: '₹3,499' },
