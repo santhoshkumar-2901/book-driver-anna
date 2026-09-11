@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Car, Users, TrendingUp, DollarSign, MapPin, Clock, 
   Calendar, ShieldCheck, CheckCircle2, AlertCircle, Search, Filter, 
   ChevronRight, Phone, ArrowUpRight, Check, X, Lock, Mail, User, Key, LogOut, ArrowRight, Eye, EyeOff, GraduationCap, Ban,
-  Trash2, UserPlus, AlertTriangle, ShieldAlert, Award, Star, UserCheck, Menu
+  Trash2, UserPlus, AlertTriangle, ShieldAlert, Award, Star, UserCheck, Menu, Copy
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import { BANGALORE_AREAS, FEATURED_DRIVERS, VEHICLE_SERVICES, DEFAULT_REGISTERED_DRIVERS } from '../data/mockData';
@@ -303,7 +303,7 @@ const DEFAULT_CLASS_ENROLLMENTS = [
   }
 ];
 
-// Default Registered Clients / Users
+// Default Registered Clients / Users (Exactly 2 Demo Clients)
 const DEFAULT_REGISTERED_CLIENTS = [
   {
     id: 'CLI-901',
@@ -322,35 +322,71 @@ const DEFAULT_REGISTERED_CLIENTS = [
     area: 'Koramangala',
     status: 'Active',
     createdAt: '2026-09-02'
-  },
-  {
-    id: 'CLI-903',
-    name: 'Anand Rao',
-    email: 'anand.rao@outlook.com',
-    phone: '+91 99002 33445',
-    area: 'Whitefield',
-    status: 'Active',
-    createdAt: '2026-09-02'
-  },
-  {
-    id: 'CLI-904',
-    name: 'Deepika Nair',
-    email: 'deepika.nair@gmail.com',
-    phone: '+91 98450 67890',
-    area: 'HSR Layout',
-    status: 'Active',
-    createdAt: '2026-09-03'
-  },
-  {
-    id: 'CLI-905',
-    name: 'Karthik Swamy',
-    email: 'karthik.s@gmail.com',
-    phone: '+91 97410 88990',
-    area: 'Jayanagar',
-    status: 'Active',
-    createdAt: '2026-09-03'
   }
 ];
+
+export const sanitizeClients = (list) => {
+  if (!Array.isArray(list)) return DEFAULT_REGISTERED_CLIENTS;
+  const filtered = list.filter(u => {
+    if (!u) return false;
+    const id = u.id || '';
+    const email = (u.email || '').toLowerCase();
+    if (['CLI-903', 'CLI-904', 'CLI-905'].includes(id)) return false;
+    if (['anand.rao@outlook.com', 'deepika.nair@gmail.com', 'karthik.s@gmail.com'].includes(email)) return false;
+    if (
+      email.startsWith('newuser_') ||
+      email.startsWith('brand_new_user_') ||
+      email.startsWith('test_new_client_') ||
+      email.startsWith('user_a_') ||
+      email.startsWith('user_b_')
+    ) {
+      return false;
+    }
+    return true;
+  });
+  return filtered.length > 0 ? filtered : DEFAULT_REGISTERED_CLIENTS;
+};
+
+export const sanitizeDrivers = (list) => {
+  if (!Array.isArray(list)) return DEFAULT_REGISTERED_DRIVERS;
+  const filtered = list.filter(d => {
+    if (!d) return false;
+    const id = d.id || '';
+    if (['DRV-1004', 'DRV-1005'].includes(id)) return false;
+    return true;
+  });
+  return filtered.length > 0 ? filtered : DEFAULT_REGISTERED_DRIVERS;
+};
+
+// SPA Route Paths for Admin Sections
+export const ADMIN_TAB_ROUTES = {
+  'dashboard': '/admin/dashboard',
+  'for-driver': '/admin/driver',
+  'for-vehicle': '/admin/vehicle',
+  'for-class': '/admin/class',
+  'users': '/admin/users'
+};
+
+export const parseTabFromPath = (path) => {
+  if (!path) return 'dashboard';
+  const clean = path.toLowerCase().replace(/\/+$/, '');
+  if (clean === '/admin' || clean === '/admin/dashboard' || clean === '/admin/overview') {
+    return 'dashboard';
+  }
+  if (clean === '/admin/driver' || clean === '/admin/drivers' || clean === '/admin/for-driver' || clean === '/admin/driver-bookings') {
+    return 'for-driver';
+  }
+  if (clean === '/admin/vehicle' || clean === '/admin/vehicles' || clean === '/admin/for-vehicle' || clean === '/admin/rentals') {
+    return 'for-vehicle';
+  }
+  if (clean === '/admin/class' || clean === '/admin/classes' || clean === '/admin/for-class' || clean === '/admin/academy' || clean === '/admin/driving-class') {
+    return 'for-class';
+  }
+  if (clean === '/admin/users' || clean === '/admin/user' || clean === '/admin/clients' || clean === '/admin/customers') {
+    return 'users';
+  }
+  return 'dashboard';
+};
 
 export default function AdminPage({ onReturnToClient }) {
   // Persistent Authentication State (persists across page refreshes)
@@ -376,9 +412,75 @@ export default function AdminPage({ onReturnToClient }) {
     return localStorage.getItem('bda_admin_phone') || '+91 98860 12345';
   });
 
-  // Sidebar Tab State (after login)
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'for-driver', 'for-vehicle'
+  // Sidebar Tab State (after login) - derived from URL path for full SPA experience
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return parseTabFromPath(window.location.pathname);
+    }
+    return 'dashboard';
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // SPA Navigation Helper
+  const navigateToTab = (newTab, replace = false) => {
+    setActiveTab(newTab);
+    setIsMobileSidebarOpen(false);
+
+    if (typeof window !== 'undefined') {
+      const targetPath = ADMIN_TAB_ROUTES[newTab] || '/admin/dashboard';
+      if (window.location.pathname !== targetPath) {
+        if (replace) {
+          window.history.replaceState({ adminTab: newTab }, '', targetPath);
+        } else {
+          window.history.pushState({ adminTab: newTab }, '', targetPath);
+        }
+      }
+      const tabTitles = {
+        'dashboard': 'Admin Dashboard • Book Driver Anna',
+        'for-driver': 'Driver Bookings Management • Admin • Book Driver Anna',
+        'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
+        'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
+        'users': 'Customers & Fleet Partners • Admin • Book Driver Anna'
+      };
+      document.title = tabTitles[newTab] || 'Admin Portal • Book Driver Anna';
+    }
+  };
+
+  // Synchronize activeTab on initial mount and handle browser back/forward navigation in SPA
+  useEffect(() => {
+    const syncFromUrl = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (path === '/admin' || path.startsWith('/admin/')) {
+          const tab = parseTabFromPath(path);
+          setActiveTab(tab);
+          const tabTitles = {
+            'dashboard': 'Admin Dashboard • Book Driver Anna',
+            'for-driver': 'Driver Bookings Management • Admin • Book Driver Anna',
+            'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
+            'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
+            'users': 'Customers & Fleet Partners • Admin • Book Driver Anna'
+          };
+          document.title = tabTitles[tab] || 'Admin Portal • Book Driver Anna';
+        }
+      }
+    };
+
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
+
+  // Update URL if user lands on plain /admin or /admin/
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      const tab = parseTabFromPath(currentPath);
+      if (currentPath === '/admin' || currentPath === '/admin/') {
+        window.history.replaceState({ adminTab: tab }, '', ADMIN_TAB_ROUTES[tab]);
+      }
+    }
+  }, [isAdminLoggedIn]);
 
   // Persistent Driver Bookings State
   const [driverBookings, setDriverBookings] = useState(() => {
@@ -460,7 +562,9 @@ export default function AdminPage({ onReturnToClient }) {
       const saved = localStorage.getItem('bda_registered_clients');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const clean = sanitizeClients(parsed);
+        localStorage.setItem('bda_registered_clients', JSON.stringify(clean));
+        return clean;
       }
     } catch (e) {}
     localStorage.setItem('bda_registered_clients', JSON.stringify(DEFAULT_REGISTERED_CLIENTS));
@@ -473,7 +577,9 @@ export default function AdminPage({ onReturnToClient }) {
       const saved = localStorage.getItem('bda_registered_drivers');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const clean = sanitizeDrivers(parsed);
+        localStorage.setItem('bda_registered_drivers', JSON.stringify(clean));
+        return clean;
       }
     } catch (e) {}
     localStorage.setItem('bda_registered_drivers', JSON.stringify(DEFAULT_REGISTERED_DRIVERS));
@@ -630,11 +736,11 @@ export default function AdminPage({ onReturnToClient }) {
       }
       const savedUsers = localStorage.getItem('bda_registered_clients');
       if (savedUsers) {
-        try { setRegisteredUsers(JSON.parse(savedUsers)); } catch (e) {}
+        try { setRegisteredUsers(sanitizeClients(JSON.parse(savedUsers))); } catch (e) {}
       }
       const savedDrivers = localStorage.getItem('bda_registered_drivers');
       if (savedDrivers) {
-        try { setRegisteredDrivers(JSON.parse(savedDrivers)); } catch (e) {}
+        try { setRegisteredDrivers(sanitizeDrivers(JSON.parse(savedDrivers))); } catch (e) {}
       }
     };
 
@@ -678,6 +784,51 @@ export default function AdminPage({ onReturnToClient }) {
     localStorage.setItem('bda_class_enrollments', JSON.stringify(classEnrollments));
   }, [classEnrollments]);
 
+  // Sync users with backend server database when admin is logged in
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    apiClient.getAdminUsers()
+      .then((res) => {
+        if (res && res.data && Array.isArray(res.data.users)) {
+          setRegisteredUsers((prev) => {
+            const serverUsers = res.data.users
+              .filter(u => {
+                const email = (u.email || '').toLowerCase();
+                return (
+                  !email.startsWith('newuser_') &&
+                  !email.startsWith('brand_new_user_') &&
+                  !email.startsWith('test_new_client_') &&
+                  !email.startsWith('user_a_') &&
+                  !email.startsWith('user_b_')
+                );
+              })
+              .map(u => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                phone: u.phone,
+                area: u.area || 'Indiranagar',
+                status: u.status || 'Active',
+                createdAt: u.created_at || u.createdAt || new Date().toISOString().split('T')[0]
+              }));
+
+            const cleanPrev = sanitizeClients(prev || []);
+            const map = new Map();
+            cleanPrev.forEach(u => map.set(u.id || u.phone || u.email, u));
+            serverUsers.forEach(u => {
+              const key = u.id || u.phone || u.email;
+              map.set(key, { ...(map.get(key) || {}), ...u });
+            });
+
+            const merged = sanitizeClients(Array.from(map.values()));
+            localStorage.setItem('bda_registered_clients', JSON.stringify(merged));
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+  }, [isAdminLoggedIn]);
+
   // Search & Filters
   const [driverSearchQuery, setDriverSearchQuery] = useState('');
   const [driverStatusFilter, setDriverStatusFilter] = useState('All');
@@ -711,6 +862,8 @@ export default function AdminPage({ onReturnToClient }) {
         localStorage.setItem('bda_admin_logged_in', 'true');
         localStorage.setItem('bda_admin_name', res.data.user.name);
         localStorage.setItem('bda_admin_phone', res.data.user.phone);
+        const requestedTab = parseTabFromPath(window.location.pathname);
+        navigateToTab(requestedTab, true);
         return;
       }
     } catch (apiErr) {
@@ -777,6 +930,10 @@ export default function AdminPage({ onReturnToClient }) {
     localStorage.setItem('bda_admin_logged_in', 'true');
     localStorage.setItem('bda_admin_name', nameToSave);
     localStorage.setItem('bda_admin_phone', phoneToSave);
+
+    // Navigate to the requested tab from URL
+    const requestedTab = parseTabFromPath(window.location.pathname);
+    navigateToTab(requestedTab, true);
   };
 
   const handleLogout = async () => {
@@ -789,6 +946,10 @@ export default function AdminPage({ onReturnToClient }) {
     localStorage.removeItem('bda_admin_phone');
     setIsAdminLoggedIn(false);
     setActiveTab('dashboard');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/admin/dashboard');
+      document.title = 'Admin Portal • Book Driver Anna';
+    }
   };
 
   // State map for admin-typed driver details (bookingId -> { name, phone })
@@ -1060,15 +1221,6 @@ export default function AdminPage({ onReturnToClient }) {
             </span>
           </div>
 
-          {/* Search/URL Address Indicator Bar */}
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-full px-4 py-1.5 text-xs text-slate-400 w-full sm:w-80 font-mono">
-            <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="text-slate-300 font-semibold truncate">localhost:3000/admin</span>
-            <span className="ml-auto text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase">
-              Secure
-            </span>
-          </div>
-
           <button 
             onClick={onReturnToClient}
             className="text-xs text-slate-400 hover:text-white font-semibold flex items-center gap-1 transition-colors"
@@ -1302,7 +1454,7 @@ export default function AdminPage({ onReturnToClient }) {
 
           {/* Sidebar Item 1: Dashboard */}
           <button
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => navigateToTab('dashboard')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'dashboard'
                 ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
@@ -1318,7 +1470,7 @@ export default function AdminPage({ onReturnToClient }) {
 
           {/* Sidebar Item 2: For Driver */}
           <button
-            onClick={() => setActiveTab('for-driver')}
+            onClick={() => navigateToTab('for-driver')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'for-driver'
                 ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
@@ -1340,7 +1492,7 @@ export default function AdminPage({ onReturnToClient }) {
 
           {/* Sidebar Item 3: For Vehicle */}
           <button
-            onClick={() => setActiveTab('for-vehicle')}
+            onClick={() => navigateToTab('for-vehicle')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'for-vehicle'
                 ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
@@ -1362,7 +1514,7 @@ export default function AdminPage({ onReturnToClient }) {
 
           {/* Sidebar Item 4: For Driving Class */}
           <button
-            onClick={() => setActiveTab('for-class')}
+            onClick={() => navigateToTab('for-class')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'for-class'
                 ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
@@ -1384,7 +1536,7 @@ export default function AdminPage({ onReturnToClient }) {
 
           {/* Sidebar Item 5: Users */}
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => navigateToTab('users')}
             className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'users'
                 ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
@@ -1482,7 +1634,7 @@ export default function AdminPage({ onReturnToClient }) {
         {/* Mobile Horizontal Quick-Tab Strip */}
         <div className="px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => navigateToTab('dashboard')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'dashboard'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1494,7 +1646,7 @@ export default function AdminPage({ onReturnToClient }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('for-driver')}
+            onClick={() => navigateToTab('for-driver')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'for-driver'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1511,7 +1663,7 @@ export default function AdminPage({ onReturnToClient }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('for-vehicle')}
+            onClick={() => navigateToTab('for-vehicle')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'for-vehicle'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1528,7 +1680,7 @@ export default function AdminPage({ onReturnToClient }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('for-class')}
+            onClick={() => navigateToTab('for-class')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'for-class'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1545,7 +1697,7 @@ export default function AdminPage({ onReturnToClient }) {
           </button>
 
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => navigateToTab('users')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'users'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1621,7 +1773,7 @@ export default function AdminPage({ onReturnToClient }) {
               </div>
 
               <button
-                onClick={() => { setActiveTab('dashboard'); setIsMobileSidebarOpen(false); }}
+                onClick={() => navigateToTab('dashboard')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'dashboard'
                     ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1636,7 +1788,7 @@ export default function AdminPage({ onReturnToClient }) {
               </button>
 
               <button
-                onClick={() => { setActiveTab('for-driver'); setIsMobileSidebarOpen(false); }}
+                onClick={() => navigateToTab('for-driver')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'for-driver'
                     ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1655,7 +1807,7 @@ export default function AdminPage({ onReturnToClient }) {
               </button>
 
               <button
-                onClick={() => { setActiveTab('for-vehicle'); setIsMobileSidebarOpen(false); }}
+                onClick={() => navigateToTab('for-vehicle')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'for-vehicle'
                     ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1674,7 +1826,7 @@ export default function AdminPage({ onReturnToClient }) {
               </button>
 
               <button
-                onClick={() => { setActiveTab('for-class'); setIsMobileSidebarOpen(false); }}
+                onClick={() => navigateToTab('for-class')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'for-class'
                     ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1693,7 +1845,7 @@ export default function AdminPage({ onReturnToClient }) {
               </button>
 
               <button
-                onClick={() => { setActiveTab('users'); setIsMobileSidebarOpen(false); }}
+                onClick={() => navigateToTab('users')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'users'
                     ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -1819,7 +1971,7 @@ export default function AdminPage({ onReturnToClient }) {
 
               {/* KPI 5: Driving Classes */}
               <div 
-                onClick={() => setActiveTab('for-class')}
+                onClick={() => navigateToTab('for-class')}
                 className="bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-3xl p-6 space-y-2 cursor-pointer transition-all group shadow-md"
               >
                 <div className="flex items-center justify-between text-slate-400">
@@ -1837,7 +1989,7 @@ export default function AdminPage({ onReturnToClient }) {
 
               {/* KPI 6: Users & Drivers */}
               <div 
-                onClick={() => setActiveTab('users')}
+                onClick={() => navigateToTab('users')}
                 className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 space-y-2 cursor-pointer transition-all group shadow-md sm:col-span-2 lg:col-span-1"
               >
                 <div className="flex items-center justify-between text-slate-400">
@@ -1864,7 +2016,7 @@ export default function AdminPage({ onReturnToClient }) {
                   <SteeringWheel className="w-5 h-5 text-amber-400" /> Recent Driver Booking Dispatches
                 </h3>
                 <button 
-                  onClick={() => setActiveTab('for-driver')}
+                  onClick={() => navigateToTab('for-driver')}
                   className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1"
                 >
                   Manage All Drivers <ChevronRight className="w-3.5 h-3.5" />

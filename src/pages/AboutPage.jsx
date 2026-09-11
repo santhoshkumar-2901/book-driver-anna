@@ -1,7 +1,5 @@
 import React from 'react';
-import { ShieldCheck, MapPin, CheckCircle2, Car, Award } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
-import { FEATURED_DRIVERS } from '../data/mockData';
 
 export default function AboutPage({ openBookingModal }) {
   return (
@@ -88,39 +86,6 @@ export default function AboutPage({ openBookingModal }) {
         </div>
       </div>
 
-      {/* Driver Partners Grid */}
-      <div className="space-y-6">
-        <div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Our Team
-          </span>
-          <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit'] mt-1">
-            Featured Driver Partners
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {FEATURED_DRIVERS.slice(0, 3).map((driver) => (
-            <div key={driver.id} className="card-surface p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={driver.avatar} 
-                  alt={driver.name} 
-                  className="w-12 h-12 rounded-lg object-cover bg-slate-950" 
-                />
-                <div>
-                  <h4 className="font-bold text-white text-sm">{driver.name}</h4>
-                  <div className="text-xs text-slate-400">{driver.experience}</div>
-                  <div className="text-[11px] text-slate-300">{driver.trips} verified trips</div>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                "{driver.tagline}"
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* CTA Box */}
       <div className="card-surface p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4">

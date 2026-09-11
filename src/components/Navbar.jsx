@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Car, PhoneCall, Menu, X, ShieldCheck, MapPin, GraduationCap, Ban, LogOut, User } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 
-export default function Navbar({ 
-  activePage, 
-  setActivePage, 
-  openBookingModal, 
-  openCancelModal, 
-  clientUser, 
+export default function Navbar({
+  activePage,
+  setActivePage,
+  openBookingModal,
+  openCancelModal,
+  clientUser,
   onLogout,
   onOpenProfile
 }) {
@@ -15,9 +15,9 @@ export default function Navbar({
 
   const navItems = [
     { id: 'home', label: 'Home' },
-    { id: 'services', label: 'Services & Rates' },
-    { id: 'about', label: 'About & Standards' },
-    { id: 'contact', label: 'Contact & Hubs' },
+    { id: 'services', label: 'Services' },
+    { id: 'about', label: 'About' },
+    { id: 'contact', label: 'Contact' },
   ];
 
   const handleNavClick = (pageId) => {
@@ -38,15 +38,15 @@ export default function Navbar({
           </div>
 
           <div className="hidden sm:flex items-center gap-4 text-[11px] shrink-0">
-            <a 
-              href="tel:+919886012345" 
+            <a
+              href="tel:+919886012345"
               className="flex items-center gap-1.5 text-slate-300 hover:text-amber-400 transition-colors"
             >
               <PhoneCall className="w-3 h-3 text-amber-500" />
               <span>24/7 Helpline: +91 98860 12345</span>
             </a>
             <span className="text-slate-700">|</span>
-            <button 
+            <button
               onClick={() => openBookingModal('class')}
               className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer flex items-center gap-1"
             >
@@ -54,7 +54,7 @@ export default function Navbar({
               <span>Driving Classes</span>
             </button>
             <span className="text-slate-700">|</span>
-            <button 
+            <button
               onClick={openCancelModal}
               className="text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
             >
@@ -96,11 +96,10 @@ export default function Navbar({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-800 text-white font-semibold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
-                  }`}
+                  className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${isActive
+                    ? 'bg-slate-800 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -132,7 +131,7 @@ export default function Navbar({
             {/* User Profile Pill & Logout (if logged in) */}
             {clientUser && (
               <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-3 border-l border-slate-800">
-                <button 
+                <button
                   type="button"
                   onClick={onOpenProfile}
                   className="flex items-center gap-1.5 sm:gap-2 py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer"
@@ -176,11 +175,10 @@ export default function Navbar({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  activePage === item.id
-                    ? 'bg-slate-800 text-white font-semibold'
-                    : 'text-slate-300 hover:bg-slate-900'
-                }`}
+                className={`text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
+                  ? 'bg-slate-800 text-white font-semibold'
+                  : 'text-slate-300 hover:bg-slate-900'
+                  }`}
               >
                 {item.label}
               </button>
@@ -189,7 +187,7 @@ export default function Navbar({
 
           {clientUser && (
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-              <button 
+              <button
                 onClick={() => {
                   if (onOpenProfile) onOpenProfile();
                   setMobileMenuOpen(false);

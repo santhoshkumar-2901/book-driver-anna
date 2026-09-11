@@ -96,4 +96,45 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
     assert.strictEqual(data.success, true);
     assert.strictEqual(data.data.booking.id, 'BDA-DRV-9801');
   });
+
+  test('6. Newly registered user has 0 bookings on default (isolation from demo bookings)', async () => {
+    // Register a fresh customer
+    const newEmail = `brand_new_user_${Date.now()}@example.com`;
+    const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Brand New User',
+        email: newEmail,
+        phone: `+91 ${Math.floor(6000000000 + Math.random() * 3000000000)}`,
+        password: 'password123',
+        area: 'Indiranagar'
+      })
+    });
+    assert.strictEqual(regRes.status, 201);
+    const regData = await regRes.json();
+    const newUserToken = regData.data.token;
+
+    // Call /api/bookings/my with the newly registered user
+    const myBookingsRes = await fetch(`${baseUrl}/api/bookings/my`, {
+      headers: { 'Authorization': `Bearer ${newUserToken}` }
+    });
+    assert.strictEqual(myBookingsRes.status, 200);
+    const myBookingsData = await myBookingsRes.json();
+    assert.strictEqual(myBookingsData.success, true);
+    assert.strictEqual(Array.isArray(myBookingsData.data.bookings), true);
+    assert.strictEqual(myBookingsData.data.bookings.length, 0, 'New user must have exactly 0 bookings on default');
+  });
+
+  test('7. Demo user has access to seeded demo bookings', async () => {
+    // Call /api/bookings/my with userToken (logged in as demo user rahul.sharma@example.com)
+    const res = await fetch(`${baseUrl}/api/bookings/my`, {
+      headers: { 'Authorization': `Bearer ${userToken}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert.ok(data.data.bookings.length > 0, 'Demo user should have their seeded demo booking');
+    assert.strictEqual(data.data.bookings[0].id, 'BDA-DRV-9801');
+  });
 });

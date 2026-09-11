@@ -1,66 +1,20 @@
 import React from 'react';
 import { 
-  Car, ShieldCheck, MapPin, Clock, Star, 
-  ArrowRight, CheckCircle2, Compass, Phone, GraduationCap, User
+  Car, ShieldCheck, MapPin, Clock, 
+  ArrowRight, Compass, Phone, GraduationCap 
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
-import { FEATURED_DRIVERS, LOCAL_STATS, OUTSTATION_DESTINATIONS } from '../data/mockData';
+import { LOCAL_STATS, OUTSTATION_DESTINATIONS } from '../data/mockData';
 
 export default function HomePage({ 
   setActivePage, 
-  openBookingModal, 
-  openDriverSpotlight,
-  clientUser,
-  onOpenProfile
+  openBookingModal 
 }) {
   return (
     <div className="space-y-12 pb-16">
 
-      {/* Logged-In User Account Summary Strip */}
-      {clientUser && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-          <div 
-            onClick={onOpenProfile}
-            className="card-surface p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:border-slate-700 cursor-pointer"
-            title="Click to view your profile and trip history"
-          >
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm flex items-center justify-center shrink-0">
-                {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <span className="text-xs text-slate-400">Welcome,</span>
-                  <span className="text-sm font-bold text-white truncate">
-                    {clientUser.name}
-                  </span>
-                  <span className="text-[9px] sm:text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.5 rounded font-medium shrink-0">
-                    Verified
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
-                  <span className="font-mono text-slate-300">{clientUser.phone}</span>
-                  <span>•</span>
-                  <span className="text-slate-400 truncate">{clientUser.area || 'Indiranagar'}</span>
-                </div>
-              </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onOpenProfile) onOpenProfile();
-              }}
-              className="btn-secondary py-1.5 px-3 text-xs w-full sm:w-auto shrink-0 justify-center"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Manage Account</span>
-            </button>
-          </div>
-        </div>
-      )}
       
       {/* HERO SECTION */}
       <section className="pt-6 sm:pt-12 px-4 sm:px-6 lg:px-8">
@@ -314,83 +268,7 @@ export default function HomePage({
         </div>
       </section>
 
-      {/* VERIFIED DRIVER PARTNERS SPOTLIGHT */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Quality Standards
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white font-['Outfit'] mt-0.5">
-              Verified Driver Partners
-            </h2>
-            <p className="text-slate-400 text-xs mt-1">
-              Police verified, background-cleared, with minimum 5+ years of city and highway experience.
-            </p>
-          </div>
 
-          <button
-            onClick={() => setActivePage('about')}
-            className="text-xs font-semibold text-amber-500 hover:text-amber-400 transition-colors flex items-center gap-1 self-start sm:self-auto"
-          >
-            Driver verification standards <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURED_DRIVERS.map((driver) => (
-            <div 
-              key={driver.id} 
-              className="card-surface p-4 flex flex-col justify-between hover:border-slate-700 transition-colors"
-            >
-              <div className="space-y-3">
-                <div className="relative rounded-lg overflow-hidden bg-slate-950 aspect-[4/3]">
-                  <img 
-                    src={driver.avatar} 
-                    alt={driver.name} 
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-2 left-2 bg-slate-950/90 text-slate-200 text-[10px] font-semibold px-2 py-0.5 rounded border border-slate-800">
-                    {driver.badge}
-                  </span>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-sm text-white">{driver.name}</h3>
-                    <div className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
-                      <Star className="w-3 h-3 fill-amber-500" /> {driver.rating}
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-0.5">{driver.experience}</div>
-                  <div className="text-[11px] text-slate-300 mt-1 font-medium">
-                    {driver.trips} verified trips
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-400 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 line-clamp-2">
-                  "{driver.tagline}"
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 mt-3 flex gap-2">
-                <button
-                  onClick={() => openDriverSpotlight(driver)}
-                  className="btn-ghost flex-1 py-1.5 text-xs"
-                >
-                  Details
-                </button>
-                <button
-                  onClick={() => openBookingModal('driver')}
-                  className="btn-primary py-1.5 px-3 text-xs"
-                >
-                  Book
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* POPULAR OUTSTATION ROUTES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">

@@ -99,32 +99,6 @@ export function seedDatabase() {
       spec: 'SUVs & Outstation Routes',
       rating: 4.94,
       trips: 2190
-    },
-    {
-      drvId: 'DRV-1004',
-      usrId: 'USR-DRV-1004',
-      name: 'Raghavendra Rao',
-      email: 'raghavendra.rao@driveranna.com',
-      phone: '+91 97410 33445',
-      license: 'KA-03-2022-0077889',
-      area: 'Jayanagar',
-      exp: 10,
-      spec: 'Hill Driving & Outstation Ghats',
-      rating: 4.99,
-      trips: 4120
-    },
-    {
-      drvId: 'DRV-1005',
-      usrId: 'USR-DRV-1005',
-      name: 'Chandra Shekar',
-      email: 'chandra.shekar@driveranna.com',
-      phone: '+91 98801 99881',
-      license: 'KA-51-2021-0065432',
-      area: 'HSR Layout',
-      exp: 5,
-      spec: 'Commercial Tempos & Mini Buses',
-      rating: 4.92,
-      trips: 1840
     }
   ];
 

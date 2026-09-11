@@ -33,8 +33,7 @@ const DEFAULT_REGISTERED_CLIENTS = [
 export default function ClientAuthPage({ 
   initialMode = 'login', 
   onLoginSuccess, 
-  onGoToAdmin,
-  onChangeRole,
+  onChangeRole, 
   onSwitchMode 
 }) {
   const [authMode, setAuthMode] = useState(initialMode); // 'login' or 'signup'
@@ -59,27 +58,116 @@ export default function ClientAuthPage({
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sync mode from URL or prop changes
-  useEffect(() => {
-    setAuthMode(initialMode);
+  // Form input element refs for direct DOM clearing if browser injects values
+  const loginIdentifierRef = React.useRef(null);
+  const loginPasswordRef = React.useRef(null);
+  const signupNameRef = React.useRef(null);
+  const signupPhoneRef = React.useRef(null);
+  const signupEmailRef = React.useRef(null);
+  const signupPasswordRef = React.useRef(null);
+  const signupConfirmPasswordRef = React.useRef(null);
+
+  // Clear all previous input information from login and signup forms
+  const resetForm = () => {
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setSignupName('');
+    setSignupPhone('');
+    setSignupEmail('');
+    setSignupArea('Indiranagar');
+    setSignupPassword('');
+    setSignupConfirmPassword('');
+    setAgreeTerms(true);
+    setShowPassword(false);
     setErrorMessage('');
     setSuccessMessage('');
+
+    if (loginIdentifierRef.current) loginIdentifierRef.current.value = '';
+    if (loginPasswordRef.current) loginPasswordRef.current.value = '';
+    if (signupNameRef.current) signupNameRef.current.value = '';
+    if (signupPhoneRef.current) signupPhoneRef.current.value = '';
+    if (signupEmailRef.current) signupEmailRef.current.value = '';
+    if (signupPasswordRef.current) signupPasswordRef.current.value = '';
+    if (signupConfirmPasswordRef.current) signupConfirmPasswordRef.current.value = '';
+  };
+
+  // Sync mode from URL or prop changes and wipe all previous input info on visit/revisit
+  useEffect(() => {
+    setAuthMode(initialMode);
+    resetForm();
+
+    // Browser password managers / autofill engines inject credentials asynchronously 50-300ms after DOM mount
+    const t1 = setTimeout(() => {
+      resetForm();
+    }, 60);
+    const t2 = setTimeout(() => {
+      resetForm();
+    }, 250);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      resetForm();
+    };
   }, [initialMode]);
 
-  // Seed default registered clients if not present, and purge any old non-dummy test names
+  // Seed default registered clients if not present
   useEffect(() => {
     try {
       const stored = localStorage.getItem('bda_registered_clients');
-      if (!stored || stored.toLowerCase().includes('santhosh')) {
+      if (!stored) {
         localStorage.setItem('bda_registered_clients', JSON.stringify(DEFAULT_REGISTERED_CLIENTS));
       }
     } catch (e) {}
   }, []);
 
+  // Synchronize registered/authenticated customer with localStorage and notify Admin in real-time
+  const syncUserToRegisteredClients = (user) => {
+    if (!user) return;
+    try {
+      let list = DEFAULT_REGISTERED_CLIENTS;
+      const raw = localStorage.getItem('bda_registered_clients');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+      }
+      const cleanPhone = (user.phone || '').replace(/[^0-9]/g, '');
+      const cleanEmail = (user.email || '').trim().toLowerCase();
+
+      const idx = list.findIndex(u => 
+        (u.id && user.id && u.id === user.id) ||
+        (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail) ||
+        (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
+      );
+
+      const clientEntry = {
+        id: user.id || ('CLI-' + Math.floor(1000 + Math.random() * 9000)),
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        area: user.area || 'Indiranagar',
+        status: user.status || 'Active',
+        createdAt: user.createdAt || user.created_at || new Date().toISOString().split('T')[0]
+      };
+
+      let updatedList;
+      if (idx !== -1) {
+        updatedList = [...list];
+        updatedList[idx] = { ...updatedList[idx], ...clientEntry };
+      } else {
+        updatedList = [clientEntry, ...list];
+      }
+
+      localStorage.setItem('bda_registered_clients', JSON.stringify(updatedList));
+      window.dispatchEvent(new CustomEvent('bda_client_registered', { detail: clientEntry }));
+    } catch (err) {
+      console.error('Error syncing user to registered clients:', err);
+    }
+  };
+
   const switchMode = (newMode) => {
     setAuthMode(newMode);
-    setErrorMessage('');
-    setSuccessMessage('');
+    resetForm();
     if (onSwitchMode) {
       onSwitchMode(newMode);
     } else if (typeof window !== 'undefined') {
@@ -103,7 +191,10 @@ export default function ClientAuthPage({
         loggedInAt: new Date().toISOString()
       };
       localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
+      syncUserToRegisteredClients(sessionData);
       setSuccessMessage(`Welcome back, ${demoUser.name}! Logging you in...`);
+      // Wipe input boxes immediately so returning to signin page starts completely empty
+      resetForm();
       setTimeout(() => {
         setIsLoading(false);
         onLoginSuccess(sessionData);
@@ -126,12 +217,15 @@ export default function ClientAuthPage({
       return;
     }
 
+    const submittedIdentifier = loginIdentifier.trim();
+    const submittedPassword = loginPassword;
+
     setIsLoading(true);
 
     try {
       const res = await apiClient.login({
-        identifier: loginIdentifier.trim(),
-        password: loginPassword
+        identifier: submittedIdentifier,
+        password: submittedPassword
       });
 
       if (res && res.data && res.data.user) {
@@ -146,6 +240,11 @@ export default function ClientAuthPage({
         } else {
           sessionStorage.setItem('bda_client_user', JSON.stringify(sessionData));
         }
+
+        syncUserToRegisteredClients(res.data.user);
+
+        // Wipe input boxes immediately so returning to signin page starts completely empty
+        resetForm();
 
         setSuccessMessage(`Welcome, ${res.data.user.name}! Opening Namma Bangalore services...`);
         setTimeout(() => {
@@ -170,8 +269,8 @@ export default function ClientAuthPage({
         registeredUsers = DEFAULT_REGISTERED_CLIENTS;
       }
 
-      const cleanInput = loginIdentifier.trim().toLowerCase();
-      const cleanPhone = loginIdentifier.replace(/[^0-9]/g, '');
+      const cleanInput = submittedIdentifier.toLowerCase();
+      const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
 
       // Check against stored registered clients
       const matchedUser = registeredUsers.find(u => 
@@ -180,7 +279,7 @@ export default function ClientAuthPage({
       );
 
       if (matchedUser) {
-        if (matchedUser.password && matchedUser.password !== loginPassword) {
+        if (matchedUser.password && matchedUser.password !== submittedPassword) {
           setIsLoading(false);
           setErrorMessage('Incorrect password. Please verify and try again.');
           return;
@@ -201,6 +300,11 @@ export default function ClientAuthPage({
         } else {
           sessionStorage.setItem('bda_client_user', JSON.stringify(sessionData));
         }
+
+        syncUserToRegisteredClients(matchedUser);
+
+        // Wipe input boxes immediately so returning to signin page starts completely empty
+        resetForm();
 
         setSuccessMessage(`Welcome, ${matchedUser.name}! Opening Namma Bangalore services...`);
         setTimeout(() => {
@@ -264,6 +368,8 @@ export default function ClientAuthPage({
           loggedInAt: new Date().toISOString()
         };
         localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
+        syncUserToRegisteredClients(res.data.user);
+        resetForm();
         setSuccessMessage(`Registration successful! Welcome to Book Driver Anna, ${res.data.user.name}!`);
         setTimeout(() => {
           setIsLoading(false);
@@ -282,7 +388,7 @@ export default function ClientAuthPage({
     setTimeout(() => {
       setIsLoading(false);
 
-      let registeredClients = DEFAULT_CLIENTS;
+      let registeredClients = DEFAULT_REGISTERED_CLIENTS;
       try {
         const saved = localStorage.getItem('bda_registered_clients');
         if (saved) {
@@ -290,7 +396,7 @@ export default function ClientAuthPage({
           if (Array.isArray(parsed)) registeredClients = parsed;
         }
       } catch (err) {
-        registeredClients = DEFAULT_CLIENTS;
+        registeredClients = DEFAULT_REGISTERED_CLIENTS;
       }
 
       // Check if email or phone already registered
@@ -319,17 +425,8 @@ export default function ClientAuthPage({
         createdAt: new Date().toISOString().split('T')[0]
       };
 
-      try {
-        let registeredClients = DEFAULT_CLIENTS;
-        const saved = localStorage.getItem('bda_registered_clients');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) registeredClients = parsed;
-        }
-        const updatedList = [...registeredClients, newClient];
-        localStorage.setItem('bda_registered_clients', JSON.stringify(updatedList));
-        window.dispatchEvent(new CustomEvent('bda_client_registered'));
-      } catch (err) {}
+      syncUserToRegisteredClients(newClient);
+      resetForm();
 
       setSuccessMessage(`Account created successfully! Welcome, ${newClient.name}.`);
       if (onLoginSuccess) {
@@ -365,7 +462,10 @@ export default function ClientAuthPage({
         {onChangeRole && (
           <button
             type="button"
-            onClick={onChangeRole}
+            onClick={() => {
+              resetForm();
+              onChangeRole();
+            }}
             className="text-[10px] sm:text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
           >
             <span>← Role</span>
@@ -440,7 +540,26 @@ export default function ClientAuthPage({
                 A. LOGIN FORM
                ========================================================================= */}
             {authMode === 'login' ? (
-              <form onSubmit={handleLoginSubmit} className="space-y-3">
+              <form onSubmit={handleLoginSubmit} className="space-y-3" autoComplete="off">
+                {/* Hidden dummy fields to absorb aggressive browser autofill */}
+                <input
+                  type="text"
+                  name="bda_prevent_autofill_user"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="off"
+                  className="sr-only hidden"
+                  readOnly
+                />
+                <input
+                  type="password"
+                  name="bda_prevent_autofill_pwd"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="new-password"
+                  className="sr-only hidden"
+                  readOnly
+                />
                 
                 {/* Email or Phone */}
                 <div className="space-y-1">
@@ -450,8 +569,12 @@ export default function ClientAuthPage({
                   <div className="relative">
                     <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={loginIdentifierRef}
                       type="text"
+                      name="bda_client_identity"
+                      id="bda_client_identity"
                       required
+                      autoComplete="off"
                       placeholder="e.g. rahul.sharma@example.com or 9886012345"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
@@ -470,8 +593,12 @@ export default function ClientAuthPage({
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={loginPasswordRef}
                       type={showPassword ? 'text' : 'password'}
+                      name="bda_client_security_key"
+                      id="bda_client_security_key"
                       required
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
@@ -541,7 +668,26 @@ export default function ClientAuthPage({
               /* =========================================================================
                   B. SIGNUP FORM
                  ========================================================================= */
-              <form onSubmit={handleSignupSubmit} className="space-y-2">
+              <form onSubmit={handleSignupSubmit} className="space-y-2" autoComplete="off">
+                {/* Hidden dummy fields to absorb browser autofill */}
+                <input
+                  type="text"
+                  name="bda_prevent_signup_user"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="off"
+                  className="sr-only hidden"
+                  readOnly
+                />
+                <input
+                  type="password"
+                  name="bda_prevent_signup_pwd"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="new-password"
+                  className="sr-only hidden"
+                  readOnly
+                />
                 
                 {/* Full Name */}
                 <div className="space-y-0.5">
@@ -551,8 +697,11 @@ export default function ClientAuthPage({
                   <div className="relative">
                     <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={signupNameRef}
                       type="text"
+                      name="bda_client_reg_name"
                       required
+                      autoComplete="off"
                       placeholder="e.g. Rahul Sharma"
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
@@ -570,8 +719,11 @@ export default function ClientAuthPage({
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        ref={signupPhoneRef}
                         type="tel"
+                        name="bda_client_reg_phone"
                         required
+                        autoComplete="off"
                         placeholder="98860 12345"
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}
@@ -607,8 +759,11 @@ export default function ClientAuthPage({
                   <div className="relative">
                     <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={signupEmailRef}
                       type="email"
+                      name="bda_client_reg_email"
                       required
+                      autoComplete="off"
                       placeholder="e.g. rahul.sharma@example.com"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
@@ -626,8 +781,11 @@ export default function ClientAuthPage({
                     <div className="relative">
                       <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        ref={signupPasswordRef}
                         type={showPassword ? 'text' : 'password'}
+                        name="bda_client_reg_pwd"
                         required
+                        autoComplete="new-password"
                         placeholder="Min 6 chars"
                         value={signupPassword}
                         onChange={(e) => setSignupPassword(e.target.value)}
@@ -643,8 +801,11 @@ export default function ClientAuthPage({
                     <div className="relative">
                       <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        ref={signupConfirmPasswordRef}
                         type={showPassword ? 'text' : 'password'}
+                        name="bda_client_reg_cpwd"
                         required
+                        autoComplete="new-password"
                         placeholder="Repeat password"
                         value={signupConfirmPassword}
                         onChange={(e) => setSignupConfirmPassword(e.target.value)}

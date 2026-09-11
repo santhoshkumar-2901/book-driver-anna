@@ -39,14 +39,63 @@ export default function DriverAuthPage({
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
 
+  // Form input element refs for direct DOM clearing if browser injects values
+  const loginIdentifierRef = React.useRef(null);
+  const loginPasswordRef = React.useRef(null);
+  const signupNameRef = React.useRef(null);
+  const signupPhoneRef = React.useRef(null);
+  const signupDlRef = React.useRef(null);
+  const signupPasswordRef = React.useRef(null);
+  const signupConfirmPasswordRef = React.useRef(null);
+
+  // Clear all previous input information from driver login and signup forms
+  const resetForm = () => {
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setSignupName('');
+    setSignupPhone('');
+    setSignupDl('');
+    setSignupVehicleType('Manual & Automatic Cars');
+    setSignupArea('Indiranagar');
+    setSignupExperience('3-5 Years');
+    setSignupPassword('');
+    setSignupConfirmPassword('');
+    setAgreeTerms(true);
+    setShowPassword(false);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (loginIdentifierRef.current) loginIdentifierRef.current.value = '';
+    if (loginPasswordRef.current) loginPasswordRef.current.value = '';
+    if (signupNameRef.current) signupNameRef.current.value = '';
+    if (signupPhoneRef.current) signupPhoneRef.current.value = '';
+    if (signupDlRef.current) signupDlRef.current.value = '';
+    if (signupPasswordRef.current) signupPasswordRef.current.value = '';
+    if (signupConfirmPasswordRef.current) signupConfirmPasswordRef.current.value = '';
+  };
+
   useEffect(() => {
     setAuthMode(initialMode);
+    resetForm();
+
+    // Browser password managers / autofill engines inject credentials asynchronously 50-300ms after DOM mount
+    const t1 = setTimeout(() => {
+      resetForm();
+    }, 60);
+    const t2 = setTimeout(() => {
+      resetForm();
+    }, 250);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      resetForm();
+    };
   }, [initialMode]);
 
   const switchMode = (mode) => {
     setAuthMode(mode);
-    setErrorMessage('');
-    setSuccessMessage('');
+    resetForm();
     if (onSwitchMode) onSwitchMode(mode);
   };
 
@@ -61,12 +110,15 @@ export default function DriverAuthPage({
       return;
     }
 
+    const submittedIdentifier = loginIdentifier.trim();
+    const submittedPassword = loginPassword.trim();
+
     setIsLoading(true);
 
     try {
       const res = await apiClient.driverLogin({
-        identifier: loginIdentifier.trim(),
-        password: loginPassword
+        identifier: submittedIdentifier,
+        password: submittedPassword
       });
 
       if (res && res.data && res.data.user) {
@@ -76,6 +128,7 @@ export default function DriverAuthPage({
           loggedInAt: new Date().toISOString()
         };
         localStorage.setItem('bda_driver_user', JSON.stringify(driverData));
+        resetForm();
         setSuccessMessage(`Welcome back, Anna ${res.data.user.name}!`);
         setTimeout(() => {
           setIsLoading(false);
@@ -104,7 +157,7 @@ export default function DriverAuthPage({
         }
       } catch (err) {}
 
-      const cleanInput = loginIdentifier.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const cleanInput = submittedIdentifier.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
       const matched = drivers.find(d => {
         const cleanPhone = (d.phone || '').replace(/[^0-9]/g, '');
         const cleanDl = (d.dlNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -112,6 +165,7 @@ export default function DriverAuthPage({
       });
 
       if (matched) {
+        resetForm();
         setSuccessMessage(`Welcome back, Anna ${matched.name}!`);
         if (onLoginSuccess) {
           onLoginSuccess(matched);
@@ -121,8 +175,9 @@ export default function DriverAuthPage({
         const fallbackDriver = {
           ...DEFAULT_DRIVERS[0],
           name: "Manjunath Gowda",
-          phone: loginIdentifier.startsWith('+91') ? loginIdentifier : `+91 ${loginIdentifier}`
+          phone: submittedIdentifier.startsWith('+91') ? submittedIdentifier : `+91 ${submittedIdentifier}`
         };
+        resetForm();
         setSuccessMessage(`Verified successfully. Welcome, Anna ${fallbackDriver.name}!`);
         if (onLoginSuccess) {
           onLoginSuccess(fallbackDriver);
@@ -138,6 +193,7 @@ export default function DriverAuthPage({
     setTimeout(() => {
       setIsLoading(false);
       const demoDriver = DEFAULT_DRIVERS[0];
+      resetForm();
       setSuccessMessage(`Logged in as Top Rated Anna: ${demoDriver.name}`);
       if (onLoginSuccess) {
         onLoginSuccess(demoDriver);
@@ -210,6 +266,7 @@ export default function DriverAuthPage({
         window.dispatchEvent(new CustomEvent('bda_driver_registered'));
       } catch (err) {}
 
+      resetForm();
       setSuccessMessage(`Driver partner profile registered! Welcome to the fleet, Anna ${newDriver.name}.`);
       if (onLoginSuccess) {
         onLoginSuccess(newDriver);
@@ -244,7 +301,10 @@ export default function DriverAuthPage({
         {onChangeRole && (
           <button
             type="button"
-            onClick={onChangeRole}
+            onClick={() => {
+              resetForm();
+              onChangeRole();
+            }}
             className="text-[10px] sm:text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
           >
             <span>← Role</span>
@@ -319,7 +379,26 @@ export default function DriverAuthPage({
                 A. DRIVER LOGIN FORM (/driver/login)
                ========================================================================= */}
             {authMode === 'login' ? (
-              <form onSubmit={handleLoginSubmit} className="space-y-3">
+              <form onSubmit={handleLoginSubmit} className="space-y-3" autoComplete="off">
+                {/* Hidden dummy fields to absorb aggressive browser autofill */}
+                <input
+                  type="text"
+                  name="bda_prevent_driver_user"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="off"
+                  className="sr-only hidden"
+                  readOnly
+                />
+                <input
+                  type="password"
+                  name="bda_prevent_driver_pwd"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="new-password"
+                  className="sr-only hidden"
+                  readOnly
+                />
                 
                 {/* Mobile or DL Number */}
                 <div className="space-y-1">
@@ -329,8 +408,12 @@ export default function DriverAuthPage({
                   <div className="relative">
                     <Phone className="w-3.5 h-3.5 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={loginIdentifierRef}
                       type="text"
+                      name="bda_driver_identity"
+                      id="bda_driver_identity"
                       required
+                      autoComplete="off"
                       placeholder="e.g. 98860 12345 or KA-04-2021-0098745"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
@@ -349,8 +432,12 @@ export default function DriverAuthPage({
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={loginPasswordRef}
                       type={showPassword ? 'text' : 'password'}
+                      name="bda_driver_security_pin"
+                      id="bda_driver_security_pin"
                       required
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
@@ -420,7 +507,26 @@ export default function DriverAuthPage({
               /* =========================================================================
                   B. DRIVER SIGNUP FORM (/driver/signup)
                  ========================================================================= */
-              <form onSubmit={handleSignupSubmit} className="space-y-2">
+              <form onSubmit={handleSignupSubmit} className="space-y-2" autoComplete="off">
+                {/* Hidden dummy fields to absorb browser autofill */}
+                <input
+                  type="text"
+                  name="bda_prevent_drv_signup_user"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="off"
+                  className="sr-only hidden"
+                  readOnly
+                />
+                <input
+                  type="password"
+                  name="bda_prevent_drv_signup_pwd"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="new-password"
+                  className="sr-only hidden"
+                  readOnly
+                />
                 
                 {/* Full Name */}
                 <div className="space-y-0.5">
@@ -430,8 +536,11 @@ export default function DriverAuthPage({
                   <div className="relative">
                     <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={signupNameRef}
                       type="text"
+                      name="bda_drv_reg_name"
                       required
+                      autoComplete="off"
                       placeholder="e.g. Manjunath Gowda"
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
@@ -449,8 +558,11 @@ export default function DriverAuthPage({
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        ref={signupPhoneRef}
                         type="tel"
+                        name="bda_drv_reg_phone"
                         required
+                        autoComplete="off"
                         placeholder="98860 12345"
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}
@@ -466,8 +578,11 @@ export default function DriverAuthPage({
                     <div className="relative">
                       <Award className="w-3.5 h-3.5 text-amber-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        ref={signupDlRef}
                         type="text"
+                        name="bda_drv_reg_dl"
                         required
+                        autoComplete="off"
                         placeholder="KA-04-2022-0048123"
                         value={signupDl}
                         onChange={(e) => setSignupDl(e.target.value)}
@@ -534,8 +649,11 @@ export default function DriverAuthPage({
                       Create PIN (Password) *
                     </label>
                     <input
+                      ref={signupPasswordRef}
                       type={showPassword ? 'text' : 'password'}
+                      name="bda_drv_reg_pin"
                       required
+                      autoComplete="new-password"
                       placeholder="Min 6 chars"
                       value={signupPassword}
                       onChange={(e) => setSignupPassword(e.target.value)}
@@ -550,8 +668,11 @@ export default function DriverAuthPage({
                     Confirm PIN *
                   </label>
                   <input
+                    ref={signupConfirmPasswordRef}
                     type={showPassword ? 'text' : 'password'}
+                    name="bda_drv_reg_cpin"
                     required
+                    autoComplete="new-password"
                     placeholder="Repeat PIN / password"
                     value={signupConfirmPassword}
                     onChange={(e) => setSignupConfirmPassword(e.target.value)}

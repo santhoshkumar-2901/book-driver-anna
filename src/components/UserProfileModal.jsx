@@ -2,12 +2,72 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, User, Phone, Mail, MapPin, Calendar, ShieldCheck, 
   Car, Clock, CheckCircle2, AlertCircle, Edit3, LogOut, 
-  Sparkles, ArrowRight, Ban, Award, Check, Save
+  Sparkles, ArrowRight, Ban, Award, Check, Save, XCircle
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { useScrollLock } from '../utils/useScrollLock';
 import { toDDMMYYYY } from '../utils/dateUtils';
+import { apiClient } from '../services/apiClient';
+
+// Helper to determine if the active user is one of the pre-seeded demo accounts
+export const isDemoUser = (user) => {
+  if (!user) return false;
+  const email = (user.email || '').toLowerCase().trim();
+  const id = (user.id || '').toUpperCase().trim();
+  
+  // Seeded demo IDs or emails
+  if (['CLI-901', 'CLI-902', 'USR-8821', 'USR-8822'].includes(id)) return true;
+  if (['rahul.sharma@example.com', 'priya@gmail.com'].includes(email)) return true;
+  if (user.isDemo === true) return true;
+
+  return false;
+};
+
+// The two default bookings that strictly and exclusively appear ONLY on demo users
+export const DEFAULT_DEMO_BOOKINGS = [
+  {
+    id: 'BDA-DRV-9801',
+    serviceType: 'driver',
+    title: 'One Way Trip Driver',
+    category: 'Personal Driver',
+    date: '06/09/2026',
+    time: '09:00 AM',
+    pickup: 'Indiranagar',
+    drop: 'Kempegowda Intl Airport (BLR T1/T2)',
+    amount: '₹314',
+    status: 'Pending'
+  },
+  {
+    id: 'BDA-VEH-9802',
+    serviceType: 'vehicle',
+    title: 'Sedan Rental',
+    category: 'Car Rental',
+    date: 'Recent',
+    time: '10:30 AM',
+    pickup: 'Indiranagar',
+    drop: 'Koramangala 5th Block',
+    amount: '₹1,499',
+    status: 'Cancelled'
+  }
+];
+
+// Set of demo booking IDs to exclude for any non-demo users
+const DEMO_BOOKING_IDS = new Set([
+  'BDA-DRV-9801',
+  'BDA-VEH-9802',
+  'BDA-977047',
+  'BDA-VEH-9DE337',
+  'BDA-DRV-9802',
+  'BDA-DRV-9803',
+  'BDA-DRV-9804',
+  'BDA-DRV-9805',
+  'BDA-DRV-9806',
+  'BDA-VEH-4101',
+  'BDA-VEH-4102',
+  'BDA-VEH-4103',
+  'BDA-VEH-4104'
+]);
 
 export default function UserProfileModal({ 
   isOpen, 
@@ -41,107 +101,175 @@ export default function UserProfileModal({
     }
   }, [clientUser]);
 
-  // Load user bookings whenever modal opens
+  // Load user bookings whenever modal opens or bookings are updated
   useEffect(() => {
     if (!isOpen || !clientUser) return;
 
-    const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
-    const userEmailClean = (clientUser.email || '').toLowerCase().trim();
-    const userNameClean = (clientUser.name || '').toLowerCase().trim();
+    // 1. If this is a seeded demo user, show the 2 demo bookings
+    if (isDemoUser(clientUser)) {
+      setUserBookings(DEFAULT_DEMO_BOOKINGS);
+      return;
+    }
 
-    const matched = [];
+    // 2. For newly registered or real users:
+    // Start empty by default so new accounts have 0 bookings until they place an order
+    let isCancelled = false;
 
-    // 1. Driver bookings
-    try {
-      const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      driverBookings.forEach(b => {
-        const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
-        const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-        const bName = (b.customerName || '').toLowerCase().trim();
+    const fetchBookings = async () => {
+      const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
+      const userEmailClean = (clientUser.email || '').toLowerCase().trim();
+      const currentUserId = clientUser.id ? String(clientUser.id).trim() : null;
 
-        const isMatch = 
-          (userPhoneClean && bPhone.endsWith(userPhoneClean.slice(-10))) ||
-          (userEmailClean && bEmail === userEmailClean) ||
-          (userNameClean && bName === userNameClean);
+      const matched = [];
+      const seenIds = new Set();
 
-        if (isMatch) {
-          matched.push({
-            id: b.id,
-            serviceType: 'driver',
-            title: b.tripTitle || 'Driver Anna Duty',
-            category: 'Personal Driver',
-            date: b.date || b.bookingDate || 'Recent',
-            time: b.time || b.bookingTime || '',
-            pickup: b.pickupArea || 'Indiranagar',
-            drop: b.dropLocation || '',
-            amount: b.estimatedPrice || b.fare || '₹299',
-            status: b.status || 'Confirmed'
+      // First attempt: Query authoritative bookings from backend API
+      try {
+        const res = await apiClient.getMyBookings();
+        if (!isCancelled && res && res.data && Array.isArray(res.data.bookings)) {
+          res.data.bookings.forEach(b => {
+            // Strictly exclude any demo bookings for regular/new accounts
+            if (DEMO_BOOKING_IDS.has(b.id)) return;
+            if (!seenIds.has(b.id)) {
+              seenIds.add(b.id);
+              matched.push({
+                id: b.id,
+                serviceType: b.booking_type || 'driver',
+                title: b.service_name || 'Driver Anna Duty',
+                category: b.booking_type === 'vehicle' ? 'Car Rental' : (b.booking_type === 'class' ? 'Driving School' : 'Personal Driver'),
+                date: b.date || 'Recent',
+                time: b.time || '',
+                pickup: b.pickup_area || 'Indiranagar',
+                drop: b.drop_location || '',
+                amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
+                status: b.status || 'Confirmed'
+              });
+            }
           });
         }
-      });
-    } catch (e) {}
+      } catch (err) {
+        // Backend lookup fallback
+      }
 
-    // 2. Vehicle bookings
-    try {
-      const vehicleBookings = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
-      vehicleBookings.forEach(b => {
-        const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
-        const bEmail = (b.email || '').toLowerCase().trim();
-        const bName = (b.customerName || '').toLowerCase().trim();
+      // Check local storage for any bookings created during the active browser session
+      // STRICT requirement: Only match if booking explicitly has this user's userId or verified email/phone,
+      // and NEVER include demo bookings or match by name alone.
+      try {
+        const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        driverBookings.forEach(b => {
+          if (DEMO_BOOKING_IDS.has(b.id)) return;
+          if (b.isDemo) return;
 
-        const isMatch = 
-          (userPhoneClean && bPhone.endsWith(userPhoneClean.slice(-10))) ||
-          (userEmailClean && bEmail === userEmailClean) ||
-          (userNameClean && bName === userNameClean);
+          const bUserId = b.userId ? String(b.userId).trim() : null;
+          const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
+          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
 
-        if (isMatch) {
-          matched.push({
-            id: b.id,
-            serviceType: 'vehicle',
-            title: b.vehicleName || 'Rental Vehicle',
-            category: 'Car Rental',
-            date: b.startDate || 'Recent',
-            time: b.pickupTime || '',
-            pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
-            drop: b.dropLocation || '',
-            amount: b.totalPrice ? `₹${b.totalPrice}` : '₹1,499',
-            status: b.status || 'Confirmed'
-          });
-        }
-      });
-    } catch (e) {}
+          const isOwner = 
+            (currentUserId && bUserId && bUserId === currentUserId) ||
+            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
+            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
 
-    // 3. Driving classes
-    try {
-      const classEnrollments = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
-      classEnrollments.forEach(b => {
-        const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
-        const bEmail = (b.email || '').toLowerCase().trim();
-        const bName = (b.studentName || b.candidateName || '').toLowerCase().trim();
+          if (isOwner && !seenIds.has(b.id)) {
+            seenIds.add(b.id);
+            matched.push({
+              id: b.id,
+              serviceType: 'driver',
+              title: b.tripTitle || 'Driver Anna Duty',
+              category: 'Personal Driver',
+              date: b.date || b.bookingDate || 'Recent',
+              time: b.time || b.bookingTime || '',
+              pickup: b.pickupArea || 'Indiranagar',
+              drop: b.dropLocation || '',
+              amount: b.estimatedPrice || b.fare || '₹299',
+              status: b.status || 'Confirmed'
+            });
+          }
+        });
+      } catch (e) {}
 
-        const isMatch = 
-          (userPhoneClean && bPhone.endsWith(userPhoneClean.slice(-10))) ||
-          (userEmailClean && bEmail === userEmailClean) ||
-          (userNameClean && bName === userNameClean);
+      try {
+        const vehicleBookings = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
+        vehicleBookings.forEach(b => {
+          if (DEMO_BOOKING_IDS.has(b.id)) return;
+          if (b.isDemo) return;
 
-        if (isMatch) {
-          matched.push({
-            id: b.enrollmentId || b.id,
-            serviceType: 'class',
-            title: b.courseName || 'Driving Class Session',
-            category: 'Driving School',
-            date: b.startDate || 'Upcoming',
-            time: b.preferredSlot || '',
-            pickup: b.pickupArea || 'Doorstep',
-            drop: '',
-            amount: b.courseFee || '₹3,999',
-            status: b.status || 'Active'
-          });
-        }
-      });
-    } catch (e) {}
+          const bUserId = b.userId ? String(b.userId).trim() : null;
+          const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
+          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
 
-    setUserBookings(matched);
+          const isOwner = 
+            (currentUserId && bUserId && bUserId === currentUserId) ||
+            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
+            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+
+          if (isOwner && !seenIds.has(b.id)) {
+            seenIds.add(b.id);
+            matched.push({
+              id: b.id,
+              serviceType: 'vehicle',
+              title: b.vehicleName || 'Rental Vehicle',
+              category: 'Car Rental',
+              date: b.startDate || 'Recent',
+              time: b.pickupTime || '',
+              pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
+              drop: b.dropLocation || '',
+              amount: b.totalPrice ? `₹${b.totalPrice}` : '₹1,499',
+              status: b.status || 'Confirmed'
+            });
+          }
+        });
+      } catch (e) {}
+
+      try {
+        const classEnrollments = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
+        classEnrollments.forEach(b => {
+          const bId = b.enrollmentId || b.id;
+          if (DEMO_BOOKING_IDS.has(bId)) return;
+          if (b.isDemo) return;
+
+          const bUserId = b.userId ? String(b.userId).trim() : null;
+          const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
+          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
+
+          const isOwner = 
+            (currentUserId && bUserId && bUserId === currentUserId) ||
+            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
+            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+
+          if (isOwner && !seenIds.has(bId)) {
+            seenIds.add(bId);
+            matched.push({
+              id: bId,
+              serviceType: 'class',
+              title: b.courseName || 'Driving Class Session',
+              category: 'Driving School',
+              date: b.startDate || 'Upcoming',
+              time: b.preferredSlot || '',
+              pickup: b.pickupArea || 'Doorstep',
+              drop: '',
+              amount: b.courseFee || '₹3,999',
+              status: b.status || 'Active'
+            });
+          }
+        });
+      } catch (e) {}
+
+      if (!isCancelled) {
+        setUserBookings(matched);
+      }
+    };
+
+    fetchBookings();
+
+    const handleBookingsUpdated = () => {
+      fetchBookings();
+    };
+
+    window.addEventListener('bda_booking_updated', handleBookingsUpdated);
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('bda_booking_updated', handleBookingsUpdated);
+    };
   }, [isOpen, clientUser]);
 
   if (!isOpen || !clientUser) return null;
@@ -460,41 +588,79 @@ export default function UserProfileModal({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {userBookings.map((b, idx) => (
-                    <div 
-                      key={idx}
-                      className="bg-slate-950/70 border border-slate-800/90 hover:border-amber-500/40 rounded-2xl p-3.5 space-y-2.5 transition-all"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-mono font-bold text-[10px] bg-slate-900 text-slate-300 px-2 py-0.5 rounded-md border border-slate-800">
-                            {b.id}
-                          </span>
-                          <span className="font-bold text-white text-xs truncate">
-                            {b.title}
-                          </span>
-                        </div>
-                        <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
-                          {b.status}
-                        </span>
-                      </div>
+                  {userBookings.map((b, idx) => {
+                    const statusStr = (b.status || '').toLowerCase();
+                    const isCancelled = statusStr.includes('cancel');
+                    const isPending = statusStr.includes('pending');
 
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800/60">
-                        <div>
-                          <span className="text-slate-500">Service:</span> <span className="font-semibold text-slate-200">{b.category}</span>
+                    return (
+                      <div 
+                        key={idx}
+                        className={`rounded-2xl p-3.5 space-y-2.5 transition-all ${
+                          isCancelled
+                            ? 'bg-red-950/20 border border-red-900/50 hover:border-red-500/50'
+                            : 'bg-slate-950/70 border border-slate-800/90 hover:border-amber-500/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`font-mono font-bold text-[10px] px-2 py-0.5 rounded-md border ${
+                              isCancelled
+                                ? 'bg-red-950/60 text-red-300 border-red-900/60'
+                                : 'bg-slate-900 text-slate-300 border border-slate-800'
+                            }`}>
+                              {b.id}
+                            </span>
+                            <span className={`font-bold text-xs truncate ${
+                              isCancelled ? 'text-slate-300 line-through decoration-red-400/70' : 'text-white'
+                            }`}>
+                              {b.title}
+                            </span>
+                          </div>
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold shrink-0 border flex items-center gap-1 ${
+                            isCancelled
+                              ? 'bg-red-500/15 text-red-400 border-red-500/40 shadow-sm shadow-red-500/10'
+                              : isPending
+                              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          }`}>
+                            {isCancelled && <XCircle className="w-3 h-3 text-red-400 shrink-0" />}
+                            <span>{b.status}</span>
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-slate-500">Fare:</span> <span className="font-extrabold text-amber-400 font-mono">{b.amount}</span>
+
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800/60">
+                          <div>
+                            <span className="text-slate-500">Service:</span> <span className="font-semibold text-slate-200">{b.category}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Fare:</span>{' '}
+                            <span className={`font-mono ${isCancelled ? 'line-through text-slate-500' : 'font-extrabold text-amber-400'}`}>
+                              {b.amount}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Pickup:</span> <span className="font-medium text-slate-200">{b.pickup}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Scheduled:</span> <span className="font-medium text-slate-200">{b.date} {b.time}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-500">Pickup:</span> <span className="font-medium text-slate-200">{b.pickup}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500">Scheduled:</span> <span className="font-medium text-slate-200">{b.date} {b.time}</span>
-                        </div>
+
+                        {isCancelled && (
+                          <div className="flex items-center justify-between text-[10px] text-red-400/90 bg-red-950/40 px-2.5 py-1.5 rounded-xl border border-red-900/40">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                              <span>Booking Cancelled • Zero Cancellation Fee</span>
+                            </span>
+                            <span className="font-mono text-[9px] uppercase tracking-wider text-red-400/80 font-bold bg-red-950/80 px-1.5 py-0.5 rounded border border-red-900/50">
+                              Cancelled
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

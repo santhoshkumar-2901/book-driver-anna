@@ -22,53 +22,31 @@ import UserProfileModal from './components/UserProfileModal';
 import { apiClient } from './services/apiClient';
 
 export default function App() {
-  // Client Authentication State (uses dummy client data only)
+  // Client Authentication State
   const getInitialClientUser = () => {
     try {
       const storedLocal = localStorage.getItem('bda_client_user');
       if (storedLocal) {
-        const parsed = JSON.parse(storedLocal);
-        if (parsed && parsed.name && parsed.name.toLowerCase().includes('santhosh')) {
-          parsed.name = 'Rahul Sharma';
-          parsed.email = 'rahul.sharma@example.com';
-          localStorage.setItem('bda_client_user', JSON.stringify(parsed));
-        }
-        return parsed;
+        return JSON.parse(storedLocal);
       }
       const storedSession = sessionStorage.getItem('bda_client_user');
       if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed && parsed.name && parsed.name.toLowerCase().includes('santhosh')) {
-          parsed.name = 'Rahul Sharma';
-          parsed.email = 'rahul.sharma@example.com';
-          sessionStorage.setItem('bda_client_user', JSON.stringify(parsed));
-        }
-        return parsed;
+        return JSON.parse(storedSession);
       }
     } catch (e) {}
     return null;
   };
 
-  // Driver Authentication State (uses dummy driver data only)
+  // Driver Authentication State
   const getInitialDriverUser = () => {
     try {
       const storedLocal = localStorage.getItem('bda_driver_user');
       if (storedLocal) {
-        const parsed = JSON.parse(storedLocal);
-        if (parsed && parsed.name && parsed.name.toLowerCase().includes('santhosh')) {
-          parsed.name = 'Manjunath Gowda';
-          localStorage.setItem('bda_driver_user', JSON.stringify(parsed));
-        }
-        return parsed;
+        return JSON.parse(storedLocal);
       }
       const storedSession = sessionStorage.getItem('bda_driver_user');
       if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed && parsed.name && parsed.name.toLowerCase().includes('santhosh')) {
-          parsed.name = 'Manjunath Gowda';
-          sessionStorage.setItem('bda_driver_user', JSON.stringify(parsed));
-        }
-        return parsed;
+        return JSON.parse(storedSession);
       }
     } catch (e) {}
     return null;
@@ -88,7 +66,7 @@ export default function App() {
   const getInitialPage = () => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
-      if (path === '/admin' || path === '/admin/') return 'admin';
+      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) return 'admin';
       if (path === '/driver/signup' || path === '/driver/signup/') return 'driver-signup';
       if (path === '/driver/login' || path === '/driver/login/') return 'driver-login';
       if (path === '/driver/portal' || path === '/driver/portal/' || path === '/driver' || path === '/driver/') return 'driver-portal';
@@ -105,28 +83,34 @@ export default function App() {
   const [driverUser, setDriverUser] = useState(getInitialDriverUser);
   const [selectedRole, setSelectedRole] = useState(getInitialRole);
   const [activePage, setActivePage] = useState(getInitialPage);
+  // Unique auth session key to guarantee pristine, freshly mounted login & signup pages upon visit/revisit
+  const [authSessionKey, setAuthSessionKey] = useState(1);
 
   // Sync URL changes via popstate
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      if (path === '/admin' || path === '/admin/') {
+      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) {
         setActivePage('admin');
       } else if (path === '/driver/signup' || path === '/driver/signup/') {
         setSelectedRole('driver');
         setActivePage('driver-signup');
+        setAuthSessionKey(k => k + 1);
       } else if (path === '/driver/login' || path === '/driver/login/') {
         setSelectedRole('driver');
         setActivePage('driver-login');
+        setAuthSessionKey(k => k + 1);
       } else if (path === '/driver/portal' || path === '/driver/portal/' || path === '/driver' || path === '/driver/') {
         setSelectedRole('driver');
         setActivePage('driver-portal');
       } else if (path === '/signup' || path === '/signup/') {
         setSelectedRole('user');
         setActivePage('signup');
+        setAuthSessionKey(k => k + 1);
       } else if (path === '/login' || path === '/login/') {
         setSelectedRole('user');
         setActivePage('login');
+        setAuthSessionKey(k => k + 1);
       } else if (path === '/services' || path === '/services/') {
         setActivePage('services');
       } else if (path === '/about' || path === '/about/') {
@@ -160,25 +144,32 @@ export default function App() {
   const changePage = (newPage) => {
     setActivePage(newPage);
     if (newPage === 'admin') {
-      window.history.pushState({}, '', '/admin');
+      if (!window.location.pathname.startsWith('/admin')) {
+        window.history.pushState({}, '', '/admin/dashboard');
+      }
     } else if (newPage === 'driver-signup') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/signup');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'driver-login') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/login');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'driver-portal') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/portal');
     } else if (newPage === 'signup') {
       setSelectedRole('user');
       window.history.pushState({}, '', '/signup');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'login') {
       setSelectedRole('user');
       window.history.pushState({}, '', '/login');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'role-select') {
       setSelectedRole(null);
       window.history.pushState({}, '', '/');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'services') {
       window.history.pushState({}, '', '/services');
     } else if (newPage === 'about') {
@@ -194,6 +185,7 @@ export default function App() {
 
   const handleSelectRole = (role, mode = 'login') => {
     setSelectedRole(role);
+    setAuthSessionKey(k => k + 1);
     if (role === 'driver') {
       changePage(mode === 'signup' ? 'driver-signup' : 'driver-login');
     } else {
@@ -203,12 +195,14 @@ export default function App() {
 
   const handleChangeRole = () => {
     setSelectedRole(null);
+    setAuthSessionKey(k => k + 1);
     changePage('role-select');
   };
 
   const handleClientLoginSuccess = (userData) => {
     setClientUser(userData);
     setSelectedRole('user');
+    setAuthSessionKey(k => k + 1);
     changePage('home');
   };
 
@@ -220,12 +214,14 @@ export default function App() {
     sessionStorage.removeItem('bda_client_user');
     setClientUser(null);
     setSelectedRole(null);
+    setAuthSessionKey(k => k + 1);
     changePage('role-select');
   };
 
   const handleDriverLoginSuccess = (driverData) => {
     setDriverUser(driverData);
     setSelectedRole('driver');
+    setAuthSessionKey(k => k + 1);
     changePage('driver-portal');
   };
 
@@ -237,6 +233,7 @@ export default function App() {
     sessionStorage.removeItem('bda_driver_user');
     setDriverUser(null);
     setSelectedRole(null);
+    setAuthSessionKey(k => k + 1);
     changePage('role-select');
   };
   
@@ -373,11 +370,17 @@ export default function App() {
   const handleBookingComplete = (bookingDetails) => {
     setActiveBookingPass(bookingDetails);
 
+    const bookingUserId = bookingDetails.userId || clientUser?.id || null;
+    const bookingUserEmail = (bookingDetails.customerEmail || clientUser?.email || '').toLowerCase().trim();
+    const bookingUserPhone = bookingDetails.customerPhone || clientUser?.phone || '';
+
     if (bookingDetails.bookingType === 'class') {
       const newClassBooking = {
         id: bookingDetails.bookingId || ('BDA-CLS-' + Math.floor(1000 + Math.random() * 9000)),
+        userId: bookingUserId,
+        customerEmail: bookingUserEmail,
         customerName: bookingDetails.customerName,
-        phone: bookingDetails.customerPhone || '+91 98765 43210',
+        phone: bookingUserPhone,
         tripType: 'class',
         tripTitle: bookingDetails.serviceName || 'Driving Class',
         pickupArea: bookingDetails.pickupArea || 'Indiranagar',
@@ -404,8 +407,10 @@ export default function App() {
     } else if (bookingDetails.bookingType === 'vehicle') {
       const newVehicleBooking = {
         id: bookingDetails.bookingId || ('BDA-VEH-' + Math.floor(1000 + Math.random() * 9000)),
+        userId: bookingUserId,
+        customerEmail: bookingUserEmail,
         customerName: bookingDetails.customerName,
-        phone: bookingDetails.customerPhone || '+91 98765 43210',
+        phone: bookingUserPhone,
         vehicleName: bookingDetails.vehicleCategory ? `${bookingDetails.vehicleCategory} Rental` : 'Sedan (Dzire / Honda City)',
         category: bookingDetails.vehicleCategory || 'Sedan',
         rentalType: 'Full Day Rental',
@@ -430,8 +435,10 @@ export default function App() {
     } else {
       const newDriverBooking = {
         id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
+        userId: bookingUserId,
+        customerEmail: bookingUserEmail,
         customerName: bookingDetails.customerName,
-        phone: bookingDetails.customerPhone || '+91 98765 43210',
+        phone: bookingUserPhone,
         tripType: bookingDetails.driverTripOption || 'one-way',
         tripTitle: bookingDetails.serviceName || 'One Way Trip',
         pickupArea: bookingDetails.pickupArea || 'Indiranagar',
@@ -497,6 +504,7 @@ export default function App() {
   if (activePage === 'driver-login' || activePage === 'driver-signup') {
     return (
       <DriverAuthPage 
+        key={`${activePage}-${authSessionKey}`}
         initialMode={activePage === 'driver-signup' ? 'signup' : 'login'}
         onLoginSuccess={handleDriverLoginSuccess}
         onChangeRole={handleChangeRole}
@@ -509,9 +517,9 @@ export default function App() {
   if (activePage === 'login' || activePage === 'signup') {
     return (
       <ClientAuthPage 
+        key={`${activePage}-${authSessionKey}`}
         initialMode={activePage === 'signup' ? 'signup' : 'login'}
         onLoginSuccess={handleClientLoginSuccess}
-        onGoToAdmin={() => changePage('admin')}
         onChangeRole={handleChangeRole}
         onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
       />
@@ -523,6 +531,7 @@ export default function App() {
     if (selectedRole === 'driver') {
       return (
         <DriverAuthPage 
+          key={`driver-role-${activePage}-${authSessionKey}`}
           initialMode="login"
           onLoginSuccess={handleDriverLoginSuccess}
           onChangeRole={handleChangeRole}
@@ -534,9 +543,9 @@ export default function App() {
     if (selectedRole === 'user') {
       return (
         <ClientAuthPage 
+          key={`user-role-${activePage}-${authSessionKey}`}
           initialMode="login"
           onLoginSuccess={handleClientLoginSuccess}
-          onGoToAdmin={() => changePage('admin')}
           onChangeRole={handleChangeRole}
           onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
         />
@@ -609,6 +618,7 @@ export default function App() {
       <BookingModal 
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
+        clientUser={clientUser}
         initialType={bookingModalType}
         initialData={bookingModalData}
         onBookingComplete={handleBookingComplete}

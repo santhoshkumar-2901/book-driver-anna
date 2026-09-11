@@ -465,36 +465,6 @@ export const DEFAULT_REGISTERED_DRIVERS = [
     earningsToday: 2100,
     isOnline: true,
     createdAt: "2026-08-22"
-  },
-  {
-    id: "DRV-1004",
-    name: "Raghavendra Rao",
-    phone: "+91 97410 33445",
-    dlNumber: "KA-03-2022-0077889",
-    vehicleType: "Manual Hatchback & Sedans",
-    area: "Jayanagar",
-    experienceYears: "7 Years",
-    rating: 4.92,
-    trips: 1940,
-    status: "Active",
-    earningsToday: 1650,
-    isOnline: true,
-    createdAt: "2026-08-28"
-  },
-  {
-    id: "DRV-1005",
-    name: "Chandra Shekar",
-    phone: "+91 98801 99881",
-    dlNumber: "KA-51-2021-0065432",
-    vehicleType: "Electric & Automatic Cars",
-    area: "HSR Layout",
-    experienceYears: "6 Years",
-    rating: 4.94,
-    trips: 1620,
-    status: "Active",
-    earningsToday: 1950,
-    isOnline: true,
-    createdAt: "2026-09-01"
   }
 ];
 

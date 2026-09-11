@@ -7,7 +7,7 @@ import { toDDMMYYYY, toYYYYMMDD, getTodayDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
 
-export default function BookingModal({ isOpen, onClose, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal }) {
+export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal }) {
   useScrollLock(isOpen);
 
   // Service Type: 'driver', 'vehicle', or 'class'
@@ -77,9 +77,9 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
   }, [initialType, initialData, isOpen]);
 
   const resetForm = () => {
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerEmail('');
+    setCustomerName(clientUser?.name || '');
+    setCustomerPhone(clientUser?.phone || '');
+    setCustomerEmail(clientUser?.email || '');
     setPassengerCount('');
     setLuggageCount('');
     setStreetAddress('');
@@ -91,7 +91,7 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
     if (isOpen) {
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, clientUser]);
 
   if (!isOpen) return null;
 
@@ -246,6 +246,7 @@ export default function BookingModal({ isOpen, onClose, initialType = 'driver', 
       customerName,
       customerPhone,
       customerEmail,
+      userId: clientUser?.id || null,
       paymentMode,
       totalFare: finalFare,
       assignedAnna: bookingCategory === 'class'

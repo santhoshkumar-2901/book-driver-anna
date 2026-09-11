@@ -26,5 +26,9 @@ export const ENV = {
     process.env.CORS_ORIGIN ||
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000',
 
-  DB_PATH: process.env.DB_PATH || './bda_database.sqlite',
+  DB_PATH:
+    process.env.DB_PATH ||
+    (process.env.NODE_ENV === 'test'
+      ? './bda_test_database.sqlite'
+      : './bda_database.sqlite'),
 }; 
