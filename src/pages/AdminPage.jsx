@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, Car, Users, TrendingUp, DollarSign, MapPin, Clock, 
   Calendar, ShieldCheck, CheckCircle2, AlertCircle, Search, Filter, 
@@ -394,15 +394,38 @@ export default function AdminPage({ onReturnToClient }) {
     return localStorage.getItem('bda_admin_logged_in') === 'true';
   });
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-  
-  // Auth Form Fields
-  const [authEmail, setAuthEmail] = useState('admin@bookdriveranna.com');
-  const [authPassword, setAuthPassword] = useState('admin123');
+  // Auth Form Fields (cleared upon submit and mode switches)
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); // Show / Hide Password toggle state
-  const [authFullName, setAuthFullName] = useState('Manjunath Anna');
-  const [authPhone, setAuthPhone] = useState('+91 98860 12345');
-  const [authSecretKey, setAuthSecretKey] = useState('ANNA2026');
+  const [authFullName, setAuthFullName] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authSecretKey, setAuthSecretKey] = useState('');
   const [authError, setAuthError] = useState('');
+
+  // Input element refs for direct DOM clearing if browser autofill engines inject values
+  const authFullNameRef = useRef(null);
+  const authPhoneRef = useRef(null);
+  const authEmailRef = useRef(null);
+  const authPasswordRef = useRef(null);
+  const authSecretKeyRef = useRef(null);
+
+  // Clear all previous input values from login and register forms
+  const resetAuthForm = () => {
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthFullName('');
+    setAuthPhone('');
+    setAuthSecretKey('');
+    setShowPassword(false);
+    setAuthError('');
+
+    if (authFullNameRef.current) authFullNameRef.current.value = '';
+    if (authPhoneRef.current) authPhoneRef.current.value = '';
+    if (authEmailRef.current) authEmailRef.current.value = '';
+    if (authPasswordRef.current) authPasswordRef.current.value = '';
+    if (authSecretKeyRef.current) authSecretKeyRef.current.value = '';
+  };
   
   // Logged-in Admin Info
   const [loggedInAdminName, setLoggedInAdminName] = useState(() => {
@@ -844,32 +867,41 @@ export default function AdminPage({ onReturnToClient }) {
     e.preventDefault();
     setAuthError('');
 
-    if (!authEmail.trim() || !authPassword.trim()) {
+    const submittedEmail = authEmail.trim();
+    const submittedPassword = authPassword.trim();
+    const submittedFullName = authFullName.trim();
+    const submittedPhone = authPhone.trim();
+    const submittedSecretKey = authSecretKey.trim();
+
+    if (!submittedEmail || !submittedPassword) {
       setAuthError('Please enter email and password');
       return;
     }
 
     if (authMode === 'register') {
-      if (!authFullName.trim()) {
+      if (!submittedFullName) {
         setAuthError('Please enter your full name');
         return;
       }
-      if (!authPhone.trim()) {
+      if (!submittedPhone) {
         setAuthError('Please enter your mobile phone number');
         return;
       }
-      if (authPassword.length < 6) {
+      if (submittedPassword.length < 6) {
         setAuthError('Password must be at least 6 characters long');
         return;
       }
-      if (authSecretKey.trim() !== 'ANNA2026') {
+      if (submittedSecretKey !== 'ANNA2026') {
         setAuthError('Invalid Admin Secret Key (Demo Key: ANNA2026)');
         return;
       }
 
-      const nameToSave = authFullName.trim();
-      const phoneToSave = authPhone.trim();
-      const emailLower = authEmail.trim().toLowerCase();
+      const nameToSave = submittedFullName;
+      const phoneToSave = submittedPhone;
+      const emailLower = submittedEmail.toLowerCase();
+
+      // Clear input fields immediately after successful form validation and submission
+      resetAuthForm();
 
       // Attempt backend admin registration in database (TiDB / SQLite)
       try {
@@ -877,8 +909,8 @@ export default function AdminPage({ onReturnToClient }) {
           name: nameToSave,
           email: emailLower,
           phone: phoneToSave,
-          password: authPassword.trim(),
-          secretKey: authSecretKey.trim()
+          password: submittedPassword,
+          secretKey: submittedSecretKey
         });
       } catch (err) {
         console.warn('[ADMIN AUTH] Remote admin registration error/fallback:', err.message);
@@ -894,7 +926,7 @@ export default function AdminPage({ onReturnToClient }) {
           name: nameToSave,
           phone: phoneToSave,
           email: emailLower,
-          password: authPassword.trim()
+          password: submittedPassword
         });
         localStorage.setItem('bda_registered_admins', JSON.stringify(registeredAdmins));
       } catch (e) {}
@@ -913,11 +945,14 @@ export default function AdminPage({ onReturnToClient }) {
 
     try {
       const res = await apiClient.adminLogin({
-        identifier: authEmail.trim(),
-        password: authPassword.trim()
+        identifier: submittedEmail,
+        password: submittedPassword
       });
 
       if (res && res.data && res.data.user) {
+        // Clear input fields immediately upon successful login
+        resetAuthForm();
+
         setLoggedInAdminName(res.data.user.name);
         setLoggedInAdminPhone(res.data.user.phone);
         setIsAdminLoggedIn(true);
@@ -931,17 +966,17 @@ export default function AdminPage({ onReturnToClient }) {
     } catch (apiErr) {
       // 1. Invalid credentials from backend (401)
       if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
-        const emailLower = authEmail.trim().toLowerCase();
+        const emailLower = submittedEmail.toLowerCase();
         let localMatch = false;
         try {
           const saved = localStorage.getItem('bda_registered_admins');
           if (saved) {
             const registeredAdmins = JSON.parse(saved);
-            localMatch = registeredAdmins.some(a => a.email === emailLower && a.password === authPassword.trim());
+            localMatch = registeredAdmins.some(a => a.email === emailLower && a.password === submittedPassword);
           }
         } catch (e) {}
 
-        if (!localMatch && !(emailLower === 'admin@bookdriveranna.com' && authPassword.trim() === 'admin123')) {
+        if (!localMatch && !(emailLower === 'admin@bookdriveranna.com' && submittedPassword === 'admin123')) {
           setAuthError(apiErr.message || 'Invalid admin email or password.');
           return;
         }
@@ -961,19 +996,19 @@ export default function AdminPage({ onReturnToClient }) {
     }
 
     // In offline/demo fallback mode, verify credentials match demo credentials or a registered admin
-    const emailLower = authEmail.trim().toLowerCase();
+    const emailLower = submittedEmail.toLowerCase();
     let isMatch = false;
     let nameToSave = 'Admin Anna';
     let phoneToSave = '+91 98765 00000';
 
-    if (emailLower === 'admin@bookdriveranna.com' && authPassword.trim() === 'admin123') {
+    if (emailLower === 'admin@bookdriveranna.com' && submittedPassword === 'admin123') {
       isMatch = true;
     } else {
       try {
         const saved = localStorage.getItem('bda_registered_admins');
         if (saved) {
           const registeredAdmins = JSON.parse(saved);
-          const found = registeredAdmins.find(a => a.email === emailLower && a.password === authPassword.trim());
+          const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
           if (found) {
             isMatch = true;
             nameToSave = found.name;
@@ -987,6 +1022,9 @@ export default function AdminPage({ onReturnToClient }) {
       setAuthError('Invalid credentials. (Demo: admin@bookdriveranna.com / admin123)');
       return;
     }
+
+    // Clear input fields immediately after fallback match
+    resetAuthForm();
 
     setLoggedInAdminName(nameToSave);
     setLoggedInAdminPhone(phoneToSave);
@@ -1004,6 +1042,7 @@ export default function AdminPage({ onReturnToClient }) {
 
   const handleLogout = async () => {
     setIsMobileSidebarOpen(false);
+    resetAuthForm();
     try {
       await apiClient.logout();
     } catch (e) {}
@@ -1319,7 +1358,7 @@ export default function AdminPage({ onReturnToClient }) {
             <div className="grid grid-cols-2 bg-slate-950 p-1 rounded-2xl border border-slate-800">
               <button
                 type="button"
-                onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                onClick={() => { setAuthMode('login'); resetAuthForm(); }}
                 className={`py-2 rounded-xl text-xs font-bold transition-all ${
                   authMode === 'login'
                     ? 'bg-amber-400 text-slate-950 shadow-md'
@@ -1330,7 +1369,7 @@ export default function AdminPage({ onReturnToClient }) {
               </button>
               <button
                 type="button"
-                onClick={() => { setAuthMode('register'); setAuthError(''); }}
+                onClick={() => { setAuthMode('register'); resetAuthForm(); }}
                 className={`py-2 rounded-xl text-xs font-bold transition-all ${
                   authMode === 'register'
                     ? 'bg-amber-400 text-slate-950 shadow-md'
@@ -1359,6 +1398,7 @@ export default function AdminPage({ onReturnToClient }) {
                     <div className="relative">
                       <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input 
+                        ref={authFullNameRef}
                         type="text"
                         required
                         placeholder="e.g. Manjunath Gowda"
@@ -1374,6 +1414,7 @@ export default function AdminPage({ onReturnToClient }) {
                     <div className="relative">
                       <Phone className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input 
+                        ref={authPhoneRef}
                         type="tel"
                         required
                         placeholder="+91 98860 12345"
@@ -1391,6 +1432,7 @@ export default function AdminPage({ onReturnToClient }) {
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input 
+                    ref={authEmailRef}
                     type="email"
                     required
                     placeholder="admin@bookdriveranna.com"
@@ -1407,6 +1449,7 @@ export default function AdminPage({ onReturnToClient }) {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input 
+                    ref={authPasswordRef}
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
@@ -1431,6 +1474,7 @@ export default function AdminPage({ onReturnToClient }) {
                   <div className="relative">
                     <Key className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input 
+                      ref={authSecretKeyRef}
                       type="text"
                       required
                       placeholder="Enter secret key (e.g. ANNA2026)"
@@ -1454,8 +1498,23 @@ export default function AdminPage({ onReturnToClient }) {
             </form>
 
             {/* Quick Demo Credentials Footer */}
-            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center text-[11px] text-slate-400">
-              💡 Demo Access: <span className="text-white font-semibold">admin@bookdriveranna.com</span> / <span className="text-white font-semibold">admin123</span>
+            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between gap-2">
+              <span>💡 Demo: <span className="text-white font-semibold">admin@bookdriveranna.com</span> / <span className="text-white font-semibold">admin123</span></span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthEmail('admin@bookdriveranna.com');
+                  setAuthPassword('admin123');
+                  if (authMode === 'register') {
+                    setAuthFullName('Admin Anna');
+                    setAuthPhone('+91 98765 00000');
+                    setAuthSecretKey('ANNA2026');
+                  }
+                }}
+                className="text-amber-400 hover:text-amber-300 font-bold underline shrink-0 cursor-pointer"
+              >
+                Auto-fill
+              </button>
             </div>
 
           </div>
