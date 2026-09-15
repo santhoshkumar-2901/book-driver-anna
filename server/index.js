@@ -100,10 +100,10 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Initialize DB seed
-seedDatabase();
+seedDatabase().catch((err) => console.error('[SEED ERROR]', err.message));
 
-// Start HTTP Server if run directly
-if (process.env.NODE_ENV !== 'test') {
+// Start HTTP Server if run directly (and not in test or Vercel serverless environment)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(ENV.PORT, '0.0.0.0', () => {
     console.log(`[SERVER] Book Driver Anna API running on http://0.0.0.0:${ENV.PORT} (PID: ${process.pid})`);
   });

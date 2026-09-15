@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db } from '../db/database.js';
+import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
 import { calculateAuthoritativeFare } from './pricingService.js';
 import { logAuditEvent } from './auditService.js';
 
@@ -13,7 +13,7 @@ const ALLOWED_STATE_TRANSITIONS = {
   'CANCELLED': []  // Terminal
 };
 
-export function createBooking({
+export async function createBooking({
   userId = null,
   customerName,
   customerPhone,
@@ -46,7 +46,7 @@ export function createBooking({
 
   // 2. Idempotency Check: If duplicate request with same key arrives, return existing
   if (idempotencyKey) {
-    const existing = db.prepare('SELECT * FROM bookings WHERE idempotency_key = ?').get(idempotencyKey);
+    const existing = await queryOne('SELECT * FROM bookings WHERE idempotency_key = ?', [idempotencyKey]);
     if (existing) {
       return { booking: existing, isDuplicate: true };
     }
@@ -78,21 +78,19 @@ export function createBooking({
   }
 
   // 5. Transactional Slot Locking & Concurrency Protection
-  // We use SQLite's BEGIN IMMEDIATE to lock writer access and prevent race conditions
-  db.exec('BEGIN IMMEDIATE;');
-  try {
+  return await withTransaction(async (tx) => {
     let assignedDriverId = null;
 
     // Check if user requested a specific driver
     if (preferredDriverId) {
       // Check if driver is already booked for this slot
-      const conflict = db.prepare(`
+      const conflict = await tx.queryOne(`
         SELECT id FROM bookings 
         WHERE assigned_driver_id = ? 
           AND date = ? 
           AND time = ? 
           AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
-      `).get(preferredDriverId, date, time);
+      `, [preferredDriverId, date, time]);
 
       if (conflict) {
         throw Object.assign(new Error('The requested driver is already booked for this date and time slot.'), {
@@ -103,7 +101,7 @@ export function createBooking({
       assignedDriverId = preferredDriverId;
     }
 
-    const insertStmt = db.prepare(`
+    await tx.execute(`
       INSERT INTO bookings (
         id, user_id, customer_name, customer_phone, customer_email,
         booking_type, trip_type, service_name, pickup_area, drop_location,
@@ -111,9 +109,7 @@ export function createBooking({
         assigned_driver_id, idempotency_key
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
-    `);
-
-    insertStmt.run(
+    `, [
       bookingId,
       userId,
       customerName.trim(),
@@ -130,13 +126,11 @@ export function createBooking({
       paymentMode,
       assignedDriverId,
       idempotencyKey
-    );
+    ]);
 
-    db.exec('COMMIT;');
+    const newBooking = await tx.queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
 
-    const newBooking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
-
-    logAuditEvent({
+    await logAuditEvent({
       userId,
       action: 'BOOKING_CREATED',
       resourceType: 'booking',
@@ -146,14 +140,11 @@ export function createBooking({
     });
 
     return { booking: newBooking, isDuplicate: false };
-  } catch (err) {
-    db.exec('ROLLBACK;');
-    throw err;
-  }
+  });
 }
 
-export function cancelBooking({ bookingId, requesterUser = null, requesterPhone = null, reason = 'Customer request', ipAddress = null }) {
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+export async function cancelBooking({ bookingId, requesterUser = null, requesterPhone = null, reason = 'Customer request', ipAddress = null }) {
+  const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
   if (!booking) {
     const err = new Error('Booking not found.');
     err.statusCode = 404;
@@ -170,7 +161,7 @@ export function cancelBooking({ bookingId, requesterUser = null, requesterPhone 
   );
 
   if (!isOwner && !isPhoneMatch) {
-    logAuditEvent({
+    await logAuditEvent({
       userId: requesterUser?.id || null,
       action: 'UNAUTHORIZED_CANCEL_ATTEMPT',
       resourceType: 'booking',
@@ -196,13 +187,13 @@ export function cancelBooking({ bookingId, requesterUser = null, requesterPhone 
     return { booking, alreadyCancelled: true };
   }
 
-  db.prepare(`
+  await execute(`
     UPDATE bookings 
     SET status = 'CANCELLED', cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(reason, bookingId);
+  `, [reason, bookingId]);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: requesterUser?.id || null,
     action: 'BOOKING_CANCELLED',
     resourceType: 'booking',
@@ -211,12 +202,12 @@ export function cancelBooking({ bookingId, requesterUser = null, requesterPhone 
     ipAddress
   });
 
-  const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+  const updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
   return { booking: updated, alreadyCancelled: false };
 }
 
-export function updateBookingStatus({ bookingId, newStatus, assignedDriverId = undefined, requesterUser, ipAddress = null }) {
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+export async function updateBookingStatus({ bookingId, newStatus, assignedDriverId = undefined, requesterUser, ipAddress = null }) {
+  const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
   if (!booking) {
     const err = new Error('Booking not found.');
     err.statusCode = 404;
@@ -244,9 +235,9 @@ export function updateBookingStatus({ bookingId, newStatus, assignedDriverId = u
   updateSql += ` WHERE id = ?`;
   params.push(bookingId);
 
-  db.prepare(updateSql).run(...params);
+  await execute(updateSql, params);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: requesterUser?.id || null,
     action: 'BOOKING_STATUS_UPDATED',
     resourceType: 'booking',
@@ -255,13 +246,13 @@ export function updateBookingStatus({ bookingId, newStatus, assignedDriverId = u
     ipAddress
   });
 
-  return db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+  return await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
 }
 
-export function getUserBookings(userId, phone = null) {
+export async function getUserBookings(userId, phone = null) {
   if (!userId && !phone) return [];
   if (userId) {
-    return db.prepare('SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+    return await queryAll('SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC', [userId]);
   }
-  return db.prepare('SELECT * FROM bookings WHERE customer_phone = ? ORDER BY created_at DESC').all(phone);
+  return await queryAll('SELECT * FROM bookings WHERE customer_phone = ? ORDER BY created_at DESC', [phone]);
 }

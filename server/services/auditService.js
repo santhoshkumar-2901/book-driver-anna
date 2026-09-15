@@ -1,6 +1,6 @@
-import { db } from '../db/database.js';
+import { execute } from '../db/database.js';
 
-export function logAuditEvent({
+export async function logAuditEvent({
   userId = null,
   action,
   resourceType,
@@ -9,18 +9,17 @@ export function logAuditEvent({
   ipAddress = null
 }) {
   try {
-    const stmt = db.prepare(`
+    await execute(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
+    `, [
       userId,
       action,
       resourceType,
       resourceId,
       typeof details === 'object' ? JSON.stringify(details) : details,
       ipAddress
-    );
+    ]);
   } catch (err) {
     console.error('[AUDIT ERROR] Failed to record audit log:', err.message);
   }

@@ -8,10 +8,10 @@ import { AUTH_COOKIE_NAME, COOKIE_OPTIONS } from '../config/security.js';
 const router = Router();
 
 // POST /api/auth/register
-router.post('/register', authRateLimiter, validateRegisterInput, (req, res, next) => {
+router.post('/register', authRateLimiter, validateRegisterInput, async (req, res, next) => {
   try {
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const { user, token } = registerCustomer({
+    const { user, token } = await registerCustomer({
       name: req.body.name,
       email: req.body.email,
       phone: req.body.phone,
@@ -31,10 +31,10 @@ router.post('/register', authRateLimiter, validateRegisterInput, (req, res, next
 });
 
 // POST /api/auth/login (Customer login)
-router.post('/login', authRateLimiter, validateLoginInput, (req, res, next) => {
+router.post('/login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const { user, token } = authenticateUser({
+    const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
       requiredRole: null, // Any valid user can log in here
@@ -52,10 +52,10 @@ router.post('/login', authRateLimiter, validateLoginInput, (req, res, next) => {
 });
 
 // POST /api/auth/driver-login (Dedicated Driver portal authentication)
-router.post('/driver-login', authRateLimiter, validateLoginInput, (req, res, next) => {
+router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const { user, token } = authenticateUser({
+    const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
       requiredRole: 'driver',
@@ -73,10 +73,10 @@ router.post('/driver-login', authRateLimiter, validateLoginInput, (req, res, nex
 });
 
 // POST /api/auth/admin-login (Dedicated Admin portal authentication)
-router.post('/admin-login', authRateLimiter, validateLoginInput, (req, res, next) => {
+router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const { user, token } = authenticateUser({
+    const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
       requiredRole: 'admin',

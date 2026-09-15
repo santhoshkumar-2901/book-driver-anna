@@ -45,15 +45,28 @@ async function request(endpoint, options = {}) {
       rawText = await res.text().catch(() => '');
     }
 
+    const isHtmlResponse = contentType.includes('text/html') || (typeof rawText === 'string' && (rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html')));
+
+    // If an API request returns an HTML page with 200 OK (e.g. Vercel SPA rewrite to index.html), treat as unrouted/offline backend
+    if (res.ok && isHtmlResponse) {
+      console.warn(`[API CLIENT] API endpoint '${endpoint}' returned HTML (SPA rewrite). Backend server is offline or unrouted.`);
+      const networkErr = new Error('Backend API service is not running or unrouted on this host. Operating in offline demo mode.');
+      networkErr.code = 'NETWORK_ERROR';
+      networkErr.status = 404;
+      networkErr.data = {};
+      throw networkErr;
+    }
+
     if (!res.ok) {
-      // Check if this is a proxy failure (e.g. Vite proxy ECONNREFUSED 127.0.0.1:5000 or gateway 502/503/504)
+      // Check if this is a static host 405/404, Vite proxy failure (ECONNREFUSED 500), or gateway 502/503/504
       const isProxyOrGatewayError = 
-        (res.status === 502 || res.status === 503 || res.status === 504) ||
+        (res.status === 404 || res.status === 405 || res.status === 502 || res.status === 503 || res.status === 504) ||
+        isHtmlResponse ||
         (res.status === 500 && (!data.error || rawText.includes('ECONNREFUSED') || rawText.includes('proxy error')));
 
       if (isProxyOrGatewayError) {
-        console.warn(`[API CLIENT] Backend server offline or proxy failed (HTTP ${res.status}). Falling back to local offline mode.`);
-        const networkErr = new Error('Backend server is offline. Please start the backend service on port 5000.');
+        console.warn(`[API CLIENT] Backend server offline or proxy/route unavailable (HTTP ${res.status}). Falling back to local offline mode.`);
+        const networkErr = new Error('Backend server is offline or unreachable on this host. Operating in offline demo mode.');
         networkErr.code = 'NETWORK_ERROR';
         networkErr.status = res.status;
         networkErr.data = data;

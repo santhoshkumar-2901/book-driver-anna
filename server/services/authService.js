@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { db } from '../db/database.js';
+import { queryOne, execute } from '../db/database.js';
 import { ENV } from '../config/env.js';
 import { logAuditEvent } from './auditService.js';
 
@@ -35,9 +35,13 @@ export function verifyToken(token) {
   }
 }
 
-export function registerCustomer({ name, email, phone, password, area = 'Indiranagar', ipAddress = null }) {
-  // Check duplicate email or phone
-  const existing = db.prepare('SELECT id, email, phone FROM users WHERE email = ? COLLATE NOCASE OR phone = ?').get(email.trim(), phone.trim());
+export async function registerCustomer({ name, email, phone, password, area = 'Indiranagar', ipAddress = null }) {
+  // Check duplicate email or phone (using LOWER() for cross-DB compatibility)
+  const existing = await queryOne(
+    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
+    [email.trim(), phone.trim()]
+  );
+
   if (existing) {
     const isEmail = existing.email.toLowerCase() === email.trim().toLowerCase();
     const field = isEmail ? 'Email' : 'Phone number';
@@ -50,17 +54,15 @@ export function registerCustomer({ name, email, phone, password, area = 'Indiran
   const userId = 'USR-' + crypto.randomBytes(4).toString('hex').toUpperCase();
   const passwordHash = hashPassword(password);
 
-  const stmt = db.prepare(`
+  await execute(`
     INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
     VALUES (?, ?, ?, ?, ?, 'customer', ?, 'Active')
-  `);
+  `, [userId, name.trim(), email.trim().toLowerCase(), phone.trim(), passwordHash, area]);
 
-  stmt.run(userId, name.trim(), email.trim(), phone.trim(), passwordHash, area);
-
-  const user = { id: userId, name: name.trim(), email: email.trim(), phone: phone.trim(), role: 'customer', area };
+  const user = { id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim(), role: 'customer', area };
   const token = generateToken(user);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId,
     action: 'USER_REGISTERED',
     resourceType: 'user',
@@ -71,18 +73,18 @@ export function registerCustomer({ name, email, phone, password, area = 'Indiran
   return { user, token };
 }
 
-export function authenticateUser({ identifier, password, requiredRole = null, ipAddress = null }) {
+export async function authenticateUser({ identifier, password, requiredRole = null, ipAddress = null }) {
   const trimmed = identifier.trim();
-  // Safe parameterized query matching email OR phone
-  const user = db.prepare(`
+  // Safe parameterized query matching email OR phone (using LOWER() for cross-DB compatibility)
+  const user = await queryOne(`
     SELECT id, name, email, phone, password_hash, role, area, status 
     FROM users 
-    WHERE (email = ? COLLATE NOCASE OR phone = ?) AND status = 'Active'
-  `).get(trimmed, trimmed);
+    WHERE (LOWER(email) = LOWER(?) OR phone = ?) AND status = 'Active'
+  `, [trimmed, trimmed]);
 
   // Timing-safe constant-time comparison to prevent timing attacks & enumeration
   if (!user || !verifyPassword(password, user.password_hash)) {
-    logAuditEvent({
+    await logAuditEvent({
       userId: user?.id || null,
       action: 'LOGIN_FAILED',
       resourceType: 'auth',
@@ -97,7 +99,7 @@ export function authenticateUser({ identifier, password, requiredRole = null, ip
 
   // Role validation if required (e.g. admin login)
   if (requiredRole && user.role !== requiredRole) {
-    logAuditEvent({
+    await logAuditEvent({
       userId: user.id,
       action: 'LOGIN_ROLE_MISMATCH',
       resourceType: 'auth',
@@ -110,7 +112,7 @@ export function authenticateUser({ identifier, password, requiredRole = null, ip
     throw err;
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: user.id,
     action: 'LOGIN_SUCCESS',
     resourceType: 'auth',
@@ -130,7 +132,7 @@ export function authenticateUser({ identifier, password, requiredRole = null, ip
   return { user: safeUser, token };
 }
 
-export function getUserById(userId) {
-  const user = db.prepare('SELECT id, name, email, phone, role, area, status, created_at FROM users WHERE id = ?').get(userId);
+export async function getUserById(userId) {
+  const user = await queryOne('SELECT id, name, email, phone, role, area, status, created_at FROM users WHERE id = ?', [userId]);
   return user || null;
 }

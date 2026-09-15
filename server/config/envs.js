@@ -31,4 +31,6 @@ export const ENV = {
     (process.env.NODE_ENV === 'test'
       ? './bda_test_database.sqlite'
       : './bda_database.sqlite'),
+
+  DATABASE_URL: process.env.DATABASE_URL || '',
 }; 

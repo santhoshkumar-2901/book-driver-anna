@@ -849,6 +849,50 @@ export default function AdminPage({ onReturnToClient }) {
       return;
     }
 
+    if (authMode === 'register') {
+      if (!authFullName.trim()) {
+        setAuthError('Please enter your full name');
+        return;
+      }
+      if (!authPhone.trim()) {
+        setAuthError('Please enter your admin phone number');
+        return;
+      }
+      if (authSecretKey.trim() !== 'ANNA2026') {
+        setAuthError('Invalid Admin Secret Key (Demo Key: ANNA2026)');
+        return;
+      }
+
+      const nameToSave = authFullName.trim();
+      const phoneToSave = authPhone.trim();
+
+      // Save newly registered admin so they can log in via offline fallback mode
+      try {
+        let registeredAdmins = [];
+        const saved = localStorage.getItem('bda_registered_admins');
+        if (saved) registeredAdmins = JSON.parse(saved);
+        registeredAdmins = registeredAdmins.filter(a => a.email !== authEmail.trim().toLowerCase());
+        registeredAdmins.push({
+          name: nameToSave,
+          phone: phoneToSave,
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword.trim()
+        });
+        localStorage.setItem('bda_registered_admins', JSON.stringify(registeredAdmins));
+      } catch (e) {}
+
+      setLoggedInAdminName(nameToSave);
+      setLoggedInAdminPhone(phoneToSave);
+      setIsAdminLoggedIn(true);
+      localStorage.setItem('bda_admin_logged_in', 'true');
+      localStorage.setItem('bda_admin_name', nameToSave);
+      localStorage.setItem('bda_admin_phone', phoneToSave);
+
+      const requestedTab = parseTabFromPath(window.location.pathname);
+      navigateToTab(requestedTab, true);
+      return;
+    }
+
     try {
       const res = await apiClient.adminLogin({
         identifier: authEmail.trim(),
@@ -893,33 +937,32 @@ export default function AdminPage({ onReturnToClient }) {
       console.warn('[ADMIN AUTH] Backend offline or proxy unavailable. Engaging offline demo mode.');
     }
 
-    let nameToSave = loggedInAdminName;
-    let phoneToSave = loggedInAdminPhone;
+    // In offline/demo fallback mode, verify credentials match demo credentials or a registered admin
+    const emailLower = authEmail.trim().toLowerCase();
+    let isMatch = false;
+    let nameToSave = 'Admin Anna';
+    let phoneToSave = '+91 98765 00000';
 
-    if (authMode === 'register') {
-      if (!authFullName.trim()) {
-        setAuthError('Please enter your full name');
-        return;
-      }
-      if (!authPhone.trim()) {
-        setAuthError('Please enter your admin phone number');
-        return;
-      }
-      if (authSecretKey.trim() !== 'ANNA2026') {
-        setAuthError('Invalid Admin Secret Key (Demo Key: ANNA2026)');
-        return;
-      }
-      nameToSave = authFullName;
-      phoneToSave = authPhone;
+    if (emailLower === 'admin@bookdriveranna.com' && authPassword.trim() === 'admin123') {
+      isMatch = true;
     } else {
-      // In offline/demo fallback mode, verify credentials match demo credentials
-      const emailLower = authEmail.trim().toLowerCase();
-      if (emailLower !== 'admin@bookdriveranna.com' || authPassword.trim() !== 'admin123') {
-        setAuthError('Invalid credentials. (Demo: admin@bookdriveranna.com / admin123)');
-        return;
-      }
-      nameToSave = 'Admin Anna';
-      phoneToSave = '+91 98765 00000';
+      try {
+        const saved = localStorage.getItem('bda_registered_admins');
+        if (saved) {
+          const registeredAdmins = JSON.parse(saved);
+          const found = registeredAdmins.find(a => a.email === emailLower && a.password === authPassword.trim());
+          if (found) {
+            isMatch = true;
+            nameToSave = found.name;
+            phoneToSave = found.phone;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!isMatch) {
+      setAuthError('Invalid credentials. (Demo: admin@bookdriveranna.com / admin123)');
+      return;
     }
 
     setLoggedInAdminName(nameToSave);
