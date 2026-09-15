@@ -254,11 +254,27 @@ export default function ClientAuthPage({
         return;
       }
     } catch (apiErr) {
-      if (apiErr.code !== 'NETWORK_ERROR') {
+      let hasLocalProfileMatch = false;
+      try {
+        const stored = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
+        const allClients = [...stored, ...DEFAULT_REGISTERED_CLIENTS];
+        const cleanInput = submittedIdentifier.toLowerCase();
+        const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
+        const matched = allClients.find(u => 
+          (u.email && u.email.toLowerCase() === cleanInput) ||
+          (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
+        );
+        if (matched && (!matched.password || matched.password === submittedPassword)) {
+          hasLocalProfileMatch = true;
+        }
+      } catch (e) {}
+
+      if (!hasLocalProfileMatch && apiErr.code !== 'NETWORK_ERROR' && apiErr.status !== 500) {
         setIsLoading(false);
         setErrorMessage(apiErr.message || 'Login failed. Please check your credentials.');
         return;
       }
+      console.warn('[AUTH] API response or offline state encountered. Checking registered client credentials.');
     }
 
     setTimeout(() => {

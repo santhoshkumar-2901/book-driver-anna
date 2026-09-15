@@ -36,7 +36,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://generativelanguage.googleapis.com"]
+      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "https://generativelanguage.googleapis.com", "https:"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -44,15 +44,33 @@ app.use(helmet({
   noSniff: true // MIME sniffing defense
 }));
 
-// 2. Strict CORS Configuration
+// 2. Strict CORS Configuration supporting localhost, Vercel deployments, and configured origins
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+    // Allow requests with no origin (like mobile apps, curl, server-to-server, or same-origin)
     if (!origin) return callback(null, true);
+
+    try {
+      const parsedUrl = new URL(origin);
+      // Allow localhost and local IPs
+      if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+        return callback(null, true);
+      }
+      // Allow any Vercel domain (*.vercel.app)
+      if (parsedUrl.hostname.endsWith('.vercel.app') || parsedUrl.hostname === 'vercel.app') {
+        return callback(null, true);
+      }
+    } catch (e) {}
+
+    // Allow configured origins from CORS_ORIGIN
     if (ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+
+    const corsErr = new Error(`CORS blocked for origin: ${origin}`);
+    corsErr.statusCode = 403;
+    corsErr.code = 'CORS_BLOCKED';
+    return callback(corsErr);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],

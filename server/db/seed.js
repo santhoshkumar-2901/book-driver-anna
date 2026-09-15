@@ -4,7 +4,8 @@ import { queryOne, execute, isTiDB } from './database.js';
 export async function seedDatabase() {
   try {
     const existingUsers = await queryOne('SELECT COUNT(*) as count FROM users');
-    if (existingUsers && Number(existingUsers.count) > 0) {
+    const userCount = Number(existingUsers?.count ?? existingUsers?.COUNT ?? (existingUsers ? Object.values(existingUsers)[0] : 0));
+    if (userCount > 0) {
       return; // Already seeded
     }
 

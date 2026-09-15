@@ -46,15 +46,35 @@ if (isTiDB) {
 }
 
 /**
+ * Normalize database row objects so all column names are accessible via lowercase keys
+ */
+export function normalizeRow(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+  const normalized = { ...row };
+  for (const [key, val] of Object.entries(row)) {
+    const lower = key.toLowerCase();
+    if (lower !== key && !(lower in normalized)) {
+      normalized[lower] = val;
+    }
+  }
+  return normalized;
+}
+
+export function normalizeRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map(normalizeRow);
+}
+
+/**
  * Execute a query returning a single row (or null if not found)
  */
 export async function queryOne(sql, params = []) {
   if (isTiDB) {
     const rows = await tidbConn.execute(sql, params);
-    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    return Array.isArray(rows) && rows.length > 0 ? normalizeRow(rows[0]) : null;
   } else {
     const row = sqliteDb.prepare(sql).get(...params);
-    return row || null;
+    return row ? normalizeRow(row) : null;
   }
 }
 
@@ -64,9 +84,10 @@ export async function queryOne(sql, params = []) {
 export async function queryAll(sql, params = []) {
   if (isTiDB) {
     const rows = await tidbConn.execute(sql, params);
-    return Array.isArray(rows) ? rows : [];
+    return Array.isArray(rows) ? normalizeRows(rows) : [];
   } else {
-    return sqliteDb.prepare(sql).all(...params);
+    const rows = sqliteDb.prepare(sql).all(...params);
+    return normalizeRows(rows);
   }
 }
 
@@ -112,11 +133,11 @@ export async function withTransaction(callback) {
       const txExecutor = {
         queryOne: async (sql, params = []) => {
           const rows = await tx.execute(sql, params);
-          return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+          return Array.isArray(rows) && rows.length > 0 ? normalizeRow(rows[0]) : null;
         },
         queryAll: async (sql, params = []) => {
           const rows = await tx.execute(sql, params);
-          return Array.isArray(rows) ? rows : [];
+          return Array.isArray(rows) ? normalizeRows(rows) : [];
         },
         execute: async (sql, params = []) => {
           const res = await tx.execute(sql, params);
@@ -139,9 +160,12 @@ export async function withTransaction(callback) {
       const txExecutor = {
         queryOne: async (sql, params = []) => {
           const row = sqliteDb.prepare(sql).get(...params);
-          return row || null;
+          return row ? normalizeRow(row) : null;
         },
-        queryAll: async (sql, params = []) => sqliteDb.prepare(sql).all(...params),
+        queryAll: async (sql, params = []) => {
+          const rows = sqliteDb.prepare(sql).all(...params);
+          return normalizeRows(rows);
+        },
         execute: async (sql, params = []) => {
           const res = sqliteDb.prepare(sql).run(...params);
           return { affectedRows: res.changes, insertId: res.lastInsertRowid };

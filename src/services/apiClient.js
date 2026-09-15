@@ -101,6 +101,7 @@ export const apiClient = {
   login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
   driverLogin: (credentials) => request('/auth/driver-login', { method: 'POST', body: credentials }),
   adminLogin: (credentials) => request('/auth/admin-login', { method: 'POST', body: credentials }),
+  adminRegister: (adminData) => request('/auth/admin-register', { method: 'POST', body: adminData }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getMe: () => request('/auth/me', { method: 'GET' }),
 

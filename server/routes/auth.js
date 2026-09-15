@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerCustomer, authenticateUser } from '../services/authService.js';
+import { registerCustomer, registerAdmin, authenticateUser } from '../services/authService.js';
 import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { validateRegisterInput, validateLoginInput } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -85,6 +85,30 @@ router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res
 
     res.cookie(AUTH_COOKIE_NAME, token, COOKIE_OPTIONS);
     res.json({
+      success: true,
+      data: { user, token }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/admin-register (Dedicated Admin onboarding with secret key)
+router.post('/admin-register', authRateLimiter, validateRegisterInput, async (req, res, next) => {
+  try {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const { user, token } = await registerAdmin({
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      password: req.body.password,
+      secretKey: req.body.secretKey,
+      area: req.body.area || 'Indiranagar',
+      ipAddress
+    });
+
+    res.cookie(AUTH_COOKIE_NAME, token, COOKIE_OPTIONS);
+    res.status(201).json({
       success: true,
       data: { user, token }
     });

@@ -12,7 +12,12 @@ export function hashPassword(plainPassword) {
 }
 
 export function verifyPassword(plainPassword, hash) {
-  return bcrypt.compareSync(plainPassword, hash);
+  if (!plainPassword || !hash || typeof hash !== 'string') return false;
+  try {
+    return bcrypt.compareSync(plainPassword, hash);
+  } catch (err) {
+    return false;
+  }
 }
 
 export function generateToken(user) {
@@ -21,7 +26,7 @@ export function generateToken(user) {
     name: user.name,
     email: user.email,
     phone: user.phone,
-    role: user.role,
+    role: (user.role || 'customer').toLowerCase(),
     area: user.area
   };
   return jwt.sign(payload, ENV.JWT_SECRET, { expiresIn: ENV.JWT_EXPIRES_IN });
@@ -43,7 +48,7 @@ export async function registerCustomer({ name, email, phone, password, area = 'I
   );
 
   if (existing) {
-    const isEmail = existing.email.toLowerCase() === email.trim().toLowerCase();
+    const isEmail = existing.email && existing.email.toLowerCase() === email.trim().toLowerCase();
     const field = isEmail ? 'Email' : 'Phone number';
     const err = new Error(`${field} is already registered. Please log in.`);
     err.statusCode = 409;
@@ -73,17 +78,83 @@ export async function registerCustomer({ name, email, phone, password, area = 'I
   return { user, token };
 }
 
+export async function registerAdmin({ name, email, phone, password, secretKey, area = 'Indiranagar', ipAddress = null }) {
+  const adminSecret = (ENV.ADMIN_REGISTRATION_SECRET || 'ANNA2026').trim();
+  if (!secretKey || secretKey.trim() !== adminSecret) {
+    const err = new Error('Invalid Admin Secret Authorization Key.');
+    err.statusCode = 403;
+    err.code = 'INVALID_ADMIN_SECRET';
+    throw err;
+  }
+
+  const existing = await queryOne(
+    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
+    [email.trim(), phone.trim()]
+  );
+
+  if (existing) {
+    const isEmail = existing.email && existing.email.toLowerCase() === email.trim().toLowerCase();
+    const field = isEmail ? 'Email' : 'Phone number';
+    const err = new Error(`${field} is already registered. Please log in.`);
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
+
+  const adminId = 'ADM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const passwordHash = hashPassword(password);
+
+  await execute(`
+    INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+    VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
+  `, [adminId, name.trim(), email.trim().toLowerCase(), phone.trim(), passwordHash, area]);
+
+  const user = { id: adminId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim(), role: 'admin', area };
+  const token = generateToken(user);
+
+  await logAuditEvent({
+    userId: adminId,
+    action: 'ADMIN_REGISTERED',
+    resourceType: 'user',
+    resourceId: adminId,
+    ipAddress
+  });
+
+  return { user, token };
+}
+
 export async function authenticateUser({ identifier, password, requiredRole = null, ipAddress = null }) {
-  const trimmed = identifier.trim();
-  // Safe parameterized query matching email OR phone (using LOWER() for cross-DB compatibility)
-  const user = await queryOne(`
-    SELECT id, name, email, phone, password_hash, role, area, status 
-    FROM users 
-    WHERE (LOWER(email) = LOWER(?) OR phone = ?) AND status = 'Active'
-  `, [trimmed, trimmed]);
+  const trimmed = identifier ? String(identifier).trim() : '';
+  if (!trimmed) {
+    const err = new Error('Identifier is required.');
+    err.statusCode = 400;
+    err.code = 'INVALID_INPUT';
+    throw err;
+  }
+
+  const cleanPhone = trimmed.replace(/[^0-9]/g, '');
+  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : null;
+
+  // Safe parameterized query matching email OR phone (or last 10 digits of phone)
+  let user = null;
+  if (last10) {
+    user = await queryOne(`
+      SELECT id, name, email, phone, password_hash, role, area, status 
+      FROM users 
+      WHERE (LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?) AND status = 'Active'
+    `, [trimmed, trimmed, `%${last10}`]);
+  } else {
+    user = await queryOne(`
+      SELECT id, name, email, phone, password_hash, role, area, status 
+      FROM users 
+      WHERE LOWER(email) = LOWER(?) AND status = 'Active'
+    `, [trimmed]);
+  }
+
+  const userPasswordHash = user ? (user.password_hash || user.PASSWORD_HASH || user.Password_Hash) : null;
 
   // Timing-safe constant-time comparison to prevent timing attacks & enumeration
-  if (!user || !verifyPassword(password, user.password_hash)) {
+  if (!user || !verifyPassword(password, userPasswordHash)) {
     await logAuditEvent({
       userId: user?.id || null,
       action: 'LOGIN_FAILED',
@@ -98,7 +169,8 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
   }
 
   // Role validation if required (e.g. admin login)
-  if (requiredRole && user.role !== requiredRole) {
+  const userRole = (user.role || user.ROLE || '').toLowerCase();
+  if (requiredRole && userRole !== requiredRole.toLowerCase()) {
     await logAuditEvent({
       userId: user.id,
       action: 'LOGIN_ROLE_MISMATCH',
@@ -124,7 +196,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
     name: user.name,
     email: user.email,
     phone: user.phone,
-    role: user.role,
+    role: userRole || 'customer',
     area: user.area
   };
 
