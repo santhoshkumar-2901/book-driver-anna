@@ -6,6 +6,7 @@ import {
 export default function AdminAuthView({
   authMode,
   setAuthMode,
+  isAuthSubmitting = false,
   authEmail,
   setAuthEmail,
   authPassword,
@@ -242,10 +243,20 @@ export default function AdminAuthView({
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              disabled={isAuthSubmitting}
+              className="w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>{authMode === 'login' ? 'Enter Admin Dashboard' : 'Complete Admin Registration'}</span>
+              {isAuthSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                  <span>{authMode === 'login' ? 'Signing In...' : 'Registering Admin...'}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{authMode === 'login' ? 'Enter Admin Dashboard' : 'Complete Admin Registration'}</span>
+                </>
+              )}
             </button>
 
           </form>

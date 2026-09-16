@@ -386,7 +386,11 @@ export default function Chatbot({ openBookingModal }) {
               className="p-2.5 rounded-lg bg-amber-500 text-slate-950 font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-400 transition-colors shadow-sm shrink-0"
               aria-label="Send query"
             >
-              <Send className="w-4 h-4" />
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </form>
 

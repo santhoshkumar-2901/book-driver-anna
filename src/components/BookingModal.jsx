@@ -53,6 +53,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   const [paymentMode, setPaymentMode] = useState('cash'); // 'cash', 'upi'
 
   const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialType) {
@@ -85,6 +86,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     setStreetAddress('');
     setSpecialInstructions('');
     setFormError('');
+    setIsSubmitting(false);
   };
 
   useEffect(() => {
@@ -156,8 +158,11 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
-    // Call Backend API for authoritative fare calculation and secure slot locking
-    let serverBooking = null;
+    setIsSubmitting(true);
+
+    try {
+      // Call Backend API for authoritative fare calculation and secure slot locking
+      let serverBooking = null;
     try {
       const serverRes = await apiClient.createBooking({
         customerName: customerName.trim(),
@@ -286,6 +291,9 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     onBookingComplete(bookingDetails);
     resetForm();
     onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1038,10 +1046,20 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            className="btn-primary w-full py-3.5 text-base justify-center"
+            disabled={isSubmitting}
+            className="btn-primary w-full py-3.5 text-base justify-center disabled:opacity-50"
           >
-            <ShieldCheck className="w-5 h-5" />
-            <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total})</span>
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                <span>Confirming Booking...</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-5 h-5" />
+                <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total})</span>
+              </>
+            )}
           </button>
 
           <p className="text-center text-[10px] text-slate-500 flex items-center justify-center gap-1">

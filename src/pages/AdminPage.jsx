@@ -900,6 +900,7 @@ export default function AdminPage({ onReturnToClient }) {
 
   const [classSearchQuery, setClassSearchQuery] = useState('');
   const [classStatusFilter, setClassStatusFilter] = useState('All');
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
 
   // Handle Login & Registration with server-side authentication
   const handleAuthSubmit = async (e) => {
@@ -934,8 +935,12 @@ export default function AdminPage({ onReturnToClient }) {
         setAuthError('Invalid Admin Secret Key (Demo Key: ANNA2026)');
         return;
       }
+    }
 
-      const nameToSave = submittedFullName;
+    setIsAuthSubmitting(true);
+    try {
+      if (authMode === 'register') {
+        const nameToSave = submittedFullName;
       const phoneToSave = submittedPhone;
       const emailLower = submittedEmail.toLowerCase();
 
@@ -1077,6 +1082,9 @@ export default function AdminPage({ onReturnToClient }) {
     // Navigate to the requested tab from URL
     const requestedTab = parseTabFromPath(window.location.pathname);
     navigateToTab(requestedTab, true);
+    } finally {
+      setIsAuthSubmitting(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -1424,6 +1432,7 @@ export default function AdminPage({ onReturnToClient }) {
       <AdminAuthView
         authMode={authMode}
         setAuthMode={setAuthMode}
+        isAuthSubmitting={isAuthSubmitting}
         authEmail={authEmail}
         setAuthEmail={setAuthEmail}
         authPassword={authPassword}

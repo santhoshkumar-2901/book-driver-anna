@@ -139,11 +139,12 @@ export default function CancelBookingModal({ isOpen, onClose }) {
     setIsCancelling(true);
 
     try {
-      // 1. Call Backend API
-      await apiClient.cancelBooking(refId, phone, cancellationReason).catch(() => {});
-    } catch (e) {
-      // Ignore network fallback error
-    }
+      try {
+        // 1. Call Backend API
+        await apiClient.cancelBooking(refId, phone, cancellationReason).catch(() => {});
+      } catch (e) {
+        // Ignore network fallback error
+      }
 
     // 2. Synchronize local storage lists
     const checkLists = ['bda_driver_bookings', 'bda_vehicle_bookings', 'bda_class_enrollments'];
@@ -176,7 +177,9 @@ export default function CancelBookingModal({ isOpen, onClose }) {
     }
 
     setSelectedBookingToCancel(null);
-    setIsCancelling(false);
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handleClose = () => {
@@ -382,8 +385,17 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                   disabled={isCancelling}
                   className="py-2 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-extrabold flex items-center gap-1.5 transition-colors shadow-lg shadow-red-500/20 disabled:opacity-50"
                 >
-                  <Ban className="w-3.5 h-3.5" />
-                  <span>{isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}</span>
+                  {isCancelling ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Cancelling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>Confirm Cancellation</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

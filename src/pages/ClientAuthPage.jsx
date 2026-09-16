@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Car, ShieldCheck, MapPin, Lock, Mail, Phone, User, 
-  Eye, EyeOff, ArrowRight, CheckCircle2, AlertCircle, Sparkles, 
+import {
+  Car, ShieldCheck, MapPin, Lock, Mail, Phone, User,
+  Eye, EyeOff, ArrowRight, CheckCircle2, AlertCircle, Sparkles,
   LogIn, UserPlus, Check
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
@@ -30,14 +30,14 @@ const DEFAULT_REGISTERED_CLIENTS = [
   }
 ];
 
-export default function ClientAuthPage({ 
-  initialMode = 'login', 
-  onLoginSuccess, 
-  onChangeRole, 
-  onSwitchMode 
+export default function ClientAuthPage({
+  initialMode = 'login',
+  onLoginSuccess,
+  onChangeRole,
+  onSwitchMode
 }) {
   const [authMode, setAuthMode] = useState(initialMode); // 'login' or 'signup'
-  
+
   // Login Form States
   const [loginIdentifier, setLoginIdentifier] = useState(''); // email or phone
   const [loginPassword, setLoginPassword] = useState('');
@@ -118,7 +118,7 @@ export default function ClientAuthPage({
       if (!stored) {
         localStorage.setItem('bda_registered_clients', JSON.stringify(DEFAULT_REGISTERED_CLIENTS));
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Synchronize registered/authenticated customer with localStorage and notify Admin in real-time
@@ -134,7 +134,7 @@ export default function ClientAuthPage({
       const cleanPhone = (user.phone || '').replace(/[^0-9]/g, '');
       const cleanEmail = (user.email || '').trim().toLowerCase();
 
-      const idx = list.findIndex(u => 
+      const idx = list.findIndex(u =>
         (u.id && user.id && u.id === user.id) ||
         (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail) ||
         (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
@@ -260,14 +260,14 @@ export default function ClientAuthPage({
         const allClients = [...stored, ...DEFAULT_REGISTERED_CLIENTS];
         const cleanInput = submittedIdentifier.toLowerCase();
         const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
-        const matched = allClients.find(u => 
+        const matched = allClients.find(u =>
           (u.email && u.email.toLowerCase() === cleanInput) ||
           (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
         );
         if (matched && (!matched.password || matched.password === submittedPassword)) {
           hasLocalProfileMatch = true;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       if (!hasLocalProfileMatch && apiErr.code !== 'NETWORK_ERROR' && apiErr.status !== 500) {
         setIsLoading(false);
@@ -289,7 +289,7 @@ export default function ClientAuthPage({
       const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
 
       // Check against stored registered clients
-      const matchedUser = registeredUsers.find(u => 
+      const matchedUser = registeredUsers.find(u =>
         (u.email && u.email.toLowerCase() === cleanInput) ||
         (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
       );
@@ -417,7 +417,7 @@ export default function ClientAuthPage({
 
       // Check if email or phone already registered
       const cleanPhone = signupPhone.replace(/[^0-9]/g, '');
-      const isDuplicate = registeredClients.some(u => 
+      const isDuplicate = registeredClients.some(u =>
         (u.email && u.email.toLowerCase() === signupEmail.trim().toLowerCase()) ||
         (u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
       );
@@ -453,7 +453,7 @@ export default function ClientAuthPage({
 
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-amber-400 selection:text-slate-950 max-w-full">
-      
+
       {/* Background Ambience & Grid */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -495,15 +495,15 @@ export default function ClientAuthPage({
 
           {/* Card Wrapper */}
           <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300">
-            
+
             {/* Header / Mode Switcher */}
             <div className="text-center space-y-1 mb-3">
               <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
                 {authMode === 'login' ? 'Sign In to Your Account' : 'Create Client Account'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
-                {authMode === 'login' 
-                  ? 'Access verified drivers, vehicle rentals & driving classes across Bengaluru.' 
+                {authMode === 'login'
+                  ? 'Access verified drivers, vehicle rentals & driving classes across Bengaluru.'
                   : 'Join thousands of Bengalureans enjoying stress-free rides and doorstep classes.'}
               </p>
             </div>
@@ -513,11 +513,10 @@ export default function ClientAuthPage({
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  authMode === 'login'
-                    ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'login'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
+                  : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
@@ -526,11 +525,10 @@ export default function ClientAuthPage({
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  authMode === 'signup'
-                    ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'signup'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
+                  : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Sign Up</span>
@@ -576,7 +574,7 @@ export default function ClientAuthPage({
                   className="sr-only hidden"
                   readOnly
                 />
-                
+
                 {/* Email or Phone */}
                 <div className="space-y-1">
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
@@ -704,7 +702,7 @@ export default function ClientAuthPage({
                   className="sr-only hidden"
                   readOnly
                 />
-                
+
                 {/* Full Name */}
                 <div className="space-y-0.5">
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">

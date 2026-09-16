@@ -477,7 +477,10 @@ export default function DriverAuthPage({
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <span>Verifying driver credentials...</span>
+                    <>
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Verifying driver credentials...</span>
+                    </>
                   ) : (
                     <>
                       <span>Sign In as Driver Anna</span>
@@ -700,7 +703,10 @@ export default function DriverAuthPage({
                   className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <span>Registering driver profile...</span>
+                    <>
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Registering driver profile...</span>
+                    </>
                   ) : (
                     <>
                       <span>Complete Registration & Join Fleet</span>
