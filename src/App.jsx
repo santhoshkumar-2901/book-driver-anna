@@ -92,6 +92,7 @@ export default function App() {
       const path = window.location.pathname;
       if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) {
         setActivePage('admin');
+        setAuthSessionKey(k => k + 1);
       } else if (path === '/driver/signup' || path === '/driver/signup/') {
         setSelectedRole('driver');
         setActivePage('driver-signup');
@@ -147,6 +148,7 @@ export default function App() {
       if (!window.location.pathname.startsWith('/admin')) {
         window.history.pushState({}, '', '/admin/dashboard');
       }
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'driver-signup') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/signup');
@@ -480,6 +482,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
         <AdminPage 
+          key={`admin-page-${authSessionKey}`}
           onReturnToClient={() => changePage(clientUser ? 'home' : (driverUser ? 'driver-portal' : 'role-select'))} 
         />
       </div>

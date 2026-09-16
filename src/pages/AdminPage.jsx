@@ -403,6 +403,11 @@ export default function AdminPage({ onReturnToClient }) {
   const [authSecretKey, setAuthSecretKey] = useState('');
   const [authError, setAuthError] = useState('');
 
+  // Dynamic form seed to ensure unique non-autofilled input names on mount/visit
+  const [authFormSeed, setAuthFormSeed] = useState(() => Math.random().toString(36).substring(2, 9));
+  // Keep inputs readOnly on initial mount so browser password managers completely skip them, unlock on user interaction
+  const [inputsUnlocked, setInputsUnlocked] = useState(false);
+
   // Input element refs for direct DOM clearing if browser autofill engines inject values
   const authFullNameRef = useRef(null);
   const authPhoneRef = useRef(null);
@@ -419,6 +424,7 @@ export default function AdminPage({ onReturnToClient }) {
     setAuthSecretKey('');
     setShowPassword(false);
     setAuthError('');
+    setInputsUnlocked(false);
 
     if (authFullNameRef.current) authFullNameRef.current.value = '';
     if (authPhoneRef.current) authPhoneRef.current.value = '';
@@ -426,6 +432,36 @@ export default function AdminPage({ onReturnToClient }) {
     if (authPasswordRef.current) authPasswordRef.current.value = '';
     if (authSecretKeyRef.current) authSecretKeyRef.current.value = '';
   };
+
+  // Wipe all previous input values on mount and mode changes to prevent browser password managers from pre-filling
+  useEffect(() => {
+    resetAuthForm();
+    setAuthFormSeed(Math.random().toString(36).substring(2, 9));
+
+    // Browser password managers / autofill engines inject credentials asynchronously 50-1000ms after DOM mount
+    const timeouts = [50, 150, 300, 600, 1000].map(delay =>
+      setTimeout(() => {
+        if (!inputsUnlocked) {
+          resetAuthForm();
+        }
+      }, delay)
+    );
+
+    const handleWindowFocus = () => {
+      if (!inputsUnlocked) {
+        resetAuthForm();
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('pageshow', handleWindowFocus);
+
+    return () => {
+      timeouts.forEach(t => clearTimeout(t));
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('pageshow', handleWindowFocus);
+      resetAuthForm();
+    };
+  }, [isAdminLoggedIn, authMode]);
   
   // Logged-in Admin Info
   const [loggedInAdminName, setLoggedInAdminName] = useState(() => {
@@ -1310,34 +1346,34 @@ export default function AdminPage({ onReturnToClient }) {
   // =========================================================================
   if (!isAdminLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-3.5 sm:p-6 lg:p-8 relative overflow-x-hidden overflow-y-auto">
         
         {/* Background Decorative Glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header Bar with Search Bar Address Display */}
-        <header className="max-w-5xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4 relative z-10">
+        <header className="max-w-5xl mx-auto w-full flex flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20">
+            <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20 shrink-0">
               <Car className="w-6 h-6 stroke-[2.2]" />
             </div>
-            <span className="font-extrabold text-xl text-white font-['Outfit']">
+            <span className="font-extrabold text-lg sm:text-xl text-white font-['Outfit']">
               Book Driver <span className="text-amber-400">Anna</span>
             </span>
           </div>
 
           <button 
             onClick={onReturnToClient}
-            className="text-xs text-slate-400 hover:text-white font-semibold flex items-center gap-1 transition-colors"
+            className="text-xs text-slate-400 hover:text-white font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
           >
             Client Site <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
           </button>
         </header>
 
         {/* Center Admin Authentication Card */}
-        <div className="max-w-md mx-auto w-full my-auto py-8 relative z-10">
+        <div className="max-w-md mx-auto w-full my-auto py-6 sm:py-8 relative z-10">
           
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl space-y-5 sm:space-y-6">
             
             {/* Header Badge */}
             <div className="text-center space-y-2">
@@ -1389,8 +1425,14 @@ export default function AdminPage({ onReturnToClient }) {
             )}
 
             {/* Authentication Form */}
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-4" autoComplete="off" key={`auth-form-${authFormSeed}`}>
               
+              {/* Invisible decoy fields to absorb aggressive browser autofill */}
+              <div style={{ position: 'absolute', opacity: 0, height: 0, width: 0, zIndex: -1, overflow: 'hidden' }} tabIndex="-1" aria-hidden="true">
+                <input type="text" name="bda_decoy_user_field" tabIndex="-1" autoComplete="off" />
+                <input type="password" name="bda_decoy_pass_field" tabIndex="-1" autoComplete="new-password" />
+              </div>
+
               {authMode === 'register' && (
                 <>
                   <div className="space-y-1.5">
@@ -1401,6 +1443,11 @@ export default function AdminPage({ onReturnToClient }) {
                         ref={authFullNameRef}
                         type="text"
                         required
+                        name={`bda_adm_name_${authFormSeed}`}
+                        autoComplete="off"
+                        readOnly={!inputsUnlocked}
+                        onFocus={() => setInputsUnlocked(true)}
+                        onClick={() => setInputsUnlocked(true)}
                         placeholder="e.g. Manjunath Gowda"
                         value={authFullName}
                         onChange={(e) => setAuthFullName(e.target.value)}
@@ -1417,6 +1464,11 @@ export default function AdminPage({ onReturnToClient }) {
                         ref={authPhoneRef}
                         type="tel"
                         required
+                        name={`bda_adm_phone_${authFormSeed}`}
+                        autoComplete="off"
+                        readOnly={!inputsUnlocked}
+                        onFocus={() => setInputsUnlocked(true)}
+                        onClick={() => setInputsUnlocked(true)}
                         placeholder="+91 98860 12345"
                         value={authPhone}
                         onChange={(e) => setAuthPhone(e.target.value)}
@@ -1435,6 +1487,11 @@ export default function AdminPage({ onReturnToClient }) {
                     ref={authEmailRef}
                     type="email"
                     required
+                    name={`bda_adm_id_${authFormSeed}`}
+                    autoComplete="one-time-code"
+                    readOnly={!inputsUnlocked}
+                    onFocus={() => setInputsUnlocked(true)}
+                    onClick={() => setInputsUnlocked(true)}
                     placeholder="admin@bookdriveranna.com"
                     value={authEmail}
                     onChange={(e) => setAuthEmail(e.target.value)}
@@ -1452,6 +1509,11 @@ export default function AdminPage({ onReturnToClient }) {
                     ref={authPasswordRef}
                     type={showPassword ? 'text' : 'password'}
                     required
+                    name={`bda_adm_sec_${authFormSeed}`}
+                    autoComplete="new-password"
+                    readOnly={!inputsUnlocked}
+                    onFocus={() => setInputsUnlocked(true)}
+                    onClick={() => setInputsUnlocked(true)}
                     placeholder="••••••••"
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
@@ -1477,6 +1539,11 @@ export default function AdminPage({ onReturnToClient }) {
                       ref={authSecretKeyRef}
                       type="text"
                       required
+                      name={`bda_adm_code_${authFormSeed}`}
+                      autoComplete="off"
+                      readOnly={!inputsUnlocked}
+                      onFocus={() => setInputsUnlocked(true)}
+                      onClick={() => setInputsUnlocked(true)}
                       placeholder="Enter secret key (e.g. ANNA2026)"
                       value={authSecretKey}
                       onChange={(e) => setAuthSecretKey(e.target.value)}
@@ -1489,7 +1556,7 @@ export default function AdminPage({ onReturnToClient }) {
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2 mt-2"
+                className="w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>{authMode === 'login' ? 'Enter Admin Dashboard' : 'Complete Admin Registration'}</span>
@@ -1498,11 +1565,12 @@ export default function AdminPage({ onReturnToClient }) {
             </form>
 
             {/* Quick Demo Credentials Footer */}
-            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between gap-2">
-              <span>💡 Demo: <span className="text-white font-semibold">admin@bookdriveranna.com</span> / <span className="text-white font-semibold">admin123</span></span>
+            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-[11px] text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 min-w-0">
+              <span className="truncate min-w-0">💡 Demo: <span className="text-white font-semibold">admin@bookdriveranna.com</span> / <span className="text-white font-semibold">admin123</span></span>
               <button
                 type="button"
                 onClick={() => {
+                  setInputsUnlocked(true);
                   setAuthEmail('admin@bookdriveranna.com');
                   setAuthPassword('admin123');
                   if (authMode === 'register') {
@@ -1511,7 +1579,7 @@ export default function AdminPage({ onReturnToClient }) {
                     setAuthSecretKey('ANNA2026');
                   }
                 }}
-                className="text-amber-400 hover:text-amber-300 font-bold underline shrink-0 cursor-pointer"
+                className="text-amber-400 hover:text-amber-300 font-bold underline shrink-0 cursor-pointer self-end sm:self-auto"
               >
                 Auto-fill
               </button>
@@ -1522,7 +1590,7 @@ export default function AdminPage({ onReturnToClient }) {
         </div>
 
         {/* Page Footer */}
-        <footer className="text-center text-xs text-slate-500 relative z-10">
+        <footer className="text-center text-xs text-slate-500 relative z-10 py-2">
           © {new Date().getFullYear()} Book Driver Anna Technologies. Admin Security Portal.
         </footer>
 
@@ -1534,12 +1602,12 @@ export default function AdminPage({ onReturnToClient }) {
   // VIEW 2: LOGGED-IN ADMIN DASHBOARD (WITH SIDEBAR)
   // =========================================================================
   return (
-    <div className="min-h-screen md:h-screen md:overflow-hidden bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-slate-950 text-slate-100 flex flex-col lg:flex-row">
       
       {/* --------------------------------------------------------------------- */}
-      {/* DESKTOP SIDEBAR NAVIGATION (PERFECTLY PINNED TO VIEWPORT HEIGHT) */}
+      {/* DESKTOP SIDEBAR NAVIGATION (PINNED ON SCREENS >= lg) */}
       {/* --------------------------------------------------------------------- */}
-      <aside className="hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col shrink-0 h-full select-none z-20">
+      <aside className="hidden lg:flex lg:w-64 bg-slate-900 border-r border-slate-800 flex-col shrink-0 h-full select-none z-20">
         
         {/* Sidebar Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
@@ -1704,9 +1772,9 @@ export default function AdminPage({ onReturnToClient }) {
       </aside>
 
       {/* --------------------------------------------------------------------- */}
-      {/* MOBILE ADMIN TOP HEADER BAR (< md) */}
+      {/* MOBILE & TABLET ADMIN TOP HEADER BAR (< lg) */}
       {/* --------------------------------------------------------------------- */}
-      <div className="md:hidden sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shrink-0">
+      <div className="lg:hidden sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shrink-0">
         
         {/* Top Header Bar */}
         <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-800/80">
@@ -1841,10 +1909,10 @@ export default function AdminPage({ onReturnToClient }) {
       </div>
 
       {/* --------------------------------------------------------------------- */}
-      {/* MOBILE SIDEBAR SLIDE-OUT DRAWER (< md) */}
+      {/* MOBILE & TABLET SIDEBAR SLIDE-OUT DRAWER (< lg) */}
       {/* --------------------------------------------------------------------- */}
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 lg:hidden flex">
           {/* Backdrop overlay */}
           <div 
             className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm animate-fade-in transition-opacity"
@@ -2014,19 +2082,19 @@ export default function AdminPage({ onReturnToClient }) {
       {/* --------------------------------------------------------------------- */}
       {/* MAIN ADMIN DASHBOARD CONTENT */}
       {/* --------------------------------------------------------------------- */}
-      <main className="flex-1 md:h-full md:overflow-y-auto p-4 sm:p-6 lg:p-10 max-w-full overflow-x-hidden">
+      <main className="flex-1 min-w-0 w-full lg:h-full lg:overflow-y-auto p-3.5 sm:p-6 lg:p-8 xl:p-10 max-w-full overflow-x-hidden">
         
         {/* TAB 1: DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-fade-in">
+          <div className="space-y-6 sm:space-y-8 animate-fade-in">
             
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5 sm:pb-6">
               <div>
                 <span className="bg-amber-400/10 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/20 uppercase tracking-wider">
                   Operational Dashboard
                 </span>
-                <h1 className="text-3xl font-extrabold text-white font-['Outfit'] mt-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] mt-2">
                   Bangalore Admin Dashboard
                 </h1>
                 <p className="text-slate-400 text-xs mt-1">
@@ -2041,55 +2109,55 @@ export default function AdminPage({ onReturnToClient }) {
               </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+            {/* KPI Cards (2-col mobile, 2-col large phone, 3-col tablet/laptop, 6-col large desktop) */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 sm:gap-4 lg:gap-5 min-w-0">
               
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Total Revenue</span>
-                  <div className="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold">
-                    <DollarSign className="w-5 h-5" />
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 shadow-sm min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Total Revenue</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">₹4,85,200</div>
-                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5" /> +14.2% this month
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">₹4,85,200</div>
+                <div className="text-[11px] sm:text-xs text-emerald-400 font-semibold flex items-center gap-1 truncate min-w-0">
+                  <TrendingUp className="w-3.5 h-3.5 shrink-0" /> +14.2% this month
                 </div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Active Drivers</span>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-                    <SteeringWheel className="w-5 h-5" />
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 shadow-sm min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Active Drivers</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                    <SteeringWheel className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">1,840</div>
-                <div className="text-xs text-slate-400">100% Police Verified</div>
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">1,840</div>
+                <div className="text-[11px] sm:text-xs text-slate-400 truncate min-w-0">100% Police Verified</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Driver Requests</span>
-                  <div className="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold">
-                    <Users className="w-5 h-5" />
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 shadow-sm min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Driver Requests</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-amber-400 font-['Outfit']">{driverBookings.length} Active</div>
-                <div className="text-xs text-amber-400 font-semibold">
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-amber-400 font-['Outfit'] truncate min-w-0">{driverBookings.length} Active</div>
+                <div className="text-[11px] sm:text-xs text-amber-400 font-semibold truncate min-w-0">
                   {driverBookings.filter(b => b.status === 'Pending').length} Pending Dispatch
                 </div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-2">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Vehicle Rentals</span>
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
-                    <Car className="w-5 h-5" />
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 shadow-sm min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Vehicle Rentals</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold shrink-0">
+                    <Car className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">{vehicleBookings.length} Active</div>
-                <div className="text-xs text-slate-400">
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">{vehicleBookings.length} Active</div>
+                <div className="text-[11px] sm:text-xs text-slate-400 truncate min-w-0">
                   Sedan, SUV & Van
                 </div>
               </div>
@@ -2097,77 +2165,77 @@ export default function AdminPage({ onReturnToClient }) {
               {/* KPI 5: Driving Classes */}
               <div 
                 onClick={() => navigateToTab('for-class')}
-                className="bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-3xl p-6 space-y-2 cursor-pointer transition-all group shadow-md"
+                className="bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 cursor-pointer transition-all group shadow-sm min-w-0 overflow-hidden"
               >
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Driving Classes</span>
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center font-bold transition-colors">
-                    <GraduationCap className="w-5 h-5" />
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Driving Classes</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center font-bold transition-colors shrink-0">
+                    <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">{classEnrollments.length} Students</div>
-                <div className="text-xs text-purple-400 font-semibold flex items-center justify-between">
-                  <span>{classEnrollments.filter(e => e.status === 'Pending').length} Pending</span>
-                  <span className="text-[10px] text-slate-400 group-hover:text-amber-400 font-bold">Manage →</span>
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">{classEnrollments.length} Students</div>
+                <div className="text-[11px] sm:text-xs text-purple-400 font-semibold flex items-center justify-between min-w-0">
+                  <span className="truncate min-w-0">{classEnrollments.filter(e => e.status === 'Pending').length} Pending</span>
+                  <span className="text-[10px] text-slate-400 group-hover:text-amber-400 font-bold shrink-0 ml-1">Manage →</span>
                 </div>
               </div>
 
               {/* KPI 6: Users & Drivers */}
               <div 
                 onClick={() => navigateToTab('users')}
-                className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-3xl p-6 space-y-2 cursor-pointer transition-all group shadow-md sm:col-span-2 lg:col-span-1"
+                className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 cursor-pointer transition-all group shadow-sm min-w-0 overflow-hidden"
               >
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Users & Drivers</span>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center font-bold transition-colors">
-                    <Users className="w-5 h-5" />
+                <div className="flex items-center justify-between text-slate-400 min-w-0">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate">Users & Drivers</span>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center font-bold transition-colors shrink-0">
+                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">
+                <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">
                   {registeredUsers.length + registeredDrivers.length} Accounts
                 </div>
-                <div className="text-xs text-emerald-400 font-semibold flex items-center justify-between">
-                  <span>{registeredUsers.length} Clients · {registeredDrivers.length} Drivers</span>
-                  <span className="text-[10px] text-slate-400 group-hover:text-amber-400 font-bold">Directory →</span>
+                <div className="text-[11px] sm:text-xs text-emerald-400 font-semibold flex items-center justify-between min-w-0">
+                  <span className="truncate min-w-0">{registeredUsers.length} Clients · {registeredDrivers.length} Drivers</span>
+                  <span className="text-[10px] text-slate-400 group-hover:text-amber-400 font-bold shrink-0 ml-1">→</span>
                 </div>
               </div>
 
             </div>
 
             {/* Recent Driver Bookings with Single Combined WhatsApp Action */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-extrabold text-white font-['Outfit'] flex items-center gap-2">
-                  <SteeringWheel className="w-5 h-5 text-amber-400" /> Recent Driver Booking Dispatches
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-6 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="text-base sm:text-lg font-extrabold text-white font-['Outfit'] flex items-center gap-2">
+                  <SteeringWheel className="w-5 h-5 text-amber-400 shrink-0" /> Recent Driver Booking Dispatches
                 </h3>
                 <button 
                   onClick={() => navigateToTab('for-driver')}
-                  className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
                 >
                   Manage All Drivers <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                 {driverBookings.map((b) => (
-                  <div key={b.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm text-white">{b.customerName}</span>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded">
+                  <div key={b.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 overflow-hidden">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="font-extrabold text-sm text-white truncate min-w-0">{b.customerName}</span>
+                        <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded font-mono shrink-0">
                           {b.id}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> {b.pickupArea} to {b.dropLocation}
+                      <div className="text-xs text-slate-400 flex items-center gap-1.5 min-w-0">
+                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea} to {b.dropLocation}</span>
                       </div>
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        {b.tripTitle} • ₹{b.fare}
+                      <div className="text-[11px] text-slate-400 font-medium truncate min-w-0">
+                        {b.tripTitle} • <strong className="text-white">₹{b.fare}</strong>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className={`inline-block text-[11px] font-black px-3 py-1 rounded-full ${
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-900 w-full sm:w-auto">
+                      <span className={`inline-block text-[11px] font-black px-3 py-1 rounded-full shrink-0 ${
                         b.status === 'Cancelled'
                           ? 'bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30'
                           : b.status === 'Pending' 
@@ -2189,7 +2257,7 @@ export default function AdminPage({ onReturnToClient }) {
                             ? "Send Cancellation Notice via WhatsApp to Client"
                             : "Send trip confirmation WhatsApp to Client"
                         }
-                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all border ${
+                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all border shrink-0 ${
                           b.status === 'Pending'
                             ? 'bg-slate-950 text-slate-500 border-slate-800 opacity-60 cursor-not-allowed'
                             : b.status === 'Cancelled'
@@ -2198,7 +2266,7 @@ export default function AdminPage({ onReturnToClient }) {
                         }`}
                       >
                         <WhatsAppIcon className="w-3.5 h-3.5 fill-current" />
-                        <span>{b.status === 'Cancelled' ? 'WhatsApp to Cancelled Client' : 'WhatsApp to Client'}</span>
+                        <span>{b.status === 'Cancelled' ? 'WhatsApp to Client' : 'WhatsApp'}</span>
                       </button>
                     </div>
                   </div>
@@ -2214,7 +2282,7 @@ export default function AdminPage({ onReturnToClient }) {
           <div className="space-y-8 animate-fade-in">
             
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6 min-w-0">
               <div>
                 <span className="bg-amber-400/10 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/20 uppercase tracking-wider">
                   Driver Fleet Management
@@ -2228,8 +2296,8 @@ export default function AdminPage({ onReturnToClient }) {
               </div>
 
               {/* Search & Status Filter */}
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="relative w-full sm:w-64">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto min-w-0">
+                <div className="relative w-full sm:w-64 min-w-0">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input 
                     type="text"
@@ -2240,12 +2308,12 @@ export default function AdminPage({ onReturnToClient }) {
                   />
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar min-w-0">
                   {['All', 'Pending', 'Assigned', 'Cancelled'].map((st) => (
                     <button
                       key={st}
                       onClick={() => setDriverStatusFilter(st)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${
                         driverStatusFilter === st
                           ? 'bg-amber-400 text-slate-950 shadow'
                           : 'text-slate-400 hover:text-white'
@@ -2259,30 +2327,30 @@ export default function AdminPage({ onReturnToClient }) {
             </div>
 
             {/* Driver Booking Cards */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
               {filteredDriverBookings.map((b) => (
-                <div key={b.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
+                <div key={b.id} className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold shrink-0">
                         <SteeringWheel className="w-5 h-5" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-base text-white">{b.customerName}</span>
-                          <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="font-extrabold text-base text-white truncate min-w-0">{b.customerName}</span>
+                          <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 font-mono shrink-0">
                             {b.id}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" /> {b.phone}
+                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 min-w-0">
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" /> <a href={`tel:${b.phone}`} className="hover:text-amber-400 font-mono truncate">{b.phone}</a>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0 w-full sm:w-auto">
+                      <span className={`text-xs font-black px-3 py-1 rounded-full shrink-0 ${
                         b.status === 'Cancelled'
                           ? 'bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30'
                           : b.status === 'Pending' 
@@ -2293,77 +2361,77 @@ export default function AdminPage({ onReturnToClient }) {
                       }`}>
                         ● {b.status}
                       </span>
-                      <div className="text-sm font-extrabold text-white font-['Outfit']">₹{b.fare}</div>
+                      <div className="text-sm sm:text-base font-extrabold text-white font-['Outfit'] shrink-0">₹{b.fare}</div>
                     </div>
                   </div>
 
                   {/* Cancelled Alert Banner if booking status is Cancelled */}
                   {b.status === 'Cancelled' && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex items-center justify-between text-xs text-red-300">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-red-300 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <Ban className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>
+                        <span className="truncate">
                           <strong className="text-red-400">Driver Booking Cancelled:</strong> {b.cancelReason ? `"${b.cancelReason}"` : 'Cancelled with zero penalty'}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">Zero Charges Billed</span>
+                      <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 shrink-0 self-start sm:self-auto">Zero Charges Billed</span>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs min-w-0">
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                       <div className="text-slate-400 font-bold uppercase text-[10px]">Trip Type & Package</div>
-                      <div className="font-extrabold text-white">{b.tripTitle}</div>
-                      <div className="text-slate-400">{toDDMMYYYY(b.date)} • {b.time}</div>
+                      <div className="font-extrabold text-white truncate min-w-0">{b.tripTitle}</div>
+                      <div className="text-slate-400 truncate min-w-0">{toDDMMYYYY(b.date)} • {b.time}</div>
                     </div>
 
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                       <div className="text-slate-400 font-bold uppercase text-[10px]">Pickup & Drop Route</div>
-                      <div className="font-semibold text-slate-200 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> {b.pickupArea}
+                      <div className="font-semibold text-slate-200 flex items-center gap-1 min-w-0">
+                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea}</span>
                       </div>
-                      <div className="text-slate-400 truncate">Drop: {b.dropLocation}</div>
+                      <div className="text-slate-400 truncate min-w-0" title={b.dropLocation}>Drop: {b.dropLocation}</div>
                     </div>
 
                     {b.tripType === 'class' ? (
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                         <div className="text-amber-400 font-bold uppercase text-[10px] flex items-center gap-1">
-                          <GraduationCap className="w-3 h-3" /> Training Specs
+                          <GraduationCap className="w-3 h-3 shrink-0" /> Training Specs
                         </div>
-                        <div className="font-semibold text-slate-200">{b.classTrainingCar || "Dual-Control Car"} ({b.classTransmission || "Manual"})</div>
-                        <div className="text-amber-400 font-semibold truncate">{b.classTimeSlot || "Morning Slot"}</div>
+                        <div className="font-semibold text-slate-200 truncate min-w-0">{b.classTrainingCar || "Dual-Control Car"} ({b.classTransmission || "Manual"})</div>
+                        <div className="text-amber-400 font-semibold truncate min-w-0">{b.classTimeSlot || "Morning Slot"}</div>
                       </div>
                     ) : b.passengers ? (
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                         <div className="text-slate-400 font-bold uppercase text-[10px]">Passenger & Luggage</div>
-                        <div className="font-semibold text-slate-200">{b.passengers} Passengers • {b.luggage}</div>
-                        <div className="text-amber-400 font-semibold">{b.acPreference} Vehicle</div>
+                        <div className="font-semibold text-slate-200 truncate min-w-0">{b.passengers} Passengers • {b.luggage}</div>
+                        <div className="text-amber-400 font-semibold truncate min-w-0">{b.acPreference} Vehicle</div>
                       </div>
                     ) : (
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                         <div className="text-slate-400 font-bold uppercase text-[10px]">Service Mode</div>
-                        <div className="font-semibold text-slate-200">{b.tripTitle || 'Driver Service'}</div>
-                        <div className="text-amber-400 font-semibold">Customer's Own Car</div>
+                        <div className="font-semibold text-slate-200 truncate min-w-0">{b.tripTitle || 'Driver Service'}</div>
+                        <div className="text-amber-400 font-semibold truncate min-w-0">Customer's Own Car</div>
                       </div>
                     )}
 
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                       <div className="text-slate-400 font-bold uppercase text-[10px]">Assigned Driver Details</div>
-                      <div className="font-bold text-emerald-400 truncate">
+                      <div className="font-bold text-emerald-400 truncate min-w-0">
                         {b.assignedDriver ? b.assignedDriver : '⚠️ No Driver Assigned'}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-[10px] text-slate-400 truncate min-w-0">
                         {b.assignedDriverPhone ? `📞 ${b.assignedDriverPhone}` : 'Police Verified Driver'}
                       </div>
                     </div>
                   </div>
 
                   {/* Driver Inputs & Action Controls */}
-                  <div className="pt-2 flex flex-col lg:flex-row items-center justify-between gap-3 border-t border-slate-800/80">
+                  <div className="pt-3 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-t border-slate-800/80 min-w-0">
                     
                     {/* 2 Input Boxes Typed by Admin for Driver Name & Driver Phone Number */}
-                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
-                      <div className="relative w-full sm:w-44">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto min-w-0">
+                      <div className="relative w-full sm:w-44 min-w-0">
                         <User className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input 
                           type="text"
@@ -2373,24 +2441,23 @@ export default function AdminPage({ onReturnToClient }) {
                           className="bg-slate-950 border border-slate-700 text-xs font-semibold text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-amber-400 w-full"
                         />
                       </div>
-                      <div className="relative w-full sm:w-36">
+                      <div className="relative w-full sm:w-36 min-w-0">
                         <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input 
                           type="text"
                           placeholder="Driver Phone"
                           value={driverInputState[b.id]?.phone ?? (b.assignedDriverPhone || '')}
                           onChange={(e) => handleDriverInputChange(b.id, 'phone', e.target.value)}
-                          className="bg-slate-950 border border-slate-700 text-xs font-semibold text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-amber-400 w-full"
+                          className="bg-slate-950 border border-slate-700 text-xs font-semibold text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-amber-400 w-full font-mono"
                         />
                       </div>
                     </div>
 
                     {/* Status Toggles & WhatsApp Action */}
-                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start sm:justify-end min-w-0">
                       {b.status === 'Cancelled' ? (
                         <>
-                          {/* Cancelled Order: NO Pending or Confirmed buttons, only red Cancelled indicator and red WhatsApp button */}
-                          <span className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5">
+                          <span className="px-3.5 py-2 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5 shrink-0">
                             <Ban className="w-3.5 h-3.5" />
                             <span>Cancelled</span>
                           </span>
@@ -2398,33 +2465,33 @@ export default function AdminPage({ onReturnToClient }) {
                           <button
                             onClick={() => sendWhatsAppToClientForDriver(b)}
                             title="Send Cancellation Notice via WhatsApp to Client"
-                            className="text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer"
+                            className="text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer w-full sm:w-auto justify-center shrink-0"
                           >
                             <WhatsAppIcon className="w-4 h-4 fill-current" />
-                            <span>WhatsApp to Cancelled Client</span>
+                            <span>WhatsApp to Client</span>
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => handleUpdateDriverStatus(b.id, 'Pending')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                              b.status === 'Pending' ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'
+                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
+                              b.status === 'Pending' ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                             }`}
                           >
-                            Set Pending
+                            Pending
                           </button>
                           <button
                             onClick={() => handleAcceptAndAssignDriver(b.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                              b.status === 'Assigned' ? 'bg-blue-500 text-white border-blue-500' : 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-400'
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
+                              b.status === 'Assigned' ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-400 shadow-md shadow-amber-400/20'
                             }`}
                           >
                             Accept & Assign
                           </button>
                           <button
                             onClick={() => handleUpdateDriverStatus(b.id, 'Cancelled')}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40"
+                            className="px-3 py-2 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40 cursor-pointer flex-1 sm:flex-initial text-center"
                           >
                             Cancel
                           </button>
@@ -2437,7 +2504,7 @@ export default function AdminPage({ onReturnToClient }) {
                                 ? "Please Accept & Assign order first to send WhatsApp to client" 
                                 : "Send Accepted Order Details via WhatsApp to Client"
                             }
-                            className={`text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border ${
+                            className={`text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border w-full sm:w-auto justify-center shrink-0 ${
                               b.status === 'Pending'
                                 ? 'bg-slate-950 text-slate-500 border-slate-800 opacity-60 cursor-not-allowed'
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 border-emerald-400/40 cursor-pointer'
@@ -2449,7 +2516,6 @@ export default function AdminPage({ onReturnToClient }) {
                         </>
                       )}
                     </div>
-
                   </div>
 
                 </div>
@@ -2464,12 +2530,12 @@ export default function AdminPage({ onReturnToClient }) {
           <div className="space-y-8 animate-fade-in">
             
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6 min-w-0">
               <div>
                 <span className="bg-amber-400/10 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/20 uppercase tracking-wider">
                   Vehicle Rental Management
                 </span>
-                <h1 className="text-3xl font-extrabold text-white font-['Outfit'] mt-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] mt-2">
                   For Vehicle (Fleet Bookings & Dispatch)
                 </h1>
                 <p className="text-slate-400 text-xs mt-1">
@@ -2478,8 +2544,8 @@ export default function AdminPage({ onReturnToClient }) {
               </div>
 
               {/* Search & Status Filter */}
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="relative w-full sm:w-64">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto min-w-0">
+                <div className="relative w-full sm:w-64 min-w-0">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input 
                     type="text"
@@ -2490,12 +2556,12 @@ export default function AdminPage({ onReturnToClient }) {
                   />
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar min-w-0">
                   {['All', 'Pending', 'Confirmed', 'Dispatched', 'Cancelled'].map((st) => (
                     <button
                       key={st}
                       onClick={() => setVehicleStatusFilter(st)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${
                         vehicleStatusFilter === st
                           ? 'bg-amber-400 text-slate-950 shadow'
                           : 'text-slate-400 hover:text-white'
@@ -2509,30 +2575,30 @@ export default function AdminPage({ onReturnToClient }) {
             </div>
 
             {/* Vehicle Cards */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
               {filteredVehicleBookings.map((b) => (
-                <div key={b.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
+                <div key={b.id} className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold shrink-0">
                         <Car className="w-5 h-5" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-base text-white">{b.customerName}</span>
-                          <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="font-extrabold text-base text-white truncate min-w-0">{b.customerName}</span>
+                          <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 shrink-0">
                             {b.id}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" /> {b.phone}
+                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 min-w-0">
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" /> <span className="truncate min-w-0">{b.phone}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0 w-full sm:w-auto">
+                      <span className={`text-xs font-black px-3 py-1 rounded-full shrink-0 ${
                         b.status === 'Cancelled'
                           ? 'bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30'
                           : b.status === 'Pending' 
@@ -2543,62 +2609,62 @@ export default function AdminPage({ onReturnToClient }) {
                       }`}>
                         ● {b.status}
                       </span>
-                      <div className="text-sm font-extrabold text-amber-400 font-['Outfit']">₹{b.fare}</div>
+                      <div className="text-sm font-extrabold text-amber-400 font-['Outfit'] shrink-0">₹{b.fare}</div>
                     </div>
                   </div>
 
                   {/* Cancelled Alert Banner if vehicle rental status is Cancelled */}
                   {b.status === 'Cancelled' && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex items-center justify-between text-xs text-red-300">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-red-300 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <Ban className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>
+                        <span className="min-w-0">
                           <strong className="text-red-400">Vehicle Rental Cancelled:</strong> {b.cancelReason ? `"${b.cancelReason}"` : 'Cancelled with zero penalty'}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">Fleet Released</span>
+                      <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 shrink-0 self-start sm:self-auto">Fleet Released</span>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                      <div className="text-slate-400 font-bold uppercase text-[10px]">Vehicle Reserved</div>
-                      <div className="font-extrabold text-white">{b.vehicleName}</div>
-                      <div className="text-amber-400 font-semibold">{b.rentalType}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs min-w-0">
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
+                      <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Vehicle Reserved</div>
+                      <div className="font-extrabold text-white truncate">{b.vehicleName}</div>
+                      <div className="text-amber-400 font-semibold truncate">{b.rentalType}</div>
                     </div>
 
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                      <div className="text-slate-400 font-bold uppercase text-[10px]">Pickup Location & Time</div>
-                      <div className="font-semibold text-slate-200 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> {b.pickupArea}
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
+                      <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Pickup Location & Time</div>
+                      <div className="font-semibold text-slate-200 flex items-center gap-1 truncate min-w-0">
+                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea}</span>
                       </div>
-                      <div className="text-slate-400">{toDDMMYYYY(b.date)} • {b.time}</div>
+                      <div className="text-slate-400 truncate">{toDDMMYYYY(b.date)} • {b.time}</div>
                     </div>
 
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                      <div className="text-slate-400 font-bold uppercase text-[10px]">Passenger & Luggage</div>
-                      <div className="font-semibold text-slate-200">{b.passengers} Passengers • {b.luggage}</div>
-                      <div className="text-emerald-400 font-semibold">{b.acPreference} Vehicle</div>
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
+                      <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Passenger & Luggage</div>
+                      <div className="font-semibold text-slate-200 truncate">{b.passengers} Passengers • {b.luggage}</div>
+                      <div className="text-emerald-400 font-semibold truncate">{b.acPreference} Vehicle</div>
                     </div>
 
-                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                      <div className="text-slate-400 font-bold uppercase text-[10px]">Assigned Reg Number</div>
-                      <div className="font-mono font-bold text-amber-400">{b.vehicleRegNumber}</div>
-                      <div className="text-[10px] text-slate-500">Sanitized Fleet Vehicle</div>
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
+                      <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Assigned Reg Number</div>
+                      <div className="font-mono font-bold text-amber-400 truncate">{b.vehicleRegNumber}</div>
+                      <div className="text-[10px] text-slate-500 truncate">Sanitized Fleet Vehicle</div>
                     </div>
                   </div>
 
                   {/* Controls & Single Combined WhatsApp Dispatch Action */}
-                  <div className="pt-2 flex flex-col lg:flex-row items-center justify-between gap-3 border-t border-slate-800/80">
-                    <div className="text-xs text-slate-400">
+                  <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-800/80 min-w-0">
+                    <div className="text-xs text-slate-400 shrink-0">
                       Booked: <span className="text-slate-300 font-semibold">{b.bookedAt}</span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
                       {b.status === 'Cancelled' ? (
                         <>
                           {/* Cancelled Vehicle Order: NO Pending or Confirmed buttons, only red Cancelled indicator and red WhatsApp button */}
-                          <span className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5">
+                          <span className="px-3.5 py-2 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5 shrink-0">
                             <Ban className="w-3.5 h-3.5" />
                             <span>Cancelled</span>
                           </span>
@@ -2606,33 +2672,33 @@ export default function AdminPage({ onReturnToClient }) {
                           <button
                             onClick={() => sendWhatsAppToClientForVehicle(b)}
                             title="Send Cancellation Notice via WhatsApp to Client"
-                            className="text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer"
+                            className="text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer w-full sm:w-auto justify-center shrink-0"
                           >
                             <WhatsAppIcon className="w-4 h-4 fill-current" />
-                            <span>WhatsApp to Cancelled Client</span>
+                            <span>WhatsApp to Client</span>
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => handleUpdateVehicleStatus(b.id, 'Pending')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                              b.status === 'Pending' ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'
+                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
+                              b.status === 'Pending' ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                             }`}
                           >
                             Set Pending
                           </button>
                           <button
                             onClick={() => handleUpdateVehicleStatus(b.id, 'Confirmed')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                              b.status === 'Confirmed' ? 'bg-blue-500 text-white border-blue-500' : 'bg-slate-950 text-slate-400 border-slate-800'
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
+                              b.status === 'Confirmed' ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                             }`}
                           >
                             Accept & Confirm
                           </button>
                           <button
                             onClick={() => handleUpdateVehicleStatus(b.id, 'Cancelled')}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40"
+                            className="px-3 py-2 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40 cursor-pointer flex-1 sm:flex-initial text-center"
                           >
                             Cancel
                           </button>
@@ -2645,7 +2711,7 @@ export default function AdminPage({ onReturnToClient }) {
                                 ? "Please Accept & Confirm order first to send WhatsApp to client" 
                                 : "Send Confirmed Vehicle Details via WhatsApp to Client"
                             }
-                            className={`text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border ${
+                            className={`text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border w-full sm:w-auto justify-center shrink-0 ${
                               b.status === 'Pending'
                                 ? 'bg-slate-950 text-slate-500 border-slate-800 opacity-60 cursor-not-allowed'
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 border-emerald-400/40 cursor-pointer'
@@ -2674,14 +2740,14 @@ export default function AdminPage({ onReturnToClient }) {
           <div className="space-y-8 animate-fade-in">
             
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6 min-w-0">
               <div>
                 <span className="bg-purple-500/10 text-purple-400 text-xs font-bold px-3 py-1 rounded-full border border-purple-500/20 uppercase tracking-wider">
                   Academy Operations
                 </span>
-                <h1 className="text-3xl font-extrabold text-white font-['Outfit'] mt-2 flex items-center gap-3">
-                  <GraduationCap className="w-8 h-8 text-amber-400" />
-                  Driving Class Enrollments
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] mt-2 flex items-center gap-2.5 sm:gap-3">
+                  <GraduationCap className="w-7 h-7 sm:w-8 sm:h-8 text-amber-400 shrink-0" />
+                  <span>Driving Class Enrollments</span>
                 </h1>
                 <p className="text-slate-400 text-xs mt-1">
                   Manage student admissions, verify Learner's / Driving license statuses, assign certified instructor Annas, and dispatch WhatsApp confirmations.
@@ -2692,7 +2758,7 @@ export default function AdminPage({ onReturnToClient }) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsAdminEnrollmentModalOpen(true)}
-                  className="py-3 px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-400/20 transition-all flex items-center gap-2"
+                  className="py-2.5 sm:py-3 px-4 sm:px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-400/20 transition-all flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer"
                 >
                   <GraduationCap className="w-4 h-4" />
                   <span>+ Enroll New Student</span>
@@ -2701,21 +2767,21 @@ export default function AdminPage({ onReturnToClient }) {
             </div>
 
             {/* Search & Filter Toolbar */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 min-w-0">
               {/* Search Bar */}
-              <div className="relative w-full md:w-96">
+              <div className="relative w-full lg:w-80 xl:w-96 min-w-0">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input 
                   type="text"
                   placeholder="Search by student name, phone, ref id, area..."
                   value={classSearchQuery}
                   onChange={(e) => setClassSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl sm:rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
 
               {/* Status Filter Pills */}
-              <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar min-w-0">
                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1 shrink-0 mr-1">
                   <Filter className="w-3 h-3 text-amber-400" /> Filter:
                 </span>
@@ -2723,7 +2789,7 @@ export default function AdminPage({ onReturnToClient }) {
                   <button
                     key={st}
                     onClick={() => setClassStatusFilter(st)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors shrink-0 ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors shrink-0 whitespace-nowrap flex-1 sm:flex-initial text-center ${
                       classStatusFilter === st
                         ? 'bg-amber-400 text-slate-950 shadow-md'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
@@ -2736,14 +2802,14 @@ export default function AdminPage({ onReturnToClient }) {
             </div>
 
             {/* Enrollments Count */}
-            <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+            <div className="flex items-center justify-between text-xs text-slate-400 px-1 min-w-0">
               <span>Showing <span className="text-white font-bold">{filteredClassEnrollments.length}</span> enrollments</span>
               <span>Total Admissions: <span className="text-amber-400 font-bold">{classEnrollments.length}</span></span>
             </div>
 
             {/* Enrollment Cards List */}
             {filteredClassEnrollments.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center space-y-3">
                 <div className="w-14 h-14 rounded-2xl bg-slate-800/80 text-slate-500 flex items-center justify-center mx-auto">
                   <GraduationCap className="w-7 h-7" />
                 </div>
@@ -2753,54 +2819,54 @@ export default function AdminPage({ onReturnToClient }) {
                 </p>
                 <button
                   onClick={() => setIsAdminEnrollmentModalOpen(true)}
-                  className="py-2.5 px-4 rounded-xl bg-amber-400 text-slate-950 font-extrabold text-xs inline-flex items-center gap-2 mt-2"
+                  className="py-2.5 px-4 rounded-xl bg-amber-400 text-slate-950 font-extrabold text-xs inline-flex items-center gap-2 mt-2 cursor-pointer"
                 >
                   <GraduationCap className="w-4 h-4" /> Enroll New Student
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 min-w-0">
                 {filteredClassEnrollments.map((enr) => (
-                  <div key={enr.enrollmentId} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
+                  <div key={enr.enrollmentId} className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
                     
                     {/* Top Row: Candidate Name, ID, Phone, Status Badge */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold shrink-0">
                           <GraduationCap className="w-5 h-5" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-base text-white">{enr.fullName}</span>
-                            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <span className="font-extrabold text-base text-white truncate min-w-0">{enr.fullName}</span>
+                            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 shrink-0">
                               {enr.enrollmentId}
                             </span>
                             {enr.gender && (
-                              <span className="text-[11px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                              <span className="text-[11px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded shrink-0">
                                 {enr.gender}
                               </span>
                             )}
                             {enr.dateOfBirth && (
-                              <span className="text-[11px] text-slate-400">
+                              <span className="text-[11px] text-slate-400 shrink-0">
                                 DOB: <span className="text-slate-300 font-semibold">{toDDMMYYYY(enr.dateOfBirth)}</span>
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-3 mt-1 flex-wrap">
+                          <div className="text-xs text-slate-400 flex items-center gap-3 mt-1 flex-wrap min-w-0">
                             <a href={`tel:${enr.mobileNumber}`} className="flex items-center gap-1 hover:text-white transition-colors">
-                              <Phone className="w-3 h-3 text-emerald-400" /> +91 {enr.mobileNumber}
+                              <Phone className="w-3 h-3 text-emerald-400 shrink-0" /> +91 {enr.mobileNumber}
                             </a>
                             {enr.emailAddress && (
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <Mail className="w-3 h-3 text-amber-400" /> {enr.emailAddress}
+                              <span className="flex items-center gap-1 text-slate-400 truncate min-w-0">
+                                <Mail className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate">{enr.emailAddress}</span>
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0 w-full sm:w-auto">
+                        <span className={`text-xs font-black px-3 py-1 rounded-full shrink-0 ${
                           enr.status === 'Cancelled'
                             ? 'bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30'
                             : enr.status === 'Pending' 
@@ -2816,34 +2882,34 @@ export default function AdminPage({ onReturnToClient }) {
 
                     {/* Cancelled Alert Banner if class enrollment status is Cancelled */}
                     {enr.status === 'Cancelled' && (
-                      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex items-center justify-between text-xs text-red-300">
-                        <div className="flex items-center gap-2">
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-red-300 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <Ban className="w-4 h-4 text-red-400 shrink-0" />
-                          <span>
+                          <span className="min-w-0">
                             <strong className="text-red-400">Class Enrollment Cancelled:</strong> {enr.cancelReason ? `"${enr.cancelReason}"` : 'Admission cancelled with zero penalty'}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">Seat Released</span>
+                        <span className="text-[10px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 shrink-0 self-start sm:self-auto">Seat Released</span>
                       </div>
                     )}
 
                     {/* Middle Grid: License status, Driving Info, Class Preferences */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-xs min-w-0">
                       
                       {/* Card 1: Experience & Gear */}
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                        <div className="text-slate-400 font-bold uppercase text-[10px]">Training Preferences</div>
-                        <div className="font-extrabold text-white text-sm">
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
+                        <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Training Preferences</div>
+                        <div className="font-extrabold text-white text-sm truncate">
                           {enr.gearPreference} Transmission
                         </div>
-                        <div className="text-amber-400 font-semibold">
+                        <div className="text-amber-400 font-semibold truncate">
                           Experience: {enr.drivingExperience}
                         </div>
                       </div>
 
-                      {/* Card 2: License Checks (User requested labels!) */}
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5">
-                        <div className="text-slate-400 font-bold uppercase text-[10px]">License Verifications</div>
+                      {/* Card 2: License Checks */}
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5 min-w-0 overflow-hidden">
+                        <div className="text-slate-400 font-bold uppercase text-[10px] truncate">License Verifications</div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Learner's License:</span>
                           <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
@@ -2867,12 +2933,12 @@ export default function AdminPage({ onReturnToClient }) {
                       </div>
 
                       {/* Card 3: Batch Schedule & Pickup */}
-                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1">
-                        <div className="text-slate-400 font-bold uppercase text-[10px]">Schedule & Doorstep Pickup</div>
-                        <div className="font-semibold text-white">
+                      <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 sm:col-span-2 lg:col-span-1 min-w-0 overflow-hidden">
+                        <div className="text-slate-400 font-bold uppercase text-[10px] truncate">Schedule & Doorstep Pickup</div>
+                        <div className="font-semibold text-white truncate">
                           Start: {toDDMMYYYY(enr.preferredStartDate)}
                         </div>
-                        <div className="text-amber-400 font-semibold">
+                        <div className="text-amber-400 font-semibold truncate">
                           Slot: {enr.preferredTime}
                         </div>
                         <div className="text-slate-300 truncate">
@@ -2883,11 +2949,11 @@ export default function AdminPage({ onReturnToClient }) {
                     </div>
 
                     {/* Address & Additional Notes info */}
-                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/60 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-400">
-                      <div className="flex items-center gap-1.5 truncate">
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/60 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-400 min-w-0">
+                      <div className="flex items-center gap-1.5 truncate min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="text-slate-300 font-semibold">Address:</span>
-                        <span className="truncate">{enr.address}</span>
+                        <span className="text-slate-300 font-semibold shrink-0">Address:</span>
+                        <span className="truncate min-w-0">{enr.address}</span>
                       </div>
                       {enr.additionalNotes && (
                         <div className="text-slate-400 text-[11px] italic shrink-0">
@@ -2897,11 +2963,11 @@ export default function AdminPage({ onReturnToClient }) {
                     </div>
 
                     {/* Instructor Inputs & Action Controls */}
-                    <div className="pt-2 flex flex-col lg:flex-row items-center justify-between gap-3 border-t border-slate-800/80">
+                    <div className="pt-2 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 border-t border-slate-800/80 min-w-0">
                       
-                      {/* 2 Input Boxes Typed by Admin for Instructor Name & Instructor Phone Number (like in driver page) */}
-                      <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
-                        <div className="relative w-full sm:w-44">
+                      {/* 2 Input Boxes Typed by Admin for Instructor Name & Instructor Phone Number */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto min-w-0">
+                        <div className="relative w-full sm:w-44 min-w-0">
                           <User className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                           <input 
                             type="text"
@@ -2911,7 +2977,7 @@ export default function AdminPage({ onReturnToClient }) {
                             className="bg-slate-950 border border-slate-700 text-xs font-semibold text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-amber-400 w-full"
                           />
                         </div>
-                        <div className="relative w-full sm:w-36">
+                        <div className="relative w-full sm:w-36 min-w-0">
                           <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                           <input 
                             type="text"
@@ -2924,11 +2990,11 @@ export default function AdminPage({ onReturnToClient }) {
                       </div>
 
                       {/* Status Toggles: Pending, In Training, Completed, Cancelled & WhatsApp Action */}
-                      <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+                      <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start sm:justify-end">
                         {enr.status === 'Cancelled' ? (
                           <>
                             {/* Cancelled Class Enrollment: NO Pending, In Training, or Completed buttons, only red Cancelled indicator and red WhatsApp button */}
-                            <span className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5">
+                            <span className="px-3.5 py-2 rounded-xl text-xs font-black bg-red-600 text-white border border-red-500 shadow-md shadow-red-600/30 flex items-center gap-1.5 shrink-0">
                               <Ban className="w-3.5 h-3.5" />
                               <span>Cancelled</span>
                             </span>
@@ -2936,48 +3002,48 @@ export default function AdminPage({ onReturnToClient }) {
                             {/* Send WhatsApp Cancellation directly to Candidate */}
                             <button
                               onClick={() => sendWhatsAppToCandidate(enr)}
-                              className="text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer"
+                              className="text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 border-red-400/40 cursor-pointer w-full sm:w-auto justify-center shrink-0"
                               title="Send official cancellation update to client via WhatsApp"
                             >
                               <WhatsAppIcon className="w-4 h-4 fill-current" />
-                              <span>WhatsApp to Cancelled Client</span>
+                              <span>WhatsApp to Client</span>
                             </button>
                           </>
                         ) : (
                           <>
                             <button
                               onClick={() => handleUpdateClassStatus(enr.enrollmentId, 'Pending')}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
                                 enr.status === 'Pending' 
-                                  ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-400/20' 
-                                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                                ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-400/20' 
+                                : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                               }`}
                             >
                               Pending
                             </button>
                             <button
                               onClick={() => handleUpdateClassStatus(enr.enrollmentId, 'In Training')}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
                                 enr.status === 'In Training' 
-                                  ? 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-500/20' 
-                                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                                ? 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-500/20' 
+                                : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                               }`}
                             >
                               In Training
                             </button>
                             <button
                               onClick={() => handleUpdateClassStatus(enr.enrollmentId, 'Completed')}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
                                 enr.status === 'Completed' 
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
-                                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
+                                : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                               }`}
                             >
                               Completed
                             </button>
                             <button
                               onClick={() => handleUpdateClassStatus(enr.enrollmentId, 'Cancelled')}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40"
+                              className="px-3 py-2 rounded-xl text-xs font-bold border transition-colors bg-slate-950 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/40 cursor-pointer flex-1 sm:flex-initial text-center"
                             >
                               Cancel
                             </button>
@@ -2986,7 +3052,7 @@ export default function AdminPage({ onReturnToClient }) {
                             <button
                               onClick={() => sendWhatsAppToCandidate(enr)}
                               disabled={enr.status === 'Pending'}
-                              className={`text-xs font-extrabold px-3.5 py-1.5 rounded-xl flex items-center gap-2 transition-all border ${
+                              className={`text-xs font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-2 transition-all border w-full sm:w-auto justify-center shrink-0 ${
                                 enr.status === 'Pending'
                                   ? 'bg-slate-950 text-slate-600 border-slate-800/80 cursor-not-allowed opacity-50'
                                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 border-emerald-400/40 cursor-pointer'
@@ -3023,14 +3089,14 @@ export default function AdminPage({ onReturnToClient }) {
           <div className="space-y-8 animate-fade-in">
             
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6 min-w-0">
               <div>
                 <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-wider">
                   Account Directory & CRM
                 </span>
-                <h1 className="text-3xl font-extrabold text-white font-['Outfit'] mt-2 flex items-center gap-3">
-                  <Users className="w-8 h-8 text-amber-400" />
-                  Registered Accounts & Fleet
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] mt-2 flex items-center gap-3">
+                  <Users className="w-8 h-8 text-amber-400 shrink-0" />
+                  <span>Registered Accounts & Fleet</span>
                 </h1>
                 <p className="text-slate-400 text-xs mt-1">
                   Comprehensive directory of registered Bengaluru customers and verified Driver Partner Annas.
@@ -3042,7 +3108,7 @@ export default function AdminPage({ onReturnToClient }) {
                 {userSubTab === 'customers' ? (
                   <button
                     onClick={() => setIsAddUserModalOpen(true)}
-                    className="py-3 px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-400/20 transition-all flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                    className="py-3 px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-400/20 transition-all flex items-center gap-2 cursor-pointer w-full lg:w-auto justify-center"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>+ Add New Client</span>
@@ -3050,7 +3116,7 @@ export default function AdminPage({ onReturnToClient }) {
                 ) : (
                   <button
                     onClick={() => setIsAddDriverModalOpen(true)}
-                    className="py-3 px-5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-400/20 transition-all flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                    className="py-3 px-5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-400/20 transition-all flex items-center gap-2 cursor-pointer w-full lg:w-auto justify-center"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>+ Add Driver Anna</span>
@@ -3060,20 +3126,20 @@ export default function AdminPage({ onReturnToClient }) {
             </div>
 
             {/* Sub-Tab Navigation Switcher (Customers vs Driver Annas Separated) */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-2 rounded-2xl">
-              <div className="flex items-center gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800/80 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-2 rounded-2xl min-w-0">
+              <div className="flex items-center gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800/80 w-full sm:w-auto min-w-0">
                 <button
                   type="button"
                   onClick={() => { setUserSubTab('customers'); setUserSearchQuery(''); setUserAreaFilter('All'); }}
-                  className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial py-2.5 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer min-w-0 ${
                     userSubTab === 'customers'
                       ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
                       : 'text-slate-400 hover:text-white hover:bg-slate-900'
                   }`}
                 >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Customers (Users)</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                  <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate min-w-0">Customers</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
                     userSubTab === 'customers' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {registeredUsers.length}
@@ -3083,15 +3149,15 @@ export default function AdminPage({ onReturnToClient }) {
                 <button
                   type="button"
                   onClick={() => { setUserSubTab('drivers'); setUserSearchQuery(''); setUserAreaFilter('All'); }}
-                  className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial py-2.5 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer min-w-0 ${
                     userSubTab === 'drivers'
                       ? 'bg-emerald-400 text-slate-950 shadow-md shadow-emerald-400/20'
                       : 'text-slate-400 hover:text-white hover:bg-slate-900'
                   }`}
                 >
-                  <SteeringWheel className="w-3.5 h-3.5 stroke-[2.4]" />
-                  <span>Driver Annas (Drivers)</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                  <SteeringWheel className="w-3.5 h-3.5 stroke-[2.4] shrink-0" />
+                  <span className="truncate min-w-0">Driver Annas</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
                     userSubTab === 'drivers' ? 'bg-slate-950 text-emerald-400' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {registeredDrivers.length}
@@ -3099,67 +3165,67 @@ export default function AdminPage({ onReturnToClient }) {
                 </button>
               </div>
 
-              <div className="text-slate-400 text-[11px] font-medium hidden md:block px-2">
+              <div className="text-slate-400 text-[11px] font-medium hidden md:block px-2 truncate min-w-0">
                 Active Category: <strong className="text-white">{userSubTab === 'customers' ? 'Customer Accounts' : 'Driver Partner Fleet'}</strong>
               </div>
             </div>
 
             {/* Metrics Overview Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Registered Clients</div>
-                <div className="text-2xl font-extrabold text-white font-['Outfit'] mt-1">{registeredUsers.length} Customers</div>
-                <div className="text-[11px] text-amber-400 font-semibold mt-0.5">Verified Personal Accounts</div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 min-w-0">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Registered Clients</div>
+                <div className="text-lg sm:text-2xl font-extrabold text-white font-['Outfit'] mt-1 truncate">{registeredUsers.length} Customers</div>
+                <div className="text-[11px] text-amber-400 font-semibold mt-0.5 truncate">Verified Accounts</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Driver Partner Fleet</div>
-                <div className="text-2xl font-extrabold text-emerald-400 font-['Outfit'] mt-1">{registeredDrivers.length} Driver Annas</div>
-                <div className="text-[11px] text-slate-400 font-semibold mt-0.5">RTO Verified Credentials</div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Driver Fleet</div>
+                <div className="text-lg sm:text-2xl font-extrabold text-emerald-400 font-['Outfit'] mt-1 truncate">{registeredDrivers.length} Annas</div>
+                <div className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">RTO Verified</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Bengaluru Localities</div>
-                <div className="text-2xl font-extrabold text-white font-['Outfit'] mt-1">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">BLR Localities</div>
+                <div className="text-lg sm:text-2xl font-extrabold text-white font-['Outfit'] mt-1 truncate">
                   {new Set([...registeredUsers.map(u => u.area), ...registeredDrivers.map(d => d.area)].filter(Boolean)).size} Hubs
                 </div>
-                <div className="text-[11px] text-slate-400 font-semibold mt-0.5">Indiranagar, Koramangala, etc.</div>
+                <div className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">Indiranagar, Koramangala</div>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Direct WhatsApp</div>
-                <div className="text-2xl font-extrabold text-emerald-400 font-['Outfit'] mt-1">Instant</div>
-                <div className="text-[11px] text-slate-400 font-semibold mt-0.5">1-Click Client & Driver Connect</div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Direct WhatsApp</div>
+                <div className="text-lg sm:text-2xl font-extrabold text-emerald-400 font-['Outfit'] mt-1 truncate">Instant</div>
+                <div className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">1-Click Dispatch</div>
               </div>
             </div>
 
             {/* Search & Filter Toolbar */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 min-w-0">
               {/* Search Bar */}
-              <div className="relative w-full md:w-96">
+              <div className="relative w-full lg:w-80 xl:w-96 min-w-0">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input 
                   type="text"
                   placeholder={
                     userSubTab === 'customers'
-                      ? "Search by client name, mobile, email, area..."
-                      : "Search drivers by name, mobile, DL number, car type, area..."
+                      ? "Search client name, mobile, email, area..."
+                      : "Search driver name, mobile, DL, car type, area..."
                   }
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
                 />
               </div>
 
               {/* Area Filter */}
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto min-w-0">
                 <span className="text-xs text-slate-400 font-bold flex items-center gap-1 shrink-0">
                   <Filter className="w-3.5 h-3.5" /> Area:
                 </span>
                 <select
                   value={userAreaFilter}
                   onChange={(e) => setUserAreaFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 cursor-pointer"
+                  className="bg-slate-950 border border-slate-800 text-xs text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto flex-1 lg:flex-initial min-w-0 max-w-full truncate"
                 >
                   <option value="All">
                     All Localities ({userSubTab === 'customers' ? registeredUsers.length : registeredDrivers.length})
@@ -3194,7 +3260,7 @@ export default function AdminPage({ onReturnToClient }) {
                     const matchesArea = userAreaFilter === 'All' || u.area === userAreaFilter;
                     return matchesSearch && matchesArea;
                   }).length === 0 ? (
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-3">
                     <Users className="w-12 h-12 text-slate-600 mx-auto" />
                     <h3 className="text-lg font-bold text-white">No Registered Clients Found</h3>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto">
@@ -3208,7 +3274,7 @@ export default function AdminPage({ onReturnToClient }) {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 min-w-0">
                     {registeredUsers
                       .filter(u => {
                         const q = userSearchQuery.toLowerCase();
@@ -3224,24 +3290,24 @@ export default function AdminPage({ onReturnToClient }) {
                       .map((user) => (
                       <div 
                         key={user.id}
-                        className="bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-3xl p-5 space-y-4 transition-all shadow-md group relative flex flex-col justify-between"
+                        className="bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-3xl p-4 sm:p-5 space-y-4 transition-all shadow-md group relative flex flex-col justify-between min-w-0 overflow-hidden"
                       >
                         <div>
                           {/* Top Row: Avatar, Name & Status */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
                                 {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                               </div>
-                              <div>
-                                <h3 className="text-base font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors truncate min-w-0">
                                   {user.name}
                                 </h3>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap min-w-0">
+                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800 shrink-0">
                                     {user.id}
                                   </span>
-                                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
                                     {user.status || 'Active'}
                                   </span>
                                 </div>
@@ -3260,48 +3326,48 @@ export default function AdminPage({ onReturnToClient }) {
                           </div>
 
                           {/* Contact & Location Details */}
-                          <div className="mt-4 space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80 text-xs">
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
+                          <div className="mt-4 space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80 text-xs min-w-0">
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
                                 <Phone className="w-3.5 h-3.5 text-emerald-400" /> Phone:
                               </span>
-                              <a href={`tel:${user.phone}`} className="font-bold hover:text-amber-400 font-mono">
+                              <a href={`tel:${user.phone}`} className="font-bold hover:text-amber-400 font-mono truncate min-w-0">
                                 {user.phone}
                               </a>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
                                 <Mail className="w-3.5 h-3.5 text-blue-400" /> Email:
                               </span>
-                              <span className="font-medium text-slate-200 truncate max-w-[170px]" title={user.email}>
+                              <span className="font-medium text-slate-200 truncate min-w-0" title={user.email}>
                                 {user.email}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
                                 <MapPin className="w-3.5 h-3.5 text-red-400" /> Locality:
                               </span>
-                              <span className="font-bold text-amber-400">
+                              <span className="font-bold text-amber-400 truncate min-w-0">
                                 {user.area || 'Bangalore Central'}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/60">
-                              <span className="flex items-center gap-1.5">
+                            <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/60 gap-2 min-w-0">
+                              <span className="flex items-center gap-1.5 shrink-0">
                                 <Calendar className="w-3.5 h-3.5 text-slate-500" /> Joined:
                               </span>
-                              <span>{toDDMMYYYY(user.createdAt || '2026-09-01')}</span>
+                              <span className="truncate">{toDDMMYYYY(user.createdAt || '2026-09-01')}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Bottom Actions */}
-                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 mt-4">
+                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 mt-4 min-w-0">
                           <a
                             href={`tel:${user.phone}`}
-                            className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700"
+                            className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700 shrink-0"
                           >
                             <Phone className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Call</span>
@@ -3315,10 +3381,10 @@ export default function AdminPage({ onReturnToClient }) {
                               );
                               window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
                             }}
-                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-0 truncate"
                           >
-                            <WhatsAppIcon className="w-3.5 h-3.5 fill-current" />
-                            <span>WhatsApp Client</span>
+                            <WhatsAppIcon className="w-3.5 h-3.5 fill-current shrink-0" />
+                            <span className="truncate">WhatsApp Client</span>
                           </button>
                         </div>
 
@@ -3347,7 +3413,7 @@ export default function AdminPage({ onReturnToClient }) {
                     const matchesArea = userAreaFilter === 'All' || d.area === userAreaFilter;
                     return matchesSearch && matchesArea;
                   }).length === 0 ? (
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-3">
                     <SteeringWheel className="w-12 h-12 text-slate-600 mx-auto stroke-[1.8]" />
                     <h3 className="text-lg font-bold text-white">No Driver Partners Found</h3>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto">
@@ -3361,7 +3427,7 @@ export default function AdminPage({ onReturnToClient }) {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 min-w-0">
                     {registeredDrivers
                       .filter(d => {
                         const q = userSearchQuery.toLowerCase();
@@ -3378,27 +3444,27 @@ export default function AdminPage({ onReturnToClient }) {
                       .map((driver) => (
                       <div 
                         key={driver.id}
-                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-5 space-y-4 transition-all shadow-md group relative flex flex-col justify-between"
+                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-4 sm:p-5 space-y-4 transition-all shadow-md group relative flex flex-col justify-between min-w-0 overflow-hidden"
                       >
                         <div>
                           {/* Top Row: Avatar, Name & Status */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-base flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
                                 <SteeringWheel className="w-6 h-6 stroke-[2.2]" />
                               </div>
-                              <div>
-                                <h3 className="text-base font-extrabold text-white font-['Outfit'] group-hover:text-emerald-400 transition-colors">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-extrabold text-white font-['Outfit'] group-hover:text-emerald-400 transition-colors truncate min-w-0">
                                   {driver.name}
                                 </h3>
-                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap min-w-0">
+                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800 shrink-0">
                                     {driver.id}
                                   </span>
-                                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
                                     {driver.status || 'Active'}
                                   </span>
-                                  <span className="text-[10px] font-bold text-amber-400 flex items-center gap-0.5 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full">
+                                  <span className="text-[10px] font-bold text-amber-400 flex items-center gap-0.5 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full shrink-0">
                                     ★ {driver.rating || 4.95}
                                   </span>
                                 </div>
@@ -3417,64 +3483,64 @@ export default function AdminPage({ onReturnToClient }) {
                           </div>
 
                           {/* Driver Details & Credentials */}
-                          <div className="mt-4 space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80 text-xs">
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
-                                <Phone className="w-3.5 h-3.5 text-emerald-400" /> Driver Login Mobile:
+                          <div className="mt-4 space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80 text-xs min-w-0">
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
+                                <Phone className="w-3.5 h-3.5 text-emerald-400" /> Mobile:
                               </span>
-                              <a href={`tel:${driver.phone}`} className="font-bold hover:text-emerald-400 font-mono">
+                              <a href={`tel:${driver.phone}`} className="font-bold hover:text-emerald-400 font-mono truncate min-w-0">
                                 {driver.phone}
                               </a>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
-                                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> Driving License:
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
+                                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> License:
                               </span>
-                              <span className="font-mono font-bold text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-[11px]">
+                              <span className="font-mono font-bold text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-[11px] truncate min-w-0">
                                 {driver.dlNumber || 'KA-RTO-VERIFIED'}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
                                 <Car className="w-3.5 h-3.5 text-amber-400" /> Vehicles:
                               </span>
-                              <span className="font-medium text-slate-300 truncate max-w-[170px]" title={driver.vehicleType}>
+                              <span className="font-medium text-slate-300 truncate min-w-0" title={driver.vehicleType}>
                                 {driver.vehicleType || 'Manual & Automatic Cars'}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-300">
-                              <span className="text-slate-500 flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-red-400" /> Operating Hub:
+                            <div className="flex items-center justify-between text-slate-300 gap-2 min-w-0">
+                              <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
+                                <MapPin className="w-3.5 h-3.5 text-red-400" /> Hub:
                               </span>
-                              <span className="font-bold text-emerald-400">
+                              <span className="font-bold text-emerald-400 truncate min-w-0">
                                 {driver.area || 'Indiranagar'}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/60">
-                              <span className="flex items-center gap-1.5">
+                            <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/60 gap-2 min-w-0">
+                              <span className="flex items-center gap-1.5 shrink-0">
                                 <Award className="w-3.5 h-3.5 text-teal-400" /> Experience:
                               </span>
-                              <span className="font-bold text-slate-300">{driver.experienceYears || '5+ Years'}</span>
+                              <span className="font-bold text-slate-300 truncate">{driver.experienceYears || '5+ Years'}</span>
                             </div>
 
-                            <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                              <span className="flex items-center gap-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Completed Trips:
+                            <div className="flex items-center justify-between text-slate-400 text-[11px] gap-2 min-w-0">
+                              <span className="flex items-center gap-1.5 shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Trips:
                               </span>
-                              <span className="font-extrabold text-white font-mono">{driver.trips ? Number(driver.trips).toLocaleString() : '0'} Trips</span>
+                              <span className="font-extrabold text-white font-mono truncate">{driver.trips ? Number(driver.trips).toLocaleString() : '0'} Trips</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Bottom Actions */}
-                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 mt-4">
+                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 mt-4 min-w-0">
                           <a
                             href={`tel:${driver.phone}`}
-                            className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700"
+                            className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700 shrink-0"
                           >
                             <Phone className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Call</span>
@@ -3488,10 +3554,10 @@ export default function AdminPage({ onReturnToClient }) {
                               );
                               window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
                             }}
-                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-0 truncate"
                           >
-                            <WhatsAppIcon className="w-3.5 h-3.5 fill-current" />
-                            <span>WhatsApp Anna</span>
+                            <WhatsAppIcon className="w-3.5 h-3.5 fill-current shrink-0" />
+                            <span className="truncate">WhatsApp Anna</span>
                           </button>
                         </div>
 
