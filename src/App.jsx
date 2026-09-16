@@ -21,43 +21,84 @@ import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
 import { apiClient } from './services/apiClient';
 
+/**
+ * Resolves a given URL pathname into application route details:
+ * - role: 'client' | 'driver' | 'admin'
+ * - page: 'home' | 'about' | 'services' | 'contact' | 'client-auth' | 'driver-auth' | 'driver-portal' | 'admin'
+ * - authRole: 'driver' | 'user' | null (used for initial role selection gate)
+ * - resetAuth: boolean (whether to reset auth session mount key)
+ */
+export function resolveRoute(pathname = '') {
+  if (!pathname || typeof pathname !== 'string') {
+    return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+  }
+
+  const clean = pathname.trim().replace(/\/+$/, '') || '/';
+
+  if (clean === '/admin' || clean.startsWith('/admin/')) {
+    return { role: 'admin', page: 'admin', authRole: null, resetAuth: true };
+  }
+  if (clean === '/driver/signup') {
+    return { role: 'driver', page: 'driver-signup', authRole: 'driver', resetAuth: true };
+  }
+  if (clean === '/driver/login') {
+    return { role: 'driver', page: 'driver-login', authRole: 'driver', resetAuth: true };
+  }
+  if (clean === '/driver-auth') {
+    return { role: 'driver', page: 'driver-auth', authRole: 'driver', resetAuth: true };
+  }
+  if (clean === '/driver/portal' || clean === '/driver' || clean === '/driver-portal') {
+    return { role: 'driver', page: 'driver-portal', authRole: 'driver', resetAuth: false };
+  }
+  if (clean === '/signup') {
+    return { role: 'client', page: 'signup', authRole: 'user', resetAuth: true };
+  }
+  if (clean === '/login') {
+    return { role: 'client', page: 'login', authRole: 'user', resetAuth: true };
+  }
+  if (clean === '/client-auth') {
+    return { role: 'client', page: 'client-auth', authRole: 'user', resetAuth: true };
+  }
+  if (clean === '/services') {
+    return { role: 'client', page: 'services', authRole: null, resetAuth: false };
+  }
+  if (clean === '/about') {
+    return { role: 'client', page: 'about', authRole: null, resetAuth: false };
+  }
+  if (clean === '/contact') {
+    return { role: 'client', page: 'contact', authRole: null, resetAuth: false };
+  }
+  if (clean === '/') {
+    return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+  }
+
+  return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+}
+
+/**
+ * Reads and parses user session object from localStorage/sessionStorage.
+ * Returns null if missing, invalid JSON, or during SSR.
+ */
+export function getInitialUser(storageKey) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedLocal = localStorage.getItem(storageKey);
+    if (storedLocal) {
+      return JSON.parse(storedLocal);
+    }
+    const storedSession = sessionStorage.getItem(storageKey);
+    if (storedSession) {
+      return JSON.parse(storedSession);
+    }
+  } catch (e) {}
+  return null;
+}
+
 export default function App() {
-  // Client Authentication State
-  const getInitialClientUser = () => {
-    try {
-      const storedLocal = localStorage.getItem('bda_client_user');
-      if (storedLocal) {
-        return JSON.parse(storedLocal);
-      }
-      const storedSession = sessionStorage.getItem('bda_client_user');
-      if (storedSession) {
-        return JSON.parse(storedSession);
-      }
-    } catch (e) {}
-    return null;
-  };
-
-  // Driver Authentication State
-  const getInitialDriverUser = () => {
-    try {
-      const storedLocal = localStorage.getItem('bda_driver_user');
-      if (storedLocal) {
-        return JSON.parse(storedLocal);
-      }
-      const storedSession = sessionStorage.getItem('bda_driver_user');
-      if (storedSession) {
-        return JSON.parse(storedSession);
-      }
-    } catch (e) {}
-    return null;
-  };
-
   // Initial role detection from pathname
   const getInitialRole = () => {
     if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      if (path.startsWith('/driver')) return 'driver';
-      if (path === '/login' || path === '/signup' || path === '/login/' || path === '/signup/') return 'user';
+      return resolveRoute(window.location.pathname).authRole;
     }
     return null;
   };
@@ -65,22 +106,13 @@ export default function App() {
   // Check URL pathname for routing
   const getInitialPage = () => {
     if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) return 'admin';
-      if (path === '/driver/signup' || path === '/driver/signup/') return 'driver-signup';
-      if (path === '/driver/login' || path === '/driver/login/') return 'driver-login';
-      if (path === '/driver/portal' || path === '/driver/portal/' || path === '/driver' || path === '/driver/') return 'driver-portal';
-      if (path === '/signup' || path === '/signup/') return 'signup';
-      if (path === '/login' || path === '/login/') return 'login';
-      if (path === '/services' || path === '/services/') return 'services';
-      if (path === '/about' || path === '/about/') return 'about';
-      if (path === '/contact' || path === '/contact/') return 'contact';
+      return resolveRoute(window.location.pathname).page;
     }
     return 'home';
   };
 
-  const [clientUser, setClientUser] = useState(getInitialClientUser);
-  const [driverUser, setDriverUser] = useState(getInitialDriverUser);
+  const [clientUser, setClientUser] = useState(() => getInitialUser('bda_client_user'));
+  const [driverUser, setDriverUser] = useState(() => getInitialUser('bda_driver_user'));
   const [selectedRole, setSelectedRole] = useState(getInitialRole);
   const [activePage, setActivePage] = useState(getInitialPage);
   // Unique auth session key to guarantee pristine, freshly mounted login & signup pages upon visit/revisit
@@ -89,37 +121,13 @@ export default function App() {
   // Sync URL changes via popstate
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname;
-      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/')) {
-        setActivePage('admin');
+      const route = resolveRoute(window.location.pathname);
+      setActivePage(route.page);
+      if (route.authRole) {
+        setSelectedRole(route.authRole);
+      }
+      if (route.resetAuth) {
         setAuthSessionKey(k => k + 1);
-      } else if (path === '/driver/signup' || path === '/driver/signup/') {
-        setSelectedRole('driver');
-        setActivePage('driver-signup');
-        setAuthSessionKey(k => k + 1);
-      } else if (path === '/driver/login' || path === '/driver/login/') {
-        setSelectedRole('driver');
-        setActivePage('driver-login');
-        setAuthSessionKey(k => k + 1);
-      } else if (path === '/driver/portal' || path === '/driver/portal/' || path === '/driver' || path === '/driver/') {
-        setSelectedRole('driver');
-        setActivePage('driver-portal');
-      } else if (path === '/signup' || path === '/signup/') {
-        setSelectedRole('user');
-        setActivePage('signup');
-        setAuthSessionKey(k => k + 1);
-      } else if (path === '/login' || path === '/login/') {
-        setSelectedRole('user');
-        setActivePage('login');
-        setAuthSessionKey(k => k + 1);
-      } else if (path === '/services' || path === '/services/') {
-        setActivePage('services');
-      } else if (path === '/about' || path === '/about/') {
-        setActivePage('about');
-      } else if (path === '/contact' || path === '/contact/') {
-        setActivePage('contact');
-      } else {
-        setActivePage('home');
       }
     };
 
@@ -503,8 +511,8 @@ export default function App() {
     );
   }
 
-  // 3. Driver Auth Pages (/driver/login and /driver/signup)
-  if (activePage === 'driver-login' || activePage === 'driver-signup') {
+  // 3. Driver Auth Pages (/driver/login, /driver/signup, /driver-auth)
+  if (activePage === 'driver-login' || activePage === 'driver-signup' || activePage === 'driver-auth') {
     return (
       <DriverAuthPage 
         key={`${activePage}-${authSessionKey}`}
@@ -516,8 +524,8 @@ export default function App() {
     );
   }
 
-  // 4. Client Auth Pages (/login and /signup)
-  if (activePage === 'login' || activePage === 'signup') {
+  // 4. Client Auth Pages (/login, /signup, /client-auth)
+  if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth') {
     return (
       <ClientAuthPage 
         key={`${activePage}-${authSessionKey}`}

@@ -6,6 +6,8 @@ import { ENV } from '../config/env.js';
 import { logAuditEvent } from './auditService.js';
 
 const SALT_ROUNDS = 12;
+// Pre-computed valid dummy bcrypt hash for timing attack mitigation during failed user lookup
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dummy_password_timing_defense', SALT_ROUNDS);
 
 export function hashPassword(plainPassword) {
   return bcrypt.hashSync(plainPassword, SALT_ROUNDS);
@@ -79,7 +81,7 @@ export async function registerCustomer({ name, email, phone, password, area = 'I
 }
 
 export async function registerAdmin({ name, email, phone, password, secretKey, area = 'Indiranagar', ipAddress = null }) {
-  const adminSecret = (ENV.ADMIN_REGISTRATION_SECRET || 'ANNA2026').trim();
+  const adminSecret = ENV.ADMIN_REGISTRATION_SECRET.trim();
   if (!secretKey || secretKey.trim() !== adminSecret) {
     const err = new Error('Invalid Admin Secret Authorization Key.');
     err.statusCode = 403;
@@ -152,9 +154,12 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
   }
 
   const userPasswordHash = user ? (user.password_hash || user.PASSWORD_HASH || user.Password_Hash) : null;
+  const hashToVerify = userPasswordHash || DUMMY_PASSWORD_HASH;
 
   // Timing-safe constant-time comparison to prevent timing attacks & enumeration
-  if (!user || !verifyPassword(password, userPasswordHash)) {
+  const isPasswordValid = verifyPassword(password, hashToVerify);
+
+  if (!user || !isPasswordValid) {
     await logAuditEvent({
       userId: user?.id || null,
       action: 'LOGIN_FAILED',
