@@ -121,11 +121,11 @@ export default function Footer({ setActivePage, openBookingModal, openCancelModa
             <div className="space-y-2 text-xs text-slate-300">
               <div className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                <span className="text-slate-400">#42, 100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038</span>
+                <span className="text-slate-400">100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <a href="tel:+919886012345" className="hover:text-white font-mono">+91 98860 12345</a>
+                <a href="tel:+918025550199" className="hover:text-white font-mono">+91 80 2555 0199</a>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />

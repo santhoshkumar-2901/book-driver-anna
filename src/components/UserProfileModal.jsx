@@ -668,7 +668,7 @@ export default function UserProfileModal({
                   <div>
                     <div className="font-semibold text-white text-xs">24/7 Bengaluru Dispatch Support</div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Direct phone assistance with our Indiranagar operations team at <a href="tel:+919886012345" className="text-amber-500 font-mono hover:underline">+91 98860 12345</a>.
+                      Direct phone assistance with our Indiranagar operations team at <a href="tel:+918025550199" className="text-amber-500 font-mono hover:underline">+91 80 2555 0199</a>.
                     </p>
                   </div>
                 </div>

@@ -19,15 +19,15 @@ export default function RidePaymentModal({
   if (!isOpen || !rideData) return null;
 
   // Defaults
-  const driverName = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna || "Manjunath Gowda";
-  const driverPhone = rideData.driverPhone || "+91 98860 12345";
-  const driverRating = rideData.driverRating || 4.98;
-  const driverTrips = rideData.driverTrips || 3420;
-  const carModel = rideData.carModel || rideData.vehicleName || "Honda City (White) • KA-04-ME-5432";
-  const pickup = rideData.pickupArea || rideData.pickup || "Indiranagar 100 Feet Road";
-  const destination = rideData.dropLocation || rideData.destination || "Kempegowda Intl Airport (BLR T1)";
-  const distance = rideData.distance || "18.4 km";
-  const duration = rideData.duration || "42 mins";
+  const driverName = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna || "Driver Assigned";
+  const driverPhone = rideData.driverPhone || "+91 80 2555 0199";
+  const driverRating = rideData.driverRating || 5.0;
+  const driverTrips = rideData.driverTrips || 0;
+  const carModel = rideData.carModel || rideData.vehicleName || "Customer Vehicle";
+  const pickup = rideData.pickupArea || rideData.pickup || "Pickup Location";
+  const destination = rideData.dropLocation || rideData.destination || "Drop Location";
+  const distance = rideData.distance || "City Route";
+  const duration = rideData.duration || "Trip Duration";
   const baseCalculatedFare = Number(rideData.totalFare || rideData.fare || 549);
 
   // States

@@ -72,7 +72,7 @@ export default function ActiveRideBanner({
 
             <div className="flex items-center gap-2 shrink-0">
               <a 
-                href={`tel:${activeRide.driverPhone || '+919886012345'}`}
+                href={`tel:${activeRide.driverPhone || '+918025550199'}`}
                 className="text-slate-400 hover:text-emerald-400 flex items-center gap-1 font-bold"
               >
                 <Phone className="w-3 h-3 text-emerald-400" /> Call Anna

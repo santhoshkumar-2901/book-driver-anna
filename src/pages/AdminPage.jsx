@@ -825,8 +825,8 @@ export default function AdminPage({ onReturnToClient }) {
 
     setDriverBookings(prev => prev.map(b => {
       if (b.id === bookingId) {
-        const finalName = typedName || b.assignedDriver || "Manjunath Anna";
-        const finalPhone = typedPhone || b.assignedDriverPhone || "+91 98860 12345";
+        const finalName = typedName || b.assignedDriver || "Driver Assigned";
+        const finalPhone = typedPhone || b.assignedDriverPhone || "+91 80 2555 0199";
         return {
           ...b,
           assignedDriver: finalName,
@@ -851,13 +851,13 @@ export default function AdminPage({ onReturnToClient }) {
       const cancelMsg = `🚖 *BOOK DRIVER ANNA - BOOKING CANCELLED* 🚖\n\n` +
         `Namaskara *${booking.customerName}*,\n` +
         `Your driver booking request (Ref: ${booking.id}) has been cancelled. Zero cancellation charges apply.\n\n` +
-        `If this cancellation was unexpected or you need a replacement driver, please reach our 24x7 helpdesk at +91 98860 12345. Thank you!`;
+        `If this cancellation was unexpected or you need a replacement driver, please reach our 24x7 helpdesk at +91 80 2555 0199. Thank you!`;
       window.open(`https://api.whatsapp.com/send?phone=${cleanClientPhone}&text=${encodeURIComponent(cancelMsg)}`, '_blank');
       return;
     }
 
-    const driverName = booking.assignedDriver || "Manjunath Anna";
-    const driverPhone = booking.assignedDriverPhone || "+91 98860 12345";
+    const driverName = booking.assignedDriver || "Driver Assigned";
+    const driverPhone = booking.assignedDriverPhone || "+91 80 2555 0199";
 
     const message = `🚖 *BOOK DRIVER ANNA - TRIP ACCEPTED* 🚖\n\n` +
       `Namaskara *${booking.customerName}*,\n` +
@@ -888,7 +888,7 @@ export default function AdminPage({ onReturnToClient }) {
       const cancelMsg = `🚘 *BOOK DRIVER ANNA - VEHICLE BOOKING CANCELLED* 🚘\n\n` +
         `Namaskara *${booking.customerName}*,\n` +
         `Your vehicle rental booking (Ref: ${booking.id}) has been cancelled. Zero cancellation charges apply.\n\n` +
-        `For queries or rebooking, call our 24x7 fleet desk at +91 98860 12345. Thank you!`;
+        `For queries or rebooking, call our 24x7 fleet desk at +91 80 2555 0199. Thank you!`;
       window.open(`https://api.whatsapp.com/send?phone=${cleanClientPhone}&text=${encodeURIComponent(cancelMsg)}`, '_blank');
       return;
     }
@@ -962,13 +962,13 @@ export default function AdminPage({ onReturnToClient }) {
       const cancelMsg = `🎓 *BOOK DRIVER ANNA — ENROLLMENT CANCELLED* 🎓\n\n` +
         `Namaskara *${enrollment.fullName}*!\n` +
         `Your driving class enrollment (Ref: ${enrollment.enrollmentId}) has been cancelled. Zero cancellation charges apply.\n\n` +
-        `For re-enrollment or queries, please reach our academy desk at +91 98860 12345. Thank you!`;
+        `For re-enrollment or queries, please reach our academy desk at +91 80 2555 0199. Thank you!`;
       window.open(`https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(cancelMsg)}`, '_blank');
       return;
     }
 
-    const currentName = instructorInputState[enrollment.enrollmentId]?.name?.trim() || enrollment.assignedInstructor || "Syed Nizamuddin";
-    const currentPhone = instructorInputState[enrollment.enrollmentId]?.phone?.trim() || enrollment.assignedInstructorPhone || "+91 98860 54321";
+    const currentName = instructorInputState[enrollment.enrollmentId]?.name?.trim() || enrollment.assignedInstructor || "Instructor Assigned";
+    const currentPhone = instructorInputState[enrollment.enrollmentId]?.phone?.trim() || enrollment.assignedInstructorPhone || "+91 80 2555 0199";
 
     const instructorText = `👨‍🏫 *Assigned Instructor Anna:* ${currentName} (${currentPhone})\n`;
 
@@ -991,7 +991,7 @@ export default function AdminPage({ onReturnToClient }) {
       `📄 *Learner's License:* ${enrollment.learnersLicenseStatus}\n` +
       `🪪 *Driving License:* ${enrollment.drivingLicenseStatus}\n` +
       instructorText +
-      `\nFor any queries or schedule updates, reach our academy desk at +91 98860 12345. Happy & safe driving with Book Driver Anna! 🚗✨`;
+      `\nFor any queries or schedule updates, reach our academy desk at +91 80 2555 0199. Happy & safe driving with Book Driver Anna! 🚗✨`;
 
     window.open(`https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
   };

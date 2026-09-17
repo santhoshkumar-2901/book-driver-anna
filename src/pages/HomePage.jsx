@@ -334,11 +334,11 @@ export default function HomePage({
               <span>Book a Driver</span>
             </button>
             <a
-              href="tel:+919886012345"
+              href="tel:+918025550199"
               className="btn-secondary"
             >
               <Phone className="w-4 h-4 text-amber-500" />
-              <span>+91 98860 12345</span>
+              <span>+91 80 2555 0199</span>
             </a>
           </div>
         </div>

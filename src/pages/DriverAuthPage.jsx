@@ -382,7 +382,7 @@ export default function DriverAuthPage({
                       id="bda_driver_identity"
                       required
                       autoComplete="off"
-                      placeholder="e.g. 98860 12345 or KA-04-2021-0098745"
+                      placeholder="e.g. 98765 43210 or KA-04-2021-0098745"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-colors"
@@ -433,7 +433,7 @@ export default function DriverAuthPage({
                     <span>Remember this device</span>
                   </label>
 
-                  <span className="text-emerald-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset your driver PIN, please contact Bangalore Fleet Dispatcher at +91 98860 12345.")}>
+                  <span className="text-emerald-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset your driver PIN, please contact Bangalore Fleet Dispatcher at +91 80 2555 0199.")}>
                     Forgot PIN?
                   </span>
                 </div>
@@ -520,7 +520,7 @@ export default function DriverAuthPage({
                         name="bda_drv_reg_phone"
                         required
                         autoComplete="off"
-                        placeholder="98860 12345"
+                        placeholder="98765 43210"
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-colors"

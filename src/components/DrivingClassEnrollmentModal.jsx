@@ -290,9 +290,8 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
           date: formattedStartDate,
           time: finalData.preferredTime === 'Morning' ? '07:00 AM' : (finalData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
           fare: 5999,
-          status: 'Pending',
-          assignedDriver: 'Syed Nizamuddin',
-          assignedDriverPhone: '+91 98860 54321',
+          assignedDriver: 'Instructor Assigned on Dispatch',
+          assignedDriverPhone: '+91 80 2555 0199',
           bookedAt: 'Just Now'
         };
         const existingBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');

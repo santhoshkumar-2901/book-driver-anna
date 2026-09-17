@@ -103,7 +103,7 @@ export default function AdminModals({
                 <input 
                   type="tel"
                   required
-                  placeholder="98860 54321"
+                  placeholder="98765 43210"
                   value={newUserPhone}
                   onChange={(e) => setNewUserPhone(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
@@ -115,7 +115,7 @@ export default function AdminModals({
                 <input 
                   type="email"
                   required
-                  placeholder="e.g. vikram@example.com"
+                  placeholder="e.g. name@email.com"
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"

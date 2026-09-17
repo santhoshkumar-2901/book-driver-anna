@@ -112,7 +112,7 @@ export default function ServicesPage({ openBookingModal }) {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Have questions?</span>
                 <a 
-                  href="tel:+919886012345" 
+                  href="tel:+918025550199" 
                   className="py-2.5 px-4 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 text-xs font-bold hover:border-amber-400 transition-colors flex items-center gap-1.5"
                 >
                   <Phone className="w-3.5 h-3.5 text-amber-400" /> 24x7 Support
@@ -300,7 +300,7 @@ export default function ServicesPage({ openBookingModal }) {
 
             <div className="flex items-center gap-2 shrink-0">
               <a 
-                href="tel:+919886012345" 
+                href="tel:+918025550199" 
                 className="py-3 px-5 rounded-2xl bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg hover:bg-amber-300 transition-colors flex items-center gap-2"
               >
                 <Phone className="w-4 h-4 fill-slate-950" /> 24x7 Vehicle Helpdesk
@@ -554,10 +554,10 @@ export default function ServicesPage({ openBookingModal }) {
           Call our Indiranagar 24x7 helpdesk. Our friendly Anna will customize the driver or car rental package for your exact needs!
         </p>
         <a 
-          href="tel:+919886012345" 
+          href="tel:+918025550199" 
           className="inline-flex items-center gap-2 py-3 px-6 rounded-2xl bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg hover:bg-amber-300 transition-colors"
         >
-          <Phone className="w-4 h-4 fill-slate-950" /> Call Helpline: +91 98860 12345
+          <Phone className="w-4 h-4 fill-slate-950" /> Call Helpline: +91 80 2555 0199
         </a>
       </div>
 

@@ -489,9 +489,8 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '07:00 AM',
         fare: bookingDetails.totalFare || 5999,
-        status: 'Confirmed',
-        assignedDriver: 'Syed Nizamuddin',
-        assignedDriverPhone: '+91 98860 54321',
+        assignedDriver: bookingDetails.assignedInstructor || 'Instructor Assigned on Dispatch',
+        assignedDriverPhone: bookingDetails.assignedInstructorPhone || '+91 80 2555 0199',
         bookedAt: 'Just Now'
       };
 

@@ -527,7 +527,7 @@ export default function ClientAuthPage({
                       id="bda_client_identity"
                       required
                       autoComplete="off"
-                      placeholder="e.g. rahul.sharma@example.com or 9886012345"
+                      placeholder="e.g. name@email.com or 9876543210"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
@@ -578,7 +578,7 @@ export default function ClientAuthPage({
                     <span>Remember me</span>
                   </label>
 
-                  <span className="text-amber-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset password, please verify your mobile number via WhatsApp support (+91 98860 12345).")}>
+                  <span className="text-amber-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset password, please verify your mobile number via WhatsApp support (+91 80 2555 0199).")}>
                     Forgot Password?
                   </span>
                 </div>
@@ -662,7 +662,7 @@ export default function ClientAuthPage({
                         name="bda_client_reg_phone"
                         required
                         autoComplete="off"
-                        placeholder="98860 12345"
+                        placeholder="98765 43210"
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
@@ -702,7 +702,7 @@ export default function ClientAuthPage({
                       name="bda_client_reg_email"
                       required
                       autoComplete="off"
-                      placeholder="e.g. rahul.sharma@example.com"
+                      placeholder="e.g. name@email.com"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
