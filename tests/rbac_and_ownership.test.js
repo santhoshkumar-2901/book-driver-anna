@@ -170,7 +170,7 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
     assert.strictEqual(myBookingsData.data.bookings.length, 0, 'New user must have exactly 0 bookings on default');
   });
 
-  test('7. Authenticated user has access to their authorized bookings', async () => {
+  test('7. Fixture user can retrieve their own bookings', async () => {
     // Call /api/bookings/my with userToken for fixture user
     const res = await fetch(`${baseUrl}/api/bookings/my`, {
       headers: { 'Authorization': `Bearer ${userToken}` }
