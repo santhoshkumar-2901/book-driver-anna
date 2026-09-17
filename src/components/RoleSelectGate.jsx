@@ -42,7 +42,7 @@ export default function RoleSelectGate({ onSelectRole }) {
               Wanna Be a <span className="text-amber-400">Customer</span> or a <span className="text-emerald-400">Driver</span>?
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-normal">
-              Please choose your role to sign in or create an account. You can easily switch roles at any time.
+              Please choose your role to log in or sign up. You can easily switch roles at any time.
             </p>
           </div>
 
@@ -96,7 +96,7 @@ export default function RoleSelectGate({ onSelectRole }) {
                   onClick={() => onSelectRole('user', 'login')}
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-amber-500/20 hover:shadow-amber-500/40 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>Customer Sign In</span>
+                  <span>Login</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -106,7 +106,7 @@ export default function RoleSelectGate({ onSelectRole }) {
                   className="w-full py-2 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Create New Customer Account</span>
+                  <span>Signup</span>
                 </button>
               </div>
 
@@ -159,7 +159,7 @@ export default function RoleSelectGate({ onSelectRole }) {
                   onClick={() => onSelectRole('driver', 'login')}
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>Driver Sign In</span>
+                  <span>Login</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -169,7 +169,7 @@ export default function RoleSelectGate({ onSelectRole }) {
                   className="w-full py-2 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Register as Driver Partner</span>
+                  <span>Signup</span>
                 </button>
               </div>
 

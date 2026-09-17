@@ -57,10 +57,10 @@ export default function AdminAuthView({
               <ShieldCheck className="w-4 h-4" /> Admin Access Portal
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit']">
-              Admin Login
+              Login
             </h1>
             <p className="text-slate-400 text-xs">
-              Sign in to access Bangalore driver & vehicle management dashboard.
+              Log in to access Bangalore driver & vehicle management dashboard.
             </p>
           </div>
 
@@ -142,12 +142,12 @@ export default function AdminAuthView({
               {isAuthSubmitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Signing In...</span>
+                  <span>Logging in...</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Enter Admin Dashboard</span>
+                  <span>Login</span>
                 </>
               )}
             </button>

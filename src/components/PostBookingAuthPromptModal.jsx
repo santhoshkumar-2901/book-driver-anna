@@ -33,7 +33,7 @@ export default function PostBookingAuthPromptModal({
             <span>Booking Placed • #{bookingId}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
-            Login or Sign Up
+            Login or Signup
           </h2>
           <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1 leading-relaxed">
             {customerName ? `Hello ${customerName}, ` : ''}your booking for <strong className="text-amber-400">{serviceTitle || 'Transit Service'}</strong> is saved! Choose an option below to view your driver dispatch pass and track updates:
@@ -64,7 +64,7 @@ export default function PostBookingAuthPromptModal({
             <div className="w-8 h-8 rounded-lg bg-slate-950/20 flex items-center justify-center text-slate-950 group-hover:scale-105 transition-transform">
               <UserPlus className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <span className="font-extrabold text-xs">Sign Up</span>
+            <span className="font-extrabold text-xs">Signup</span>
             <span className="text-[10px] text-slate-900/80 font-medium">New Account</span>
           </button>
         </div>

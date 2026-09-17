@@ -58,7 +58,7 @@ describe('Driver Portal Isolation & Admin Online/Offline Duty Tracking', () => {
   test('7. AdminAuthView provides Login only (no Register tab) and sets height to 100vh', () => {
     const adminAuthViewPath = path.resolve('src/pages/admin/AdminAuthView.jsx');
     const content = fs.readFileSync(adminAuthViewPath, 'utf8');
-    assert.match(content, /Admin Login/, 'AdminAuthView should display Admin Login');
+    assert.match(content, />\s*Login\s*</, 'AdminAuthView should display Login');
     assert.doesNotMatch(content, /Admin Register/, 'AdminAuthView should not display Admin Register');
     assert.doesNotMatch(content, /Registering Admin/, 'AdminAuthView should not have Registering Admin action');
     assert.doesNotMatch(content, /Admin Security Passcode/, 'AdminAuthView should not ask for Admin Security Passcode');

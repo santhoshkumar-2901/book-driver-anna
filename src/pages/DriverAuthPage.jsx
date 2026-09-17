@@ -313,11 +313,11 @@ export default function DriverAuthPage({
             {/* Header / Mode Switcher */}
             <div className="text-center space-y-1 mb-3">
               <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
-                {authMode === 'login' ? 'Driver Partner Sign In' : 'Register as Driver Anna'}
+                {authMode === 'login' ? 'Login' : 'Signup'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
                 {authMode === 'login' 
-                  ? 'Sign in to access your Bengaluru trip dashboard & daily earnings.' 
+                  ? 'Log in to access your Bengaluru trip dashboard & daily earnings.' 
                   : 'Join 1,800+ verified drivers. Drive Bangalore cars with assured payouts.'}
               </p>
             </div>
@@ -334,7 +334,7 @@ export default function DriverAuthPage({
                 }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Driver Sign In</span>
+                <span>Login</span>
               </button>
 
               <button
@@ -347,7 +347,7 @@ export default function DriverAuthPage({
                 }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Driver Registration</span>
+                <span>Signup</span>
               </button>
             </div>
 
@@ -474,7 +474,7 @@ export default function DriverAuthPage({
                     </>
                   ) : (
                     <>
-                      <span>Sign In as Driver Anna</span>
+                      <span>Login</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -489,10 +489,10 @@ export default function DriverAuthPage({
                     className="w-full py-1.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-400 transition-all flex items-center justify-center gap-2 cursor-pointer shadow"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                    <span>⚡ 1-Click Demo Driver Login (Manjunath Gowda)</span>
+                    <span>⚡ 1-Click Demo Login (Manjunath Gowda)</span>
                   </button>
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Click to sign in immediately with active demo driver profile
+                    Click to log in immediately with active demo driver profile
                   </p>
                 </div>
 
@@ -700,7 +700,7 @@ export default function DriverAuthPage({
                     </>
                   ) : (
                     <>
-                      <span>Complete Registration & Join Fleet</span>
+                      <span>Signup</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

@@ -28,7 +28,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 max-w-full overflow-x-hidden">
+    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
       {/* Main Navigation Header */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-2">
@@ -93,9 +93,9 @@ export default function Navbar({
                 </button>
                 <button
                   onClick={onLogout}
-                  title="Sign Out"
+                  title="Logout"
                   className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                  aria-label="Sign Out"
+                  aria-label="Logout"
                 >
                   <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
@@ -116,7 +116,7 @@ export default function Navbar({
                   className="btn-primary py-1.5 px-3 sm:px-3.5 text-xs flex items-center gap-1.5"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>Sign Up</span>
+                  <span>Signup</span>
                 </button>
               </div>
             )}
@@ -176,7 +176,7 @@ export default function Navbar({
                 className="btn-danger py-1 px-2.5 text-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
+                <span>Logout</span>
               </button>
             </div>
           ) : (
@@ -201,7 +201,7 @@ export default function Navbar({
                 className="btn-primary py-2 px-3 text-xs flex items-center justify-center gap-1.5"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign Up</span>
+                <span>Signup</span>
               </button>
             </div>
           )}

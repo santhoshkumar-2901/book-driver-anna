@@ -430,7 +430,7 @@ export default function ClientAuthPage({
       );
 
       if (isDuplicate) {
-        setErrorMessage('An account with this mobile number or email already exists. Please sign in.');
+        setErrorMessage('An account with this mobile number or email already exists. Please log in.');
         return;
       }
 
@@ -479,7 +479,7 @@ export default function ClientAuthPage({
         {bookingBanner && (
           <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Please sign in or register to complete your <strong>{bookingBanner}</strong> booking!</span>
+            <span>Please log in or sign up to complete your <strong>{bookingBanner}</strong> booking!</span>
           </div>
         )}
 
@@ -490,11 +490,11 @@ export default function ClientAuthPage({
             <span>Book a Driver • Rent a Vehicle • Book a Driving Class</span>
           </div>
               <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
-                {authMode === 'login' ? 'Customer Sign In' : 'Create Customer Account'}
+                {authMode === 'login' ? 'Login' : 'Signup'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
                 {authMode === 'login'
-                  ? 'Sign in to your account to book verified private drivers, rent fleet vehicles, or schedule doorstep driving classes across Bengaluru.'
+                  ? 'Log in to your account to book verified private drivers, rent fleet vehicles, or schedule doorstep driving classes across Bengaluru.'
                   : 'Join Book Driver Anna to hire trusted car drivers, rent vehicles with zero hassle, or learn to drive with verified instructors.'}
               </p>
             </div>
@@ -510,7 +510,7 @@ export default function ClientAuthPage({
                   }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In</span>
+                <span>Login</span>
               </button>
 
               <button
@@ -522,7 +522,7 @@ export default function ClientAuthPage({
                   }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign Up</span>
+                <span>Signup</span>
               </button>
             </div>
 
@@ -646,7 +646,7 @@ export default function ClientAuthPage({
                     <span>Verifying credentials...</span>
                   ) : (
                     <>
-                      <span>Sign In to Book Driver Anna</span>
+                      <span>Login</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -661,10 +661,10 @@ export default function ClientAuthPage({
                     className="w-full py-1.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 font-bold text-xs border border-amber-500/30 hover:border-amber-400 transition-all flex items-center justify-center gap-2 cursor-pointer shadow"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                    <span>⚡ 1-Click Quick Demo Login (Rahul Sharma)</span>
+                    <span>⚡ 1-Click Demo Login (Rahul Sharma)</span>
                   </button>
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Click to instantly sign in without typing passwords
+                    Click to instantly log in without typing passwords
                   </p>
                 </div>
 
@@ -843,7 +843,7 @@ export default function ClientAuthPage({
                     <span>Creating your account...</span>
                   ) : (
                     <>
-                      <span>Complete Registration & Continue</span>
+                      <span>Signup</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
