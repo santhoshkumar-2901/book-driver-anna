@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Car, ShieldCheck, CheckCircle2, MapPin, Phone, LogOut, ArrowUpRight, 
   DollarSign, TrendingUp, Calendar, Clock, Award, AlertCircle, Check, X, 
@@ -9,10 +9,19 @@ import useScrollLock from '../utils/useScrollLock';
 
 export default function DriverPortalPage({ 
   driverUser, 
-  onLogout, 
-  onGoToCustomerSite 
+  onLogout 
 }) {
-  const [isOnline, setIsOnline] = useState(driverUser?.isOnline ?? true);
+  const [isOnline, setIsOnline] = useState(() => {
+    if (driverUser?.isOnline !== undefined) return Boolean(driverUser.isOnline);
+    try {
+      const savedUser = localStorage.getItem('bda_driver_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed?.isOnline !== undefined) return Boolean(parsed.isOnline);
+      }
+    } catch (e) {}
+    return true;
+  });
   const [acceptedTrips, setAcceptedTrips] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   const [todayEarnings, setTodayEarnings] = useState(driverUser?.earningsToday || 2450);
@@ -21,6 +30,84 @@ export default function DriverPortalPage({
   const [settlementMethod, setSettlementMethod] = useState('online'); // 'online' or 'cash'
 
   useScrollLock(Boolean(settlementTrip));
+
+  // Sync duty status to persistent database and notify admin in real-time
+  const handleToggleOnline = () => {
+    const nextStatus = !isOnline;
+    setIsOnline(nextStatus);
+
+    // 1. Update active driver user session
+    try {
+      const savedUser = localStorage.getItem('bda_driver_user');
+      const parsed = savedUser ? JSON.parse(savedUser) : { ...(driverUser || {}) };
+      parsed.isOnline = nextStatus;
+      localStorage.setItem('bda_driver_user', JSON.stringify(parsed));
+    } catch (e) {}
+
+    // 2. Update fleet directory in bda_registered_drivers
+    try {
+      const savedDrivers = localStorage.getItem('bda_registered_drivers');
+      let driversList = savedDrivers ? JSON.parse(savedDrivers) : [];
+      if (Array.isArray(driversList)) {
+        const currentId = driverUser?.id;
+        const currentPhone = (driverUser?.phone || '').replace(/[^0-9]/g, '');
+        let found = false;
+        const updated = driversList.map(d => {
+          const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+          if ((currentId && d.id === currentId) || (currentPhone && dPhone && (dPhone === currentPhone || dPhone.includes(currentPhone) || currentPhone.includes(dPhone)))) {
+            found = true;
+            return { ...d, isOnline: nextStatus };
+          }
+          return d;
+        });
+        if (!found && driverUser) {
+          updated.unshift({ ...driverUser, isOnline: nextStatus });
+        }
+        localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
+      }
+    } catch (e) {}
+
+    // 3. Dispatch real-time event for Admin Page and cross-tab sync
+    window.dispatchEvent(new CustomEvent('bda_driver_status_updated', {
+      detail: {
+        driverId: driverUser?.id,
+        phone: driverUser?.phone,
+        isOnline: nextStatus
+      }
+    }));
+
+    setToastMessage(nextStatus ? '✓ You are now ONLINE & receiving customer duties.' : 'You are now OFFLINE. New bookings paused.');
+  };
+
+  // Initial sync on mount
+  useEffect(() => {
+    if (!driverUser) return;
+    try {
+      const savedDrivers = localStorage.getItem('bda_registered_drivers');
+      let driversList = savedDrivers ? JSON.parse(savedDrivers) : [];
+      if (Array.isArray(driversList)) {
+        const currentId = driverUser?.id;
+        const currentPhone = (driverUser?.phone || '').replace(/[^0-9]/g, '');
+        let needsUpdate = false;
+        const updated = driversList.map(d => {
+          const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+          if ((currentId && d.id === currentId) || (currentPhone && dPhone && (dPhone === currentPhone || dPhone.includes(currentPhone) || currentPhone.includes(dPhone)))) {
+            if (d.isOnline !== isOnline) {
+              needsUpdate = true;
+              return { ...d, isOnline };
+            }
+          }
+          return d;
+        });
+        if (needsUpdate) {
+          localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent('bda_driver_status_updated', {
+            detail: { driverId: driverUser?.id, phone: driverUser?.phone, isOnline }
+          }));
+        }
+      }
+    } catch (e) {}
+  }, [driverUser, isOnline]);
 
   const [availableDuties, setAvailableDuties] = useState([
     {
@@ -155,27 +242,17 @@ export default function DriverPortalPage({
             
             {/* Online/Offline Duty Toggle Button */}
             <button
-              onClick={() => setIsOnline(!isOnline)}
+              onClick={handleToggleOnline}
               className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm ${
                 isOnline
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
               }`}
+              title={isOnline ? "Click to go Offline" : "Click to go Online"}
             >
               <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
               <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </button>
-
-            {/* Switch to Customer Site */}
-            {onGoToCustomerSite && (
-              <button
-                onClick={onGoToCustomerSite}
-                className="hidden sm:inline-flex text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl transition-all cursor-pointer items-center gap-1"
-              >
-                <span>Customer Site</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-amber-400" />
-              </button>
-            )}
 
             {/* Logout Button */}
             <button
@@ -197,17 +274,18 @@ export default function DriverPortalPage({
         
         {/* Welcome Driver Banner */}
         <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden shadow-xl">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-xl sm:text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
               {driverUser?.name ? driverUser.name.charAt(0).toUpperCase() : 'M'}
             </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
+                <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
                   Namaskara, Anna {driverUser?.name || 'Manjunath Gowda'}!
                 </h1>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                  Verified Fleet Anna
+                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>Verified Fleet Anna</span>
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
@@ -346,7 +424,7 @@ export default function DriverPortalPage({
                       <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                         {duty.id}
                       </span>
-                      <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                         {duty.urgency}
                       </span>
                     </div>

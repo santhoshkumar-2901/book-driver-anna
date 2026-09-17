@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Car, PhoneCall, Menu, X, ShieldCheck, MapPin, GraduationCap, Ban, LogOut, User } from 'lucide-react';
+import { Car, Menu, X, MapPin, LogOut, LogIn, UserPlus } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 
 export default function Navbar({
@@ -9,7 +9,8 @@ export default function Navbar({
   openCancelModal,
   clientUser,
   onLogout,
-  onOpenProfile
+  onOpenProfile,
+  onOpenAuth
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -28,45 +29,9 @@ export default function Navbar({
 
   return (
     <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 max-w-full overflow-x-hidden">
-      {/* Top Utility Bar */}
-      <div className="bg-slate-900/80 border-b border-slate-800/80 text-slate-300 text-xs py-1.5 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4 overflow-hidden">
-          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs min-w-0 truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-slate-400 shrink-0">Bengaluru Desk:</span>
-            <span className="text-slate-200 font-medium truncate">Drivers, Rentals & Driving Academy</span>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-4 text-[11px] shrink-0">
-            <a
-              href="tel:+919886012345"
-              className="flex items-center gap-1.5 text-slate-300 hover:text-amber-400 transition-colors"
-            >
-              <PhoneCall className="w-3 h-3 text-amber-500" />
-              <span>24/7 Helpline: +91 98860 12345</span>
-            </a>
-            <span className="text-slate-700">|</span>
-            <button
-              onClick={() => openBookingModal('class')}
-              className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <GraduationCap className="w-3 h-3 text-amber-500" />
-              <span>Driving Classes</span>
-            </button>
-            <span className="text-slate-700">|</span>
-            <button
-              onClick={openCancelModal}
-              className="text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
-            >
-              Manage / Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Navigation Header */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-15 sm:h-18 gap-2">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2">
 
           {/* Brand Logo */}
           <div
@@ -110,26 +75,8 @@ export default function Navbar({
           {/* Header Action Items */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
 
-            {/* Cancel Booking Quick Link (Desktop) */}
-            <button
-              onClick={openCancelModal}
-              className="hidden xl:inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 px-3 py-2 rounded-lg hover:bg-slate-900 transition-colors cursor-pointer"
-            >
-              <Ban className="w-3.5 h-3.5 text-slate-500" />
-              <span>Cancel Trip</span>
-            </button>
-
-            {/* Book a Driver Primary Button - Desktop & Tablet */}
-            <button
-              onClick={() => openBookingModal('driver')}
-              className="btn-primary hidden sm:inline-flex py-2 px-3.5 text-xs sm:text-sm"
-            >
-              <SteeringWheel className="w-4 h-4" />
-              <span>Book a Driver</span>
-            </button>
-
-            {/* User Profile Pill & Logout (if logged in) */}
-            {clientUser && (
+            {/* User Profile Pill & Logout (if logged in) or Login & Sign Up buttons */}
+            {clientUser ? (
               <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-3 border-l border-slate-800">
                 <button
                   type="button"
@@ -151,6 +98,25 @@ export default function Navbar({
                   aria-label="Sign Out"
                 >
                   <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth && onOpenAuth('login')}
+                  className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Login</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth && onOpenAuth('signup')}
+                  className="btn-primary py-1.5 px-3 sm:px-3.5 text-xs flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Sign Up</span>
                 </button>
               </div>
             )}
@@ -185,7 +151,7 @@ export default function Navbar({
             ))}
           </div>
 
-          {clientUser && (
+          {clientUser ? (
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
               <button
                 onClick={() => {
@@ -213,20 +179,34 @@ export default function Navbar({
                 <span>Sign Out</span>
               </button>
             </div>
+          ) : (
+            <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenAuth) onOpenAuth('login');
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-slate-400" />
+                <span>Login</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenAuth) onOpenAuth('signup');
+                  setMobileMenuOpen(false);
+                }}
+                className="btn-primary py-2 px-3 text-xs flex items-center justify-center gap-1.5"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Sign Up</span>
+              </button>
+            </div>
           )}
 
           <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                openBookingModal('driver');
-                setMobileMenuOpen(false);
-              }}
-              className="btn-primary w-full"
-            >
-              <SteeringWheel className="w-4 h-4" />
-              <span>Book a Driver Anna</span>
-            </button>
-
             <button
               onClick={() => {
                 openBookingModal('vehicle');
@@ -236,28 +216,6 @@ export default function Navbar({
             >
               <Car className="w-4 h-4 text-amber-500" />
               <span>Rent a Vehicle</span>
-            </button>
-
-            <button
-              onClick={() => {
-                openBookingModal('class');
-                setMobileMenuOpen(false);
-              }}
-              className="btn-outline w-full"
-            >
-              <GraduationCap className="w-4 h-4 text-amber-500" />
-              <span>Driving Classes</span>
-            </button>
-
-            <button
-              onClick={() => {
-                openCancelModal();
-                setMobileMenuOpen(false);
-              }}
-              className="w-full py-2 text-center text-xs text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Ban className="w-3.5 h-3.5" />
-              <span>Cancel or Modify Booking</span>
             </button>
           </div>
         </div>

@@ -8,7 +8,7 @@ import DateInput from './DateInput';
 import { toDDMMYYYY, toYYYYMMDD } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 
-export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollmentSuccess, initialData = {} }) {
+export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollmentSuccess, initialData = {}, clientUser = null, onRequireAuth }) {
   useScrollLock(isOpen);
   // 1. Personal Information State
   const [fullName, setFullName] = useState('');
@@ -267,47 +267,66 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
       status: 'Enrollment Received'
     };
 
-    // Save to local storage for Admin tracking
-    try {
-      const existing = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
-      localStorage.setItem('bda_class_enrollments', JSON.stringify([enrollmentData, ...existing]));
+    const finalizeEnrollmentSubmit = (finalData) => {
+      // Save to local storage for Admin tracking
+      try {
+        const existing = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
+        localStorage.setItem('bda_class_enrollments', JSON.stringify([finalData, ...existing]));
 
-      // Also create a pending booking entry in bda_driver_bookings so it appears in the admin order dispatcher
-      const newAdminOrder = {
-        id: enrollmentId,
-        customerName: enrollmentData.fullName,
-        phone: enrollmentData.mobileNumber,
-        tripType: 'class',
-        tripTitle: `Driving Class Enrollment (${enrollmentData.gearPreference})`,
-        pickupArea: enrollmentData.pickupLocation || enrollmentData.address.split(',')[0] || 'Bangalore',
-        dropLocation: 'Doorstep Driving School Training',
-        classCourseName: `${enrollmentData.gearPreference} Driving Course`,
-        classDuration: 'Comprehensive Batch',
-        classTrainingCar: `${enrollmentData.gearPreference} Car`,
-        classTransmission: enrollmentData.gearPreference,
-        classTimeSlot: enrollmentData.preferredTime,
-        date: formattedStartDate,
-        time: enrollmentData.preferredTime === 'Morning' ? '07:00 AM' : (enrollmentData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
-        fare: 5999,
-        status: 'Pending',
-        assignedDriver: 'Syed Nizamuddin',
-        assignedDriverPhone: '+91 98860 54321',
-        bookedAt: 'Just Now'
-      };
-      const existingBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      localStorage.setItem('bda_driver_bookings', JSON.stringify([newAdminOrder, ...existingBookings]));
+        // Also create a pending booking entry in bda_driver_bookings so it appears in the admin order dispatcher
+        const newAdminOrder = {
+          id: finalData.enrollmentId,
+          customerName: finalData.fullName,
+          phone: finalData.mobileNumber,
+          tripType: 'class',
+          tripTitle: `Driving Class Enrollment (${finalData.gearPreference})`,
+          pickupArea: finalData.pickupLocation || finalData.address.split(',')[0] || 'Bangalore',
+          dropLocation: 'Doorstep Driving School Training',
+          classCourseName: `${finalData.gearPreference} Driving Course`,
+          classDuration: 'Comprehensive Batch',
+          classTrainingCar: `${finalData.gearPreference} Car`,
+          classTransmission: finalData.gearPreference,
+          classTimeSlot: finalData.preferredTime,
+          date: formattedStartDate,
+          time: finalData.preferredTime === 'Morning' ? '07:00 AM' : (finalData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
+          fare: 5999,
+          status: 'Pending',
+          assignedDriver: 'Syed Nizamuddin',
+          assignedDriverPhone: '+91 98860 54321',
+          bookedAt: 'Just Now'
+        };
+        const existingBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        localStorage.setItem('bda_driver_bookings', JSON.stringify([newAdminOrder, ...existingBookings]));
 
-      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
-    } catch (err) {
-      console.error('Error storing enrollment:', err);
+        window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      } catch (err) {
+        console.error('Error storing enrollment:', err);
+      }
+
+      setSubmittedEnrollment(finalData);
+      setIsSubmitted(true);
+
+      if (onEnrollmentSuccess) {
+        onEnrollmentSuccess(finalData);
+      }
+    };
+
+    // If customer is not logged in, prompt login/signup on confirm enrollment
+    if (!clientUser && onRequireAuth) {
+      onRequireAuth(enrollmentData, (updatedUser) => {
+        finalizeEnrollmentSubmit({
+          ...enrollmentData,
+          userId: updatedUser?.id || null,
+          fullName: enrollmentData.fullName || updatedUser?.name || '',
+          mobileNumber: enrollmentData.mobileNumber || updatedUser?.phone || '',
+          emailAddress: enrollmentData.emailAddress || updatedUser?.email || ''
+        });
+      });
+      handleClose();
+      return;
     }
 
-    setSubmittedEnrollment(enrollmentData);
-    setIsSubmitted(true);
-
-    if (onEnrollmentSuccess) {
-      onEnrollmentSuccess(enrollmentData);
-    }
+    finalizeEnrollmentSubmit(enrollmentData);
   };
 
   if (!isOpen) return null;

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
-  Users, UserPlus, UserCheck, Search, Filter, Trash2, Phone, Mail, MapPin, Calendar, ShieldCheck, Car, Award, CheckCircle2 
+  Users, UserPlus, UserCheck, Search, Filter, Trash2, Phone, Mail, MapPin, Calendar, ShieldCheck, Car, Award, CheckCircle2, Power 
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../../components/Icons';
 import { BANGALORE_AREAS } from '../../data/mockData';
@@ -17,8 +17,10 @@ export default function AdminUsersTab({
   setUserSearchQuery,
   userAreaFilter,
   setUserAreaFilter,
-  handleOpenDeleteUserModal
+  handleOpenDeleteUserModal,
+  onToggleDriverDuty
 }) {
+  const [driverDutyFilter, setDriverDutyFilter] = useState('All');
   return (
     <div className="space-y-8 animate-fade-in">
       
@@ -115,7 +117,17 @@ export default function AdminUsersTab({
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
           <div className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Driver Fleet</div>
           <div className="text-lg sm:text-2xl font-extrabold text-emerald-400 font-['Outfit'] mt-1 truncate">{registeredDrivers.length} Annas</div>
-          <div className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">RTO Verified</div>
+          <div className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate flex items-center gap-1.5 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {registeredDrivers.filter(d => d.isOnline !== false).length} Online
+            </span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1 text-slate-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+              {registeredDrivers.filter(d => d.isOnline === false).length} Offline
+            </span>
+          </div>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 min-w-0 overflow-hidden">
@@ -175,6 +187,35 @@ export default function AdminUsersTab({
             })}
           </select>
         </div>
+
+        {/* Duty Status Filter for Drivers */}
+        {userSubTab === 'drivers' && (
+          <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto min-w-0">
+            <span className="text-xs text-slate-400 font-bold flex items-center gap-1 shrink-0">
+              <Power className="w-3.5 h-3.5 text-emerald-400" /> Duty:
+            </span>
+            <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 w-full sm:w-auto overflow-x-auto no-scrollbar min-w-0">
+              {[
+                { id: 'All', label: `All (${registeredDrivers.length})` },
+                { id: 'Online', label: `Online (${registeredDrivers.filter(d => d.isOnline !== false).length})` },
+                { id: 'Offline', label: `Offline (${registeredDrivers.filter(d => d.isOnline === false).length})` }
+              ].map(st => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setDriverDutyFilter(st.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    driverDutyFilter === st.id
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* =============================================================== */}
@@ -354,7 +395,7 @@ export default function AdminUsersTab({
                 No driver partners match your search query or area filter. Try changing your filters or add a new driver.
               </p>
               <button
-                onClick={() => { setUserSearchQuery(''); setUserAreaFilter('All'); }}
+                onClick={() => { setUserSearchQuery(''); setUserAreaFilter('All'); setDriverDutyFilter('All'); }}
                 className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer"
               >
                 Reset Filters
@@ -373,7 +414,11 @@ export default function AdminUsersTab({
                     (d.area && d.area.toLowerCase().includes(q)) ||
                     (d.id && d.id.toLowerCase().includes(q));
                   const matchesArea = userAreaFilter === 'All' || d.area === userAreaFilter;
-                  return matchesSearch && matchesArea;
+                  const matchesDuty = 
+                    driverDutyFilter === 'All' ? true :
+                    driverDutyFilter === 'Online' ? d.isOnline !== false :
+                    driverDutyFilter === 'Offline' ? d.isOnline === false : true;
+                  return matchesSearch && matchesArea && matchesDuty;
                 })
                 .map((driver) => (
                 <div 
@@ -398,6 +443,28 @@ export default function AdminUsersTab({
                             <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
                               {driver.status || 'Active'}
                             </span>
+                            {/* Online / Offline Status Badge */}
+                            {driver.isOnline !== false ? (
+                              <button
+                                type="button"
+                                onClick={() => onToggleDriverDuty && onToggleDriverDuty(driver.id)}
+                                className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1 shrink-0 cursor-pointer transition-all"
+                                title="Driver is ONLINE & ready to receive duties. Click to toggle Offline."
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                ONLINE
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onToggleDriverDuty && onToggleDriverDuty(driver.id)}
+                                className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shrink-0 cursor-pointer transition-all"
+                                title="Driver is OFFLINE. Click to toggle Online."
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                                OFFLINE
+                              </button>
+                            )}
                             <span className="text-[10px] font-bold text-amber-400 flex items-center gap-0.5 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full shrink-0">
                               ★ {driver.rating || 4.95}
                             </span>
@@ -479,6 +546,22 @@ export default function AdminUsersTab({
                       <Phone className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Call</span>
                     </a>
+
+                    {onToggleDriverDuty && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleDriverDuty(driver.id)}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shrink-0 cursor-pointer ${
+                          driver.isOnline !== false
+                            ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                        }`}
+                        title={driver.isOnline !== false ? "Toggle Anna duty to Offline" : "Toggle Anna duty to Online"}
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                        <span className="hidden xl:inline">{driver.isOnline !== false ? 'Set Offline' : 'Set Online'}</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {

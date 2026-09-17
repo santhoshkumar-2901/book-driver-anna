@@ -32,11 +32,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "https://generativelanguage.googleapis.com", "https:"]
+      imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com"],
+      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "https://generativelanguage.googleapis.com"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -118,7 +118,11 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Initialize DB seed
-seedDatabase().catch((err) => console.error('[SEED ERROR]', err.message));
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_SEED !== 'true') {
+  console.log('[SEED] Skipping database seed in production (set ALLOW_DB_SEED=true to override)');
+} else {
+  seedDatabase().catch((err) => console.error('[SEED ERROR]', err.message));
+}
 
 // Start HTTP Server if run directly (and not in test or Vercel serverless environment)
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {

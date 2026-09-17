@@ -20,6 +20,10 @@ export default {
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+      },
+      spacing: {
+        '15': '3.75rem',
+        '18': '4.5rem',
       }
     },
   },

@@ -7,7 +7,7 @@ import { toDDMMYYYY, toYYYYMMDD, getTodayDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
 
-export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal }) {
+export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal, onRequireAuth }) {
   useScrollLock(isOpen);
 
   // Service Type: 'driver', 'vehicle', or 'class'
@@ -259,34 +259,13 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
         : (bookingCategory === 'vehicle' ? "Manjunath Gowda (Assigned Vehicle Captain)" : "Manjunath Gowda (Assigned Driver)")
     };
 
-    // Send WhatsApp notification with all details directly to Admin's registered WhatsApp number
-    const adminPhone = (localStorage.getItem('bda_admin_phone') || '+91 98860 12345').replace(/[^0-9]/g, '');
-    let specsText = '';
-    if (bookingCategory === 'vehicle') {
-      specsText = `👥 *Passengers:* ${passengerCount} Passenger(s)\n` +
-        `💼 *Luggage:* ${luggageCount ? luggageCount + ' Bag(s)' : 'No Luggage'}\n` +
-        `❄️ *Vehicle Preference:* ${acPreference}\n`;
-    } else if (bookingCategory === 'class') {
-      const cls = DRIVING_CLASSES.find(c => c.id === selectedClassId) || DRIVING_CLASSES[0];
-      specsText = `🎓 *Course:* ${cls.name} (${cls.duration})\n` +
-        `🚗 *Training Vehicle:* ${classTrainingCar}\n` +
-        `⚙️ *Transmission:* ${classTransmission}\n` +
-        `⏰ *Daily Batch Slot:* ${classTimeSlot}\n`;
+    // If client is not logged in, intercept at confirmation and prompt login/signup
+    if (!clientUser && onRequireAuth) {
+      onRequireAuth(bookingDetails);
+      setIsSubmitting(false);
+      onClose();
+      return;
     }
-
-    const adminMessage = `🚖 *NEW CLIENT BOOKING CONFIRMED* 🚖\n\n` +
-      `📌 *Booking Ref:* ${bookingId}\n` +
-      `👤 *Customer Name:* ${customerName}\n` +
-      `📞 *Customer Phone:* ${customerPhone}\n` +
-      `🚕 *Service Required:* ${serviceName}\n` +
-      `📍 *Pickup Area:* ${pickupArea}\n` +
-      (bookingCategory !== 'class' ? `🏁 *Drop Location:* ${dropLocation}\n` : '') +
-      specsText +
-      `📅 *Start Date & Time:* ${toDDMMYYYY(bookingDate)} at ${bookingTime}\n` +
-      `💰 *Total Estimated Fare:* ₹${fareInfo.total}\n\n` +
-      `Please log into the Admin Dashboard to assign instructor/driver & confirm!`;
-
-    window.open(`https://api.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(adminMessage)}`, '_blank');
 
     onBookingComplete(bookingDetails);
     resetForm();

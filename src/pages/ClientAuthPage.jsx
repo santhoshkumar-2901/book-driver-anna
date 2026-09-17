@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Car, ShieldCheck, MapPin, Lock, Mail, Phone, User,
   Eye, EyeOff, ArrowRight, CheckCircle2, AlertCircle, Sparkles,
-  LogIn, UserPlus, Check
+  LogIn, UserPlus, Check, X
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
+import { useScrollLock } from '../utils/useScrollLock';
 
 // Default seeded demo clients for instant testing
 const DEFAULT_REGISTERED_CLIENTS = [
@@ -34,20 +35,27 @@ export default function ClientAuthPage({
   initialMode = 'login',
   onLoginSuccess,
   onChangeRole,
-  onSwitchMode
+  onSwitchMode,
+  isModal = false,
+  onClose,
+  bookingBanner = null,
+  prefillData = {},
+  onBackToHome = null
 }) {
+  useScrollLock(isModal);
+
   const [authMode, setAuthMode] = useState(initialMode); // 'login' or 'signup'
 
   // Login Form States
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // email or phone
+  const [loginIdentifier, setLoginIdentifier] = useState(prefillData?.phone || prefillData?.email || ''); // email or phone
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
   // Signup Form States
-  const [signupName, setSignupName] = useState('');
-  const [signupPhone, setSignupPhone] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupArea, setSignupArea] = useState('Indiranagar');
+  const [signupName, setSignupName] = useState(prefillData?.name || '');
+  const [signupPhone, setSignupPhone] = useState(prefillData?.phone || '');
+  const [signupEmail, setSignupEmail] = useState(prefillData?.email || '');
+  const [signupArea, setSignupArea] = useState(prefillData?.area || 'Indiranagar');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
@@ -67,14 +75,14 @@ export default function ClientAuthPage({
   const signupPasswordRef = React.useRef(null);
   const signupConfirmPasswordRef = React.useRef(null);
 
-  // Clear all previous input information from login and signup forms
+  // Clear or sync input information from login and signup forms
   const resetForm = () => {
-    setLoginIdentifier('');
+    setLoginIdentifier(prefillData?.phone || prefillData?.email || '');
     setLoginPassword('');
-    setSignupName('');
-    setSignupPhone('');
-    setSignupEmail('');
-    setSignupArea('Indiranagar');
+    setSignupName(prefillData?.name || '');
+    setSignupPhone(prefillData?.phone || '');
+    setSignupEmail(prefillData?.email || '');
+    setSignupArea(prefillData?.area || 'Indiranagar');
     setSignupPassword('');
     setSignupConfirmPassword('');
     setAgreeTerms(true);
@@ -82,16 +90,16 @@ export default function ClientAuthPage({
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (loginIdentifierRef.current) loginIdentifierRef.current.value = '';
+    if (loginIdentifierRef.current) loginIdentifierRef.current.value = prefillData?.phone || prefillData?.email || '';
     if (loginPasswordRef.current) loginPasswordRef.current.value = '';
-    if (signupNameRef.current) signupNameRef.current.value = '';
-    if (signupPhoneRef.current) signupPhoneRef.current.value = '';
-    if (signupEmailRef.current) signupEmailRef.current.value = '';
+    if (signupNameRef.current) signupNameRef.current.value = prefillData?.name || '';
+    if (signupPhoneRef.current) signupPhoneRef.current.value = prefillData?.phone || '';
+    if (signupEmailRef.current) signupEmailRef.current.value = prefillData?.email || '';
     if (signupPasswordRef.current) signupPasswordRef.current.value = '';
     if (signupConfirmPasswordRef.current) signupConfirmPasswordRef.current.value = '';
   };
 
-  // Sync mode from URL or prop changes and wipe all previous input info on visit/revisit
+  // Sync mode from URL or prop changes and sync input info on visit/revisit
   useEffect(() => {
     setAuthMode(initialMode);
     resetForm();
@@ -107,9 +115,8 @@ export default function ClientAuthPage({
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      resetForm();
     };
-  }, [initialMode]);
+  }, [initialMode, prefillData]);
 
   // Seed default registered clients if not present
   useEffect(() => {
@@ -451,60 +458,44 @@ export default function ClientAuthPage({
     }, 700);
   };
 
-  return (
-    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-amber-400 selection:text-slate-950 max-w-full">
+  const cardElement = (
+    <div className="w-full max-w-md my-auto">
+      {/* Card Wrapper */}
+      <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300 relative">
 
-      {/* Background Ambience & Grid */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
-
-      {/* Top Header Bar */}
-      <header className="relative z-10 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0 gap-2">
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
-            <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">
-              Book Driver <span className="text-amber-400">Anna</span>
-            </div>
-            <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
-              <MapPin className="w-2.5 h-2.5 text-red-400 inline shrink-0" /> Namma Bengaluru Services
-            </p>
-          </div>
-        </div>
-
-        {onChangeRole && (
+        {/* Modal Close Button */}
+        {isModal && onClose && (
           <button
             type="button"
-            onClick={() => {
-              resetForm();
-              onChangeRole();
-            }}
-            className="text-[10px] sm:text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
+            onClick={onClose}
+            className="absolute top-3.5 right-3.5 text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer z-20"
+            aria-label="Close"
           >
-            <span>← Role</span>
+            <X className="w-4 h-4" />
           </button>
         )}
-      </header>
 
-      {/* Central Auth Container */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
-        <div className="w-full max-w-md my-auto">
+        {/* Booking Notification Banner if prompted from booking */}
+        {bookingBanner && (
+          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Please sign in or register to complete your <strong>{bookingBanner}</strong> booking!</span>
+          </div>
+        )}
 
-          {/* Card Wrapper */}
-          <div className="bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300">
-
-            {/* Header / Mode Switcher */}
-            <div className="text-center space-y-1 mb-3">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
-                {authMode === 'login' ? 'Sign In to Your Account' : 'Create Client Account'}
+        {/* Header / Services Text */}
+        <div className="text-center space-y-2 mb-3.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[11px] sm:text-xs font-bold tracking-wide">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Book a Driver • Rent a Vehicle • Book a Driving Class</span>
+          </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
+                {authMode === 'login' ? 'Customer Sign In' : 'Create Customer Account'}
               </h1>
-              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
                 {authMode === 'login'
-                  ? 'Access verified drivers, vehicle rentals & driving classes across Bengaluru.'
-                  : 'Join thousands of Bengalureans enjoying stress-free rides and doorstep classes.'}
+                  ? 'Sign in to your account to book verified private drivers, rent fleet vehicles, or schedule doorstep driving classes across Bengaluru.'
+                  : 'Join Book Driver Anna to hire trusted car drivers, rent vehicles with zero hassle, or learn to drive with verified instructors.'}
               </p>
             </div>
 
@@ -871,13 +862,68 @@ export default function ClientAuthPage({
           </div>
 
         </div>
+  );
+
+  if (isModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div 
+          className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
+          onClick={onClose}
+        />
+        <div className="relative z-10 w-full max-w-md my-auto animate-in zoom-in-95 duration-150">
+          {cardElement}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-amber-400 selection:text-slate-950 max-w-full">
+      {/* Background Ambience & Grid */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
+
+      {/* Top Header Bar */}
+      <header className="relative z-10 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0 gap-2">
+        <div 
+          onClick={onBackToHome}
+          className={`flex items-center gap-2 sm:gap-2.5 min-w-0 ${onBackToHome ? 'cursor-pointer hover:opacity-90' : ''}`}
+        >
+          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
+            <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">
+              Book Driver <span className="text-amber-400">Anna</span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
+              <MapPin className="w-2.5 h-2.5 text-red-400 inline shrink-0" /> Namma Bengaluru Services
+            </p>
+          </div>
+        </div>
+
+        {onBackToHome && (
+          <button
+            type="button"
+            onClick={onBackToHome}
+            className="flex items-center gap-1 text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+          >
+            <span>← Back to Website</span>
+          </button>
+        )}
+      </header>
+
+      {/* Central Auth Container */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
+        {cardElement}
       </main>
 
       {/* Footer copyright */}
       <footer className="relative z-10 py-1.5 sm:py-2 text-center text-[10px] sm:text-xs text-slate-500 border-t border-slate-900 shrink-0">
         © {new Date().getFullYear()} Book Driver Anna. All rights reserved. • Serving all 28 Bengaluru assembly segments.
       </footer>
-
     </div>
   );
 }

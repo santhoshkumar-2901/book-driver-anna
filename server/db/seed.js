@@ -3,6 +3,14 @@ import { queryOne, execute, isTiDB } from './database.js';
 
 export async function seedDatabase() {
   try {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowSeed = process.env.ALLOW_DB_SEED === 'true';
+
+    if (isProduction && !allowSeed) {
+      console.log('[SEED] Production environment detected. Automatic database seeding skipped (set ALLOW_DB_SEED=true to override).');
+      return;
+    }
+
     const existingUsers = await queryOne('SELECT COUNT(*) as count FROM users');
     const userCount = Number(existingUsers?.count ?? existingUsers?.COUNT ?? (existingUsers ? Object.values(existingUsers)[0] : 0));
     if (userCount > 0) {

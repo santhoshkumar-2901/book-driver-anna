@@ -806,10 +806,28 @@ export default function AdminPage({ onReturnToClient }) {
       }
     };
 
+    const handleDriverStatusSync = (e) => {
+      if (e?.detail) {
+        const { driverId, phone, isOnline } = e.detail;
+        setRegisteredDrivers(prev => {
+          const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+          return prev.map(d => {
+            const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+            if ((driverId && d.id === driverId) || (cleanPhone && dPhone && (dPhone === cleanPhone || dPhone.includes(cleanPhone) || cleanPhone.includes(dPhone)))) {
+              return { ...d, isOnline };
+            }
+            return d;
+          });
+        });
+      }
+      loadBookingsFromStorage();
+    };
+
     window.addEventListener('bda_booking_updated', loadBookingsFromStorage);
     window.addEventListener('bda_order_created', loadBookingsFromStorage);
     window.addEventListener('bda_client_registered', loadBookingsFromStorage);
     window.addEventListener('bda_driver_registered', loadBookingsFromStorage);
+    window.addEventListener('bda_driver_status_updated', handleDriverStatusSync);
     window.addEventListener('storage', loadBookingsFromStorage);
 
     return () => {
@@ -817,6 +835,7 @@ export default function AdminPage({ onReturnToClient }) {
       window.removeEventListener('bda_order_created', loadBookingsFromStorage);
       window.removeEventListener('bda_client_registered', loadBookingsFromStorage);
       window.removeEventListener('bda_driver_registered', loadBookingsFromStorage);
+      window.removeEventListener('bda_driver_status_updated', handleDriverStatusSync);
       window.removeEventListener('storage', loadBookingsFromStorage);
     };
   }, []);
@@ -1409,6 +1428,7 @@ export default function AdminPage({ onReturnToClient }) {
       rating: 5.0,
       trips: 0,
       status: 'Active',
+      isOnline: true,
       createdAt: new Date().toISOString().split('T')[0]
     };
 
@@ -1424,6 +1444,29 @@ export default function AdminPage({ onReturnToClient }) {
     setNewDriverArea('Indiranagar');
     setNewDriverExperience('5 Years');
     setIsAddDriverModalOpen(false);
+  };
+
+  // Toggle Driver Online/Offline Duty Status directly from Admin
+  const handleToggleDriverDuty = (driverId) => {
+    setRegisteredDrivers(prev => {
+      const updated = prev.map(d => {
+        if (d.id === driverId) {
+          const newOnline = !(d.isOnline !== false);
+          return { ...d, isOnline: newOnline };
+        }
+        return d;
+      });
+      localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
+      const targetDriver = updated.find(d => d.id === driverId);
+      window.dispatchEvent(new CustomEvent('bda_driver_status_updated', {
+        detail: {
+          driverId,
+          phone: targetDriver?.phone,
+          isOnline: targetDriver?.isOnline
+        }
+      }));
+      return updated;
+    });
   };
 
   // Render Admin Authentication View if not logged in
@@ -1548,6 +1591,7 @@ export default function AdminPage({ onReturnToClient }) {
             userAreaFilter={userAreaFilter}
             setUserAreaFilter={setUserAreaFilter}
             handleOpenDeleteUserModal={handleOpenDeleteUserModal}
+            onToggleDriverDuty={handleToggleDriverDuty}
           />
         )}
       </main>

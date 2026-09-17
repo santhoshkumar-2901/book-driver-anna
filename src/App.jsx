@@ -1,15 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
-import ServicesPage from './pages/ServicesPage';
-import AboutPage from './pages/AboutPage';
-import ContactPage from './pages/ContactPage';
-import AdminPage from './pages/AdminPage';
-import ClientAuthPage from './pages/ClientAuthPage';
-import DriverAuthPage from './pages/DriverAuthPage';
-import DriverPortalPage from './pages/DriverPortalPage';
-import RoleSelectGate from './components/RoleSelectGate';
+
+// Lazy-loaded route-level pages for production bundle code-splitting
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const ClientAuthPage = lazy(() => import('./pages/ClientAuthPage'));
+const DriverAuthPage = lazy(() => import('./pages/DriverAuthPage'));
+const DriverPortalPage = lazy(() => import('./pages/DriverPortalPage'));
+
+function RouteLoadingFallback() {
+  return (
+    <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 space-y-3">
+      <div className="w-9 h-9 border-3 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
+      <p className="text-xs text-slate-400 font-medium tracking-wide">Loading page...</p>
+    </div>
+  );
+}
 import BookingModal from './components/BookingModal';
 import BookingSuccessModal from './components/BookingSuccessModal';
 import DriverSpotlightModal from './components/DriverSpotlightModal';
@@ -19,6 +29,7 @@ import Chatbot from './components/Chatbot';
 import RidePaymentModal from './components/RidePaymentModal';
 import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
+import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
 import { apiClient } from './services/apiClient';
 
 /**
@@ -30,7 +41,7 @@ import { apiClient } from './services/apiClient';
  */
 export function resolveRoute(pathname = '') {
   if (!pathname || typeof pathname !== 'string') {
-    return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+    return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
   }
 
   const clean = pathname.trim().replace(/\/+$/, '') || '/';
@@ -41,38 +52,35 @@ export function resolveRoute(pathname = '') {
   if (clean === '/driver/signup') {
     return { role: 'driver', page: 'driver-signup', authRole: 'driver', resetAuth: true };
   }
-  if (clean === '/driver/login') {
+  if (clean === '/driver/login' || clean === '/driver-auth') {
     return { role: 'driver', page: 'driver-login', authRole: 'driver', resetAuth: true };
   }
-  if (clean === '/driver-auth') {
-    return { role: 'driver', page: 'driver-auth', authRole: 'driver', resetAuth: true };
-  }
-  if (clean === '/driver/portal' || clean === '/driver' || clean === '/driver-portal') {
+  if (clean === '/driver/portal' || clean === '/driver-portal') {
     return { role: 'driver', page: 'driver-portal', authRole: 'driver', resetAuth: false };
+  }
+  if (clean === '/driver') {
+    return { role: 'driver', page: 'driver-login', authRole: 'driver', resetAuth: true };
   }
   if (clean === '/signup') {
     return { role: 'client', page: 'signup', authRole: 'user', resetAuth: true };
   }
-  if (clean === '/login') {
+  if (clean === '/login' || clean === '/client-auth') {
     return { role: 'client', page: 'login', authRole: 'user', resetAuth: true };
   }
-  if (clean === '/client-auth') {
-    return { role: 'client', page: 'client-auth', authRole: 'user', resetAuth: true };
-  }
   if (clean === '/services') {
-    return { role: 'client', page: 'services', authRole: null, resetAuth: false };
+    return { role: 'client', page: 'services', authRole: 'user', resetAuth: false };
   }
   if (clean === '/about') {
-    return { role: 'client', page: 'about', authRole: null, resetAuth: false };
+    return { role: 'client', page: 'about', authRole: 'user', resetAuth: false };
   }
   if (clean === '/contact') {
-    return { role: 'client', page: 'contact', authRole: null, resetAuth: false };
+    return { role: 'client', page: 'contact', authRole: 'user', resetAuth: false };
   }
   if (clean === '/') {
-    return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+    return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
   }
 
-  return { role: 'client', page: 'home', authRole: null, resetAuth: false };
+  return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
 }
 
 /**
@@ -157,6 +165,10 @@ export default function App() {
         window.history.pushState({}, '', '/admin/dashboard');
       }
       setAuthSessionKey(k => k + 1);
+    } else if (newPage === 'driver') {
+      setSelectedRole('driver');
+      window.history.pushState({}, '', '/driver');
+      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'driver-signup') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/signup');
@@ -176,10 +188,6 @@ export default function App() {
       setSelectedRole('user');
       window.history.pushState({}, '', '/login');
       setAuthSessionKey(k => k + 1);
-    } else if (newPage === 'role-select') {
-      setSelectedRole(null);
-      window.history.pushState({}, '', '/');
-      setAuthSessionKey(k => k + 1);
     } else if (newPage === 'services') {
       window.history.pushState({}, '', '/services');
     } else if (newPage === 'about') {
@@ -193,27 +201,62 @@ export default function App() {
     }
   };
 
-  const handleSelectRole = (role, mode = 'login') => {
-    setSelectedRole(role);
-    setAuthSessionKey(k => k + 1);
-    if (role === 'driver') {
-      changePage(mode === 'signup' ? 'driver-signup' : 'driver-login');
-    } else {
-      changePage(mode === 'signup' ? 'signup' : 'login');
-    }
-  };
-
-  const handleChangeRole = () => {
-    setSelectedRole(null);
-    setAuthSessionKey(k => k + 1);
-    changePage('role-select');
-  };
+  // State to prompt auth after customer completes booking while unauthenticated
+  const [isPostBookingPromptOpen, setIsPostBookingPromptOpen] = useState(false);
+  const [postBookingPromptInfo, setPostBookingPromptInfo] = useState(null);
+  const [pendingBookingSubmission, setPendingBookingSubmission] = useState(null);
 
   const handleClientLoginSuccess = (userData) => {
     setClientUser(userData);
     setSelectedRole('user');
     setAuthSessionKey(k => k + 1);
-    changePage('home');
+    setIsPostBookingPromptOpen(false);
+
+    // If customer was in the middle of confirming a booking or enrollment, finalize it now!
+    if (pendingBookingSubmission) {
+      const submission = pendingBookingSubmission;
+      setPendingBookingSubmission(null);
+
+      if (submission.kind === 'booking') {
+        const finalBooking = {
+          ...submission.bookingDetails,
+          userId: userData.id || null,
+          customerName: submission.bookingDetails.customerName || userData.name || '',
+          customerPhone: submission.bookingDetails.customerPhone || userData.phone || '',
+          customerEmail: submission.bookingDetails.customerEmail || userData.email || '',
+          status: 'Confirmed'
+        };
+
+        // Close the booking modal, return to home, and complete the booking as Confirmed
+        setIsBookingModalOpen(false);
+        changePage('home');
+        handleBookingComplete(finalBooking);
+      } else if (submission.kind === 'enrollment') {
+        if (submission.callback) {
+          submission.callback(userData);
+        }
+        changePage('home');
+        const classPass = {
+          bookingId: submission.enrollmentData.enrollmentId,
+          bookingType: 'class',
+          serviceName: `Car Driving Academy Enrollment (${submission.enrollmentData.gearPreference || 'Manual'})`,
+          category: 'Driving Class',
+          tripSummary: `${submission.enrollmentData.gearPreference || 'Comprehensive'} Driving Course • Slot: ${submission.enrollmentData.preferredTime || 'Morning'}`,
+          pickupArea: submission.enrollmentData.pickupLocation || submission.enrollmentData.address || 'Bengaluru',
+          customerName: userData.name || submission.enrollmentData.fullName,
+          customerPhone: userData.phone || submission.enrollmentData.mobileNumber,
+          customerEmail: userData.email || submission.enrollmentData.emailAddress,
+          date: submission.enrollmentData.preferredStartDate || new Date().toISOString().split('T')[0],
+          time: submission.enrollmentData.preferredTime === 'Morning' ? '07:00 AM' : (submission.enrollmentData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
+          totalFare: 5999,
+          status: 'Confirmed',
+          assignedAnna: 'Syed Nizamuddin (Certified Driving Instructor Anna)'
+        };
+        setActiveBookingPass(classPass);
+      }
+    } else if (activePage === 'login' || activePage === 'signup') {
+      changePage('home');
+    }
   };
 
   const handleClientLogout = async () => {
@@ -223,9 +266,9 @@ export default function App() {
     localStorage.removeItem('bda_client_user');
     sessionStorage.removeItem('bda_client_user');
     setClientUser(null);
-    setSelectedRole(null);
+    setSelectedRole('user');
     setAuthSessionKey(k => k + 1);
-    changePage('role-select');
+    changePage('home');
   };
 
   const handleDriverLoginSuccess = (driverData) => {
@@ -242,11 +285,11 @@ export default function App() {
     localStorage.removeItem('bda_driver_user');
     sessionStorage.removeItem('bda_driver_user');
     setDriverUser(null);
-    setSelectedRole(null);
+    setSelectedRole('driver');
     setAuthSessionKey(k => k + 1);
-    changePage('role-select');
+    changePage('driver-login');
   };
-  
+
   // Booking modal states
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingModalType, setBookingModalType] = useState('driver'); // 'driver' or 'vehicle'
@@ -366,6 +409,77 @@ export default function App() {
     setIsBookingModalOpen(true);
   };
 
+  // Prompt login or signup after customer books while unauthenticated
+  const handleRequireAuthForBooking = (bookingDetails) => {
+    // Explicitly close the booking modal so it is NOT open or scrolling behind the prompt!
+    setIsBookingModalOpen(false);
+
+    const serviceTitle = bookingDetails.bookingType === 'class'
+      ? 'Driving Class'
+      : bookingDetails.bookingType === 'vehicle'
+      ? 'Rental Vehicle'
+      : 'Personal Driver Anna';
+
+    setPendingBookingSubmission({
+      kind: 'booking',
+      serviceTitle,
+      bookingDetails: {
+        ...bookingDetails,
+        status: 'Confirmed'
+      }
+    });
+    setPostBookingPromptInfo({
+      bookingId: bookingDetails.bookingId,
+      serviceTitle,
+      customerName: bookingDetails.customerName
+    });
+    setIsPostBookingPromptOpen(true);
+  };
+
+  const handleRequireAuthForEnrollment = (enrollmentData, callback) => {
+    // Explicitly close the enrollment modal so it is NOT open or scrolling behind the prompt!
+    setIsEnrollmentModalOpen(false);
+
+    setPendingBookingSubmission({
+      kind: 'enrollment',
+      serviceTitle: 'Driving Class Enrollment',
+      enrollmentData,
+      callback
+    });
+    setPostBookingPromptInfo({
+      bookingId: enrollmentData.enrollmentId,
+      serviceTitle: 'Driving Class Enrollment',
+      customerName: enrollmentData.fullName
+    });
+    setIsPostBookingPromptOpen(true);
+  };
+
+  const handleChooseLoginAfterBooking = () => {
+    setIsPostBookingPromptOpen(false);
+    changePage('login');
+  };
+
+  const handleChooseSignupAfterBooking = () => {
+    setIsPostBookingPromptOpen(false);
+    changePage('signup');
+  };
+
+  const handleContinueAsGuestAfterBooking = () => {
+    setIsPostBookingPromptOpen(false);
+    if (!pendingBookingSubmission) return;
+
+    if (pendingBookingSubmission.kind === 'booking') {
+      const b = pendingBookingSubmission.bookingDetails;
+      setIsBookingModalOpen(false);
+      handleBookingComplete(b);
+    } else if (pendingBookingSubmission.kind === 'enrollment') {
+      if (pendingBookingSubmission.callback) {
+        pendingBookingSubmission.callback(null);
+      }
+    }
+    setPendingBookingSubmission(null);
+  };
+
   // Redirect authenticated users away from auth pages
   useEffect(() => {
     if (clientUser && (activePage === 'login' || activePage === 'signup')) {
@@ -403,7 +517,7 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '07:00 AM',
         fare: bookingDetails.totalFare || 5999,
-        status: 'Pending',
+        status: 'Confirmed',
         assignedDriver: 'Syed Nizamuddin',
         assignedDriverPhone: '+91 98860 54321',
         bookedAt: 'Just Now'
@@ -432,7 +546,7 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 1999,
-        status: 'Pending',
+        status: 'Confirmed',
         vehicleRegNumber: 'Unassigned',
         bookedAt: 'Just Now'
       };
@@ -459,8 +573,8 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 349,
-        status: 'Pending',
-        assignedDriver: '',
+        status: 'Confirmed',
+        assignedDriver: bookingDetails.assignedAnna || 'Manjunath Gowda (Assigned Driver)',
         bookedAt: 'Just Now'
       };
 
@@ -489,85 +603,76 @@ export default function App() {
   if (activePage === 'admin') {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
-        <AdminPage 
-          key={`admin-page-${authSessionKey}`}
-          onReturnToClient={() => changePage(clientUser ? 'home' : (driverUser ? 'driver-portal' : 'role-select'))} 
-        />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AdminPage 
+            key={`admin-page-${authSessionKey}`}
+            onReturnToClient={() => changePage(clientUser ? 'home' : 'login')} 
+          />
+        </Suspense>
       </div>
     );
   }
 
   // 2. Dedicated layout for Driver Portal (for logged in drivers or /driver/portal)
-  if (driverUser && (activePage === 'driver-portal' || (!clientUser && activePage !== 'home' && activePage !== 'services' && activePage !== 'about' && activePage !== 'contact'))) {
+  if (driverUser && (activePage === 'driver-portal' || activePage === 'driver')) {
     return (
-      <DriverPortalPage 
-        driverUser={driverUser}
-        onLogout={handleDriverLogout}
-        onGoToCustomerSite={() => {
-          setSelectedRole('user');
-          changePage('home');
-        }}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <DriverPortalPage 
+          driverUser={driverUser}
+          onLogout={handleDriverLogout}
+        />
+      </Suspense>
     );
   }
 
-  // 3. Driver Auth Pages (/driver/login, /driver/signup, /driver-auth)
-  if (activePage === 'driver-login' || activePage === 'driver-signup' || activePage === 'driver-auth') {
+  // 3. Driver Auth Pages (/driver, /driver/login, /driver/signup, /driver-auth)
+  if (activePage === 'driver' || activePage === 'driver-login' || activePage === 'driver-signup' || activePage === 'driver-auth') {
     return (
-      <DriverAuthPage 
-        key={`${activePage}-${authSessionKey}`}
-        initialMode={activePage === 'driver-signup' ? 'signup' : 'login'}
-        onLoginSuccess={handleDriverLoginSuccess}
-        onChangeRole={handleChangeRole}
-        onSwitchMode={(mode) => changePage(mode === 'signup' ? 'driver-signup' : 'driver-login')}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <DriverAuthPage 
+          key={`${activePage}-${authSessionKey}`}
+          initialMode={activePage === 'driver-signup' ? 'signup' : 'login'}
+          onLoginSuccess={handleDriverLoginSuccess}
+          onSwitchMode={(mode) => changePage(mode === 'signup' ? 'driver-signup' : 'driver-login')}
+        />
+      </Suspense>
     );
   }
 
   // 4. Client Auth Pages (/login, /signup, /client-auth)
   if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth') {
     return (
-      <ClientAuthPage 
-        key={`${activePage}-${authSessionKey}`}
-        initialMode={activePage === 'signup' ? 'signup' : 'login'}
-        onLoginSuccess={handleClientLoginSuccess}
-        onChangeRole={handleChangeRole}
-        onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
-      />
-    );
-  }
-
-  // 5. If unauthenticated, gate with Role Choice or chosen role's auth
-  if (!clientUser) {
-    if (selectedRole === 'driver') {
-      return (
-        <DriverAuthPage 
-          key={`driver-role-${activePage}-${authSessionKey}`}
-          initialMode="login"
-          onLoginSuccess={handleDriverLoginSuccess}
-          onChangeRole={handleChangeRole}
-          onSwitchMode={(mode) => changePage(mode === 'signup' ? 'driver-signup' : 'driver-login')}
-        />
-      );
-    }
-
-    if (selectedRole === 'user') {
-      return (
+      <Suspense fallback={<RouteLoadingFallback />}>
         <ClientAuthPage 
-          key={`user-role-${activePage}-${authSessionKey}`}
-          initialMode="login"
+          key={`${activePage}-${authSessionKey}`}
+          initialMode={activePage === 'signup' ? 'signup' : 'login'}
           onLoginSuccess={handleClientLoginSuccess}
-          onChangeRole={handleChangeRole}
           onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
+          onBackToHome={() => changePage('home')}
+          bookingBanner={
+            pendingBookingSubmission?.serviceTitle 
+              ? `Your booking for ${pendingBookingSubmission.serviceTitle} is saved! Please ${activePage === 'signup' ? 'create an account' : 'sign in'} to confirm & access your pass.`
+              : null
+          }
+          prefillData={
+            pendingBookingSubmission?.bookingDetails
+              ? {
+                  name: pendingBookingSubmission.bookingDetails.customerName,
+                  phone: pendingBookingSubmission.bookingDetails.customerPhone,
+                  email: pendingBookingSubmission.bookingDetails.customerEmail,
+                  area: pendingBookingSubmission.bookingDetails.pickupArea
+                }
+              : pendingBookingSubmission?.enrollmentData
+              ? {
+                  name: pendingBookingSubmission.enrollmentData.fullName,
+                  phone: pendingBookingSubmission.enrollmentData.mobileNumber,
+                  email: pendingBookingSubmission.enrollmentData.emailAddress,
+                  area: pendingBookingSubmission.enrollmentData.pickupLocation
+                }
+              : {}
+          }
         />
-      );
-    }
-
-    // Default unauthenticated gate: ask whether visitor wants to be User or Driver!
-    return (
-      <RoleSelectGate 
-        onSelectRole={handleSelectRole}
-      />
+      </Suspense>
     );
   }
 
@@ -583,6 +688,9 @@ export default function App() {
         clientUser={clientUser}
         onLogout={handleClientLogout}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenAuth={(mode = 'login') => {
+          changePage(mode === 'signup' ? 'signup' : 'login');
+        }}
       />
 
       {/* Main Dynamic View */}
@@ -597,23 +705,25 @@ export default function App() {
           />
         )}
 
-        {activePage === 'services' && (
-          <ServicesPage 
-            openBookingModal={openBookingModal} 
-          />
-        )}
+        <Suspense fallback={<RouteLoadingFallback />}>
+          {activePage === 'services' && (
+            <ServicesPage 
+              openBookingModal={openBookingModal} 
+            />
+          )}
 
-        {activePage === 'about' && (
-          <AboutPage 
-            openBookingModal={openBookingModal} 
-          />
-        )}
+          {activePage === 'about' && (
+            <AboutPage 
+              openBookingModal={openBookingModal} 
+            />
+          )}
 
-        {activePage === 'contact' && (
-          <ContactPage 
-            openBookingModal={openBookingModal} 
-          />
-        )}
+          {activePage === 'contact' && (
+            <ContactPage 
+              openBookingModal={openBookingModal} 
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Footer */}
@@ -634,6 +744,7 @@ export default function App() {
         initialData={bookingModalData}
         onBookingComplete={handleBookingComplete}
         onOpenEnrollmentModal={openEnrollmentModal}
+        onRequireAuth={handleRequireAuthForBooking}
       />
 
       {/* Professional Car Driving Class Enrollment Modal */}
@@ -641,6 +752,8 @@ export default function App() {
         isOpen={isEnrollmentModalOpen}
         onClose={() => setIsEnrollmentModalOpen(false)}
         initialData={enrollmentModalData}
+        clientUser={clientUser}
+        onRequireAuth={handleRequireAuthForEnrollment}
       />
 
       {/* Booking Success Confirmation Modal */}
@@ -709,6 +822,15 @@ export default function App() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleClientLogout}
         openBookingModal={openBookingModal}
+      />
+
+      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}
+      <PostBookingAuthPromptModal
+        isOpen={isPostBookingPromptOpen}
+        bookingInfo={postBookingPromptInfo}
+        onChooseLogin={handleChooseLoginAfterBooking}
+        onChooseSignup={handleChooseSignupAfterBooking}
+        onContinueAsGuest={handleContinueAsGuestAfterBooking}
       />
 
     </div>

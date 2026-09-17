@@ -14,7 +14,6 @@ const DEFAULT_DRIVERS = DEFAULT_REGISTERED_DRIVERS;
 export default function DriverAuthPage({ 
   initialMode = 'login', 
   onLoginSuccess, 
-  onChangeRole,
   onSwitchMode 
 }) {
   const [authMode, setAuthMode] = useState(initialMode);
@@ -298,18 +297,10 @@ export default function DriverAuthPage({
           </div>
         </div>
 
-        {onChangeRole && (
-          <button
-            type="button"
-            onClick={() => {
-              resetForm();
-              onChangeRole();
-            }}
-            className="text-[10px] sm:text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
-          >
-            <span>← Role</span>
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Partner Fleet</span>
+        </div>
       </header>
 
       {/* Central Auth Container */}
@@ -717,7 +708,6 @@ export default function DriverAuthPage({
 
               </form>
             )}
-
           </div>
 
           {/* Micro Trust Indicators */}
