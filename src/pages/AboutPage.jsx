@@ -45,12 +45,18 @@ export default function AboutPage({ openBookingModal }) {
         </div>
 
         <div className="lg:col-span-6">
-          <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900 aspect-[16/10]">
-            <img 
-              src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80" 
-              alt="Bengaluru Roads & Dispatch Operations" 
-              className="w-full h-full object-cover"
-            />
+          <div className="rounded-xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 aspect-[16/10] flex flex-col items-center justify-center p-8 text-center relative group">
+            {/* TODO: Add real operations photography */}
+            <div className="w-16 h-16 rounded-2xl bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-3 shadow-inner shadow-amber-400/10">
+              <Car className="w-8 h-8" />
+            </div>
+            <h4 className="text-white font-bold text-sm font-['Outfit']">Bengaluru Road & Fleet Telemetry</h4>
+            <p className="text-slate-400 text-xs mt-1 max-w-xs leading-relaxed">
+              Live automated dispatch routing covering 15+ zones across the Bengaluru metropolitan area.
+            </p>
+            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-[11px] text-amber-300 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live Central Dispatch Hub
+            </div>
           </div>
         </div>
       </div>

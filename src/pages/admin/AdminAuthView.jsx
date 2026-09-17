@@ -154,21 +154,7 @@ export default function AdminAuthView({
 
           </form>
 
-          {/* Quick Demo Credentials Footer */}
-          <div className="bg-slate-950 p-2.5 sm:p-3 rounded-2xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between gap-2 min-w-0">
-            <span className="truncate min-w-0">💡 Demo: <span className="text-white font-semibold">admin@bookdriveranna.com</span> / <span className="text-white font-semibold">admin123</span></span>
-            <button
-              type="button"
-              onClick={() => {
-                setInputsUnlocked(true);
-                setAuthEmail('admin@bookdriveranna.com');
-                setAuthPassword('admin123');
-              }}
-              className="text-amber-400 hover:text-amber-300 font-bold underline shrink-0 cursor-pointer"
-            >
-              Auto-fill
-            </button>
-          </div>
+
 
         </div>
 

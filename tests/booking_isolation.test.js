@@ -4,11 +4,50 @@ import { startTestServer } from './testHelper.js';
 
 describe('Booking Isolation: Demo Users vs New Users', () => {
   let server, baseUrl;
+  let existingUserToken;
+  let existingBookingId;
 
   before(async () => {
     const s = await startTestServer();
     server = s.server;
     baseUrl = s.baseUrl;
+
+    // 1. Create a customer fixture
+    const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Existing Customer Fixture',
+        email: `existing_fixture_${Date.now()}@example.com`,
+        phone: `+91 ${Math.floor(7000000000 + Math.random() * 2000000000)}`,
+        password: 'password123',
+        area: 'Indiranagar'
+      })
+    });
+    const regData = await regRes.json();
+    existingUserToken = regData.data.token;
+
+    // 2. Create an existing booking fixture for this customer
+    const bookRes = await fetch(`${baseUrl}/api/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${existingUserToken}`
+      },
+      body: JSON.stringify({
+        customerName: 'Existing Customer Fixture',
+        customerPhone: '+91 98765 43210',
+        customerEmail: 'existing_fixture@example.com',
+        bookingCategory: 'driver',
+        driverTripOption: 'one-way',
+        pickupArea: 'Indiranagar',
+        dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
+        date: '2026-10-05',
+        time: '06:30 AM'
+      })
+    });
+    const bookData = await bookRes.json();
+    existingBookingId = bookData.data.booking.id;
   });
 
   after(() => {
@@ -16,28 +55,15 @@ describe('Booking Isolation: Demo Users vs New Users', () => {
   });
 
   test('Demo user login returns exactly the seeded demo bookings', async () => {
-    // 1. Log in as Demo User Rahul Sharma
-    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        identifier: 'rahul.sharma@example.com',
-        password: 'password123'
-      })
-    });
-    assert.strictEqual(loginRes.status, 200);
-    const loginData = await loginRes.json();
-    const demoToken = loginData.data.token;
-
-    // 2. Query bookings for Demo User
+    // Query bookings for existing customer
     const bookingsRes = await fetch(`${baseUrl}/api/bookings/my`, {
-      headers: { 'Authorization': `Bearer ${demoToken}` }
+      headers: { 'Authorization': `Bearer ${existingUserToken}` }
     });
     assert.strictEqual(bookingsRes.status, 200);
     const bookingsData = await bookingsRes.json();
     assert.strictEqual(bookingsData.success, true);
-    assert.ok(bookingsData.data.bookings.length >= 1, 'Demo user should have demo bookings');
-    assert.strictEqual(bookingsData.data.bookings[0].id, 'BDA-DRV-9801');
+    assert.ok(bookingsData.data.bookings.length >= 1, 'User should have their booking');
+    assert.strictEqual(bookingsData.data.bookings[0].id, existingBookingId);
   });
 
   test('New user registration starts with exactly 0 bookings on default', async () => {

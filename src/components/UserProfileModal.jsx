@@ -10,47 +10,14 @@ import { useScrollLock } from '../utils/useScrollLock';
 import { toDDMMYYYY } from '../utils/dateUtils';
 import { apiClient } from '../services/apiClient';
 
-// Helper to determine if the active user is one of the pre-seeded demo accounts
+// Helper to determine if the active user is a demo account (neutralized in production)
 export const isDemoUser = (user) => {
   if (!user) return false;
-  const email = (user.email || '').toLowerCase().trim();
-  const id = (user.id || '').toUpperCase().trim();
-  
-  // Seeded demo IDs or emails
-  if (['CLI-901', 'CLI-902', 'USR-8821', 'USR-8822'].includes(id)) return true;
-  if (['rahul.sharma@example.com', 'priya@gmail.com'].includes(email)) return true;
-  if (user.isDemo === true) return true;
-
-  return false;
+  return user.isDemo === true;
 };
 
-// The two default bookings that strictly and exclusively appear ONLY on demo users
-export const DEFAULT_DEMO_BOOKINGS = [
-  {
-    id: 'BDA-DRV-9801',
-    serviceType: 'driver',
-    title: 'One Way Trip Driver',
-    category: 'Personal Driver',
-    date: '06/09/2026',
-    time: '09:00 AM',
-    pickup: 'Indiranagar',
-    drop: 'Kempegowda Intl Airport (BLR T1/T2)',
-    amount: '₹314',
-    status: 'Pending'
-  },
-  {
-    id: 'BDA-VEH-9802',
-    serviceType: 'vehicle',
-    title: 'Sedan Rental',
-    category: 'Car Rental',
-    date: 'Recent',
-    time: '10:30 AM',
-    pickup: 'Indiranagar',
-    drop: 'Koramangala 5th Block',
-    amount: '₹1,499',
-    status: 'Cancelled'
-  }
-];
+// Initial default bookings (empty in production; populated dynamically from bookings)
+export const DEFAULT_DEMO_BOOKINGS = [];
 
 // Set of demo booking IDs to exclude for any non-demo users
 const DEMO_BOOKING_IDS = new Set([

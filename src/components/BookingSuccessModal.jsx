@@ -115,18 +115,16 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
           {/* Driver/Instructor Card */}
           <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img 
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" 
-                alt="Instructor Anna" 
-                className="w-12 h-12 rounded-xl object-cover border-2 border-amber-400"
-              />
+              <div className="w-12 h-12 rounded-xl bg-amber-400/10 border-2 border-amber-400 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                <SteeringWheel className="w-6 h-6" />
+              </div>
               <div>
                 <div className="text-xs text-amber-400 font-bold flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" /> {booking.bookingType === 'class' ? 'Assigned Driving Instructor' : 'Assigned Driver Anna'}
                 </div>
-                <div className="text-sm font-extrabold text-white">{booking.assignedAnna || 'Manjunath Gowda'}</div>
+                <div className="text-sm font-extrabold text-white">{booking.assignedAnna || 'Driver Assigned on Dispatch'}</div>
                 <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> 4.98 Rating • Certified Instructor
+                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> {booking.driverRating || '5.0'} Rating • Certified Anna
                 </div>
               </div>
             </div>

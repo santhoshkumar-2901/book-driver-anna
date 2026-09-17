@@ -350,34 +350,6 @@ export default function App() {
     return () => window.removeEventListener('bda_ride_completed', handleRideCompleted);
   }, []);
 
-  const handleSimulateDemoRide = () => {
-    const demoRide = {
-      id: "BDA-UBR-" + Math.floor(1000 + Math.random() * 9000),
-      driverName: "Manjunath Gowda",
-      driverPhone: "+91 98860 12345",
-      driverRating: 4.98,
-      driverTrips: 3420,
-      carModel: "Honda City (White) • KA-04-ME-5432",
-      pickupArea: "Indiranagar 100 Feet Road",
-      dropLocation: "Kempegowda Intl Airport (BLR T1)",
-      distance: "38.2 km",
-      duration: "48 mins",
-      totalFare: 749
-    };
-    setPaymentRideData(demoRide);
-    setIsPaymentModalOpen(true);
-  };
-
-  const handleOpenRidePayment = () => {
-    if (activeRide) {
-      setPaymentRideData(activeRide);
-    } else {
-      handleSimulateDemoRide();
-      return;
-    }
-    setIsPaymentModalOpen(true);
-  };
-
   const openCancelModal = () => {
     setIsCancelModalOpen(true);
   };
@@ -574,7 +546,7 @@ export default function App() {
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 349,
         status: 'Confirmed',
-        assignedDriver: bookingDetails.assignedAnna || 'Manjunath Gowda (Assigned Driver)',
+        assignedDriver: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
         bookedAt: 'Just Now'
       };
 
@@ -587,15 +559,15 @@ export default function App() {
     // Set active ride for real-time tracking and post-ride fare settlement
     setActiveRide({
       id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
-      driverName: bookingDetails.assignedAnna || 'Manjunath Gowda',
-      driverPhone: '+91 98860 12345',
-      driverRating: 4.98,
-      carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Honda City • KA-04-ME-5432'),
-      pickupArea: bookingDetails.pickupArea || 'Indiranagar',
-      dropLocation: bookingDetails.dropLocation || 'Kempegowda Intl Airport (BLR T1)',
+      driverName: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
+      driverPhone: bookingDetails.driverPhone || '+91 80 2555 0199',
+      driverRating: 5.0,
+      carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
+      pickupArea: bookingDetails.pickupArea || 'Pickup Location',
+      dropLocation: bookingDetails.dropLocation || 'Drop Location',
       totalFare: bookingDetails.totalFare || 549,
-      distance: '22.4 km',
-      duration: '45 mins'
+      distance: bookingDetails.distance || 'City Route',
+      duration: bookingDetails.duration || 'Scheduled Duration'
     });
   };
 
@@ -763,15 +735,15 @@ export default function App() {
         onSimulateRidePayment={(booking) => {
           const rideForPayment = {
             id: booking.bookingId || booking.id,
-            driverName: booking.assignedAnna || "Manjunath Gowda",
-            driverPhone: "+91 98860 12345",
-            driverRating: 4.98,
-            carModel: "Honda City • KA-04-ME-5432",
-            pickupArea: booking.pickupArea || "Indiranagar",
-            dropLocation: booking.dropLocation || "Kempegowda Intl Airport",
-            distance: "21.6 km",
-            duration: "45 mins",
-            totalFare: booking.totalFare || 649
+            driverName: booking.assignedAnna || "Driver Assigned",
+            driverPhone: booking.driverPhone || "+91 80 2555 0199",
+            driverRating: 5.0,
+            carModel: booking.vehicleCategory || "Customer Vehicle",
+            pickupArea: booking.pickupArea || "Pickup Location",
+            dropLocation: booking.dropLocation || "Drop Location",
+            distance: booking.distance || "City Route",
+            duration: booking.duration || "Scheduled Trip",
+            totalFare: booking.totalFare || booking.fare || 499
           };
           setPaymentRideData(rideForPayment);
           setIsPaymentModalOpen(true);
@@ -801,7 +773,6 @@ export default function App() {
           setPaymentRideData(activeRide);
           setIsPaymentModalOpen(true);
         }}
-        onSimulateDemoRide={handleSimulateDemoRide}
       />
 
       {/* Post-Ride Digital Payment & Rating Modal */}

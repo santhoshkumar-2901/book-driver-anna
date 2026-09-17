@@ -13,6 +13,15 @@ export default function AdminDashboardTab({
   registeredDrivers,
   sendWhatsAppToClientForDriver
 }) {
+  const allBookings = [...(driverBookings || []), ...(vehicleBookings || []), ...(classEnrollments || [])];
+  const calculatedRevenue = allBookings.reduce((sum, b) => {
+    const rawVal = b.fare ?? b.totalFare ?? b.price ?? b.amount ?? 0;
+    const val = typeof rawVal === 'string' ? Number(rawVal.replace(/[^0-9.]/g, '')) : Number(rawVal);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+  const totalDriversCount = registeredDrivers ? registeredDrivers.length : 0;
+  const verifiedDriversCount = registeredDrivers ? registeredDrivers.filter(d => d.status === 'Approved' || d.status === 'Active' || d.status === 'Active / Verified').length : 0;
+
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
       
@@ -47,9 +56,9 @@ export default function AdminDashboardTab({
               <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">₹4,85,200</div>
+          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">₹{calculatedRevenue.toLocaleString('en-IN')}</div>
           <div className="text-[11px] sm:text-xs text-emerald-400 font-semibold flex items-center gap-1 truncate min-w-0">
-            <TrendingUp className="w-3.5 h-3.5 shrink-0" /> +14.2% this month
+            <TrendingUp className="w-3.5 h-3.5 shrink-0" /> Live Revenue
           </div>
         </div>
 
@@ -60,8 +69,8 @@ export default function AdminDashboardTab({
               <SteeringWheel className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">1,840</div>
-          <div className="text-[11px] sm:text-xs text-slate-400 truncate min-w-0">100% Police Verified</div>
+          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold text-white font-['Outfit'] truncate min-w-0">{totalDriversCount} Drivers</div>
+          <div className="text-[11px] sm:text-xs text-slate-400 truncate min-w-0">{verifiedDriversCount} Cleared for Duty</div>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2 shadow-sm min-w-0 overflow-hidden">

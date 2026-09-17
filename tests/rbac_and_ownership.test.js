@@ -1,34 +1,78 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { startTestServer } from './testHelper.js';
+import { bootstrapAdmin } from '../server/scripts/bootstrapAdmin.js';
 
 describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
   let server, baseUrl;
   let adminToken;
   let userToken;
+  let fixtureBookingId;
+  const fixtureCustomerPhone = `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`;
 
   before(async () => {
     const s = await startTestServer();
     server = s.server;
     baseUrl = s.baseUrl;
 
+    // 1. Create a dedicated Admin account via bootstrapAdmin
+    const adminEmail = `rbac_admin_${Date.now()}@bookdriveranna.com`;
+    const adminPhone = `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`;
+    const adminPassword = 'StrongAdminPass2026!';
+    await bootstrapAdmin({
+      email: adminEmail,
+      password: adminPassword,
+      name: 'RBAC Test Admin',
+      phone: adminPhone,
+      area: 'Indiranagar'
+    });
+
     // Login as Admin
     const adminRes = await fetch(`${baseUrl}/api/auth/admin-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'admin@bookdriveranna.com', password: 'admin123' })
+      body: JSON.stringify({ identifier: adminEmail, password: adminPassword })
     });
     const adminData = await adminRes.json();
     adminToken = adminData.data.token;
 
-    // Login as Customer
-    const userRes = await fetch(`${baseUrl}/api/auth/login`, {
+    // 2. Register Customer Fixture
+    const userEmail = `rbac_customer_${Date.now()}@example.com`;
+    const userRes = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'rahul.sharma@example.com', password: 'password123' })
+      body: JSON.stringify({
+        name: 'RBAC Customer Fixture',
+        email: userEmail,
+        phone: fixtureCustomerPhone,
+        password: 'password123',
+        area: 'Indiranagar'
+      })
     });
     const userData = await userRes.json();
     userToken = userData.data.token;
+
+    // 3. Create a Booking Fixture for this customer
+    const bookRes = await fetch(`${baseUrl}/api/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
+      body: JSON.stringify({
+        customerName: 'RBAC Customer Fixture',
+        customerPhone: fixtureCustomerPhone,
+        customerEmail: userEmail,
+        bookingCategory: 'driver',
+        driverTripOption: 'one-way',
+        pickupArea: 'Indiranagar',
+        dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
+        date: '2026-10-12',
+        time: '07:30 AM'
+      })
+    });
+    const bookData = await bookRes.json();
+    fixtureBookingId = bookData.data.booking.id;
   });
 
   after(() => {
@@ -70,7 +114,7 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        bookingId: 'BDA-DRV-9801',
+        bookingId: fixtureBookingId,
         phone: '+91 91111 22222' // Wrong phone!
       })
     });
@@ -86,15 +130,15 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        bookingId: 'BDA-DRV-9801',
-        phone: '+91 98765 43210' // Matching phone
+        bookingId: fixtureBookingId,
+        phone: fixtureCustomerPhone // Matching phone
       })
     });
 
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.success, true);
-    assert.strictEqual(data.data.booking.id, 'BDA-DRV-9801');
+    assert.strictEqual(data.data.booking.id, fixtureBookingId);
   });
 
   test('6. Newly registered user has 0 bookings on default (isolation from demo bookings)', async () => {
@@ -127,14 +171,14 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
   });
 
   test('7. Demo user has access to seeded demo bookings', async () => {
-    // Call /api/bookings/my with userToken (logged in as demo user rahul.sharma@example.com)
+    // Call /api/bookings/my with userToken for fixture user
     const res = await fetch(`${baseUrl}/api/bookings/my`, {
       headers: { 'Authorization': `Bearer ${userToken}` }
     });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.success, true);
-    assert.ok(data.data.bookings.length > 0, 'Demo user should have their seeded demo booking');
-    assert.strictEqual(data.data.bookings[0].id, 'BDA-DRV-9801');
+    assert.ok(data.data.bookings.length > 0, 'User should have their booking');
+    assert.strictEqual(data.data.bookings[0].id, fixtureBookingId);
   });
 });

@@ -16,11 +16,12 @@ export const BANGALORE_AREAS = [
   "Kempegowda Intl Airport (BLR T1/T2)"
 ];
 
+// Operational service descriptors (non-fabricated verified commitments)
 export const LOCAL_STATS = [
-  { label: "Bengaluru Hubs Covered", value: "25+ Hubs" },
-  { label: "Average Dispatch Time", value: "15–20 Mins" },
-  { label: "Background & Police Clearance", value: "100% Verified" },
-  { label: "Advance Cancellation Fee", value: "₹0 Penalty" }
+  { label: "Bengaluru Coverage", value: "Citywide" },
+  { label: "Dispatch Model", value: "On-Demand" },
+  { label: "Partner Screening", value: "Verified ID" },
+  { label: "Advance Cancellation", value: "₹0 Penalty" }
 ];
 
 export const OUTSTATION_DESTINATIONS = [
@@ -162,12 +163,15 @@ export const DRIVER_SERVICES = [
   }
 ];
 
+// Clean vehicle illustration placeholder (TODO: replace with actual fleet photography)
+const createVehiclePlaceholder = (title, category) => `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="760" height="410" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="50%" y="45%" text-anchor="middle" fill="%23f59e0b" font-family="sans-serif" font-size="28" font-weight="bold">${category}</text><text x="50%" y="58%" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="16">${encodeURIComponent(title)}</text><text x="50%" y="70%" text-anchor="middle" fill="%2364748b" font-family="sans-serif" font-size="12">Fleet Vehicle</text></svg>`;
+
 export const VEHICLE_SERVICES = [
   {
     id: "veh-sedan",
     category: "Sedan",
     name: "Sedan (Maruti Dzire / Honda City / Etios)",
-    image: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80",
+    image: createVehiclePlaceholder("Maruti Dzire / Honda City / Etios", "Sedan"),
     badge: "Comfortable 4 Seater",
     type: "Driver + Car",
     seats: 4,
@@ -183,7 +187,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-suv",
     category: "SUV",
     name: "SUV (Toyota Innova Crysta / Ertiga)",
-    image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80",
+    image: createVehiclePlaceholder("Toyota Innova Crysta / Ertiga", "SUV"),
     badge: "Spacious 6-7 Seater",
     type: "Driver + Vehicle",
     seats: 7,
@@ -199,7 +203,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-12seater",
     category: "12 Seater",
     name: "12 Seater Luxury Tempo Traveller",
-    image: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80",
+    image: createVehiclePlaceholder("Luxury Tempo Traveller", "12 Seater"),
     badge: "Group Travel 12 Seater",
     type: "Driver + Vehicle",
     seats: 12,
@@ -215,7 +219,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-24seater",
     category: "24 Seater",
     name: "24 Seater Executive Mini Bus",
-    image: "https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=800&q=80",
+    image: createVehiclePlaceholder("Executive Mini Bus", "24 Seater"),
     badge: "Executive 24 Seater",
     type: "Driver + Bus",
     seats: 24,
@@ -231,7 +235,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-32seater",
     category: "32 Seater",
     name: "32 Seater Luxury Coach Bus",
-    image: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80",
+    image: createVehiclePlaceholder("Luxury Coach Bus", "32 Seater"),
     badge: "VIP Luxury 32 Seater",
     type: "Driver + Luxury Coach",
     seats: 32,
@@ -245,89 +249,9 @@ export const VEHICLE_SERVICES = [
   }
 ];
 
-export const FEATURED_DRIVERS = [
-  {
-    id: "anna-1",
-    name: "Manjunath 'Manja' Gowda",
-    experience: "12 Years Driving in Bangalore",
-    rating: 4.98,
-    trips: 3420,
-    languages: ["Kannada", "English", "Hindi"],
-    specialty: "Silk Board Traffic Expert & Outstation Specialist",
-    tagline: "Always on time, smooth driving guarantee boss!",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
-    badge: "Top Rated Anna"
-  },
-  {
-    id: "anna-2",
-    name: "Venkatesh Prasad",
-    experience: "9 Years Driving",
-    rating: 4.95,
-    trips: 2890,
-    languages: ["Kannada", "Telugu", "Tamil", "Hindi"],
-    specialty: "Night Party Driver & Luxury Car Specialist",
-    tagline: "Safe home guaranteed after your weekend party!",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
-    badge: "Night Owl Specialist"
-  },
-  {
-    id: "anna-3",
-    name: "Syed Nizamuddin",
-    experience: "15 Years Driving",
-    rating: 4.99,
-    trips: 4150,
-    languages: ["Kannada", "Hindi", "English", "Urdu"],
-    specialty: "Airport Transfers & Corporate Executives",
-    tagline: "Punctuality is my habit. Terminal 1 or 2, I know shortcut roads!",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80",
-    badge: "Airport Express"
-  },
-  {
-    id: "anna-4",
-    name: "Ramesh Kumar K.",
-    experience: "8 Years Driving",
-    rating: 4.92,
-    trips: 2180,
-    languages: ["Kannada", "Tamil", "English"],
-    specialty: "Hill Drives (Coorg, Ooty, Nandi Hills)",
-    tagline: "Zero motion sickness smooth ghat road driver!",
-    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80",
-    badge: "Ghat Master"
-  }
-];
-
-export const BANGALORE_TESTIMONIALS = [
-  {
-    id: 1,
-    name: "Ananya Sharma",
-    role: "Senior Tech Lead @ Manyata Tech Park",
-    area: "Hebbal, Bangalore",
-    rating: 5,
-    comment: "Driving from Electronic City to Hebbal used to exhaust me daily. Booking a driver Anna for 4 hours every day was the best decision! Now I finish my code reviews on the backseat. Unmatched service!",
-    date: "2 days ago",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-  },
-  {
-    id: 2,
-    name: "Karthik Raja",
-    role: "Product Manager @ Indiranagar Startup",
-    area: "Indiranagar, Bangalore",
-    rating: 5,
-    comment: "Booked an outstation Anna for a weekend trip to Chikmagalur with family. Manja Gowda was super professional, drove very smoothly through the ghats, and recommended authentic Akki Roti spots!",
-    date: "1 week ago",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
-  },
-  {
-    id: 3,
-    name: "Dr. Sandeep Hegde",
-    role: "Consultant Surgeon",
-    area: "Koramangala, Bangalore",
-    rating: 5,
-    comment: "Whenever we host family functions, we book 24-seater mini buses and drivers from Book Driver Anna. Verified, punctual, and reliable every single time.",
-    date: "2 weeks ago",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
-  }
-];
+// Featured drivers and client testimonials (TODO: populate from live reviews API)
+export const FEATURED_DRIVERS = [];
+export const BANGALORE_TESTIMONIALS = [];
 
 export const DRIVING_CLASSES = [
   {
@@ -419,53 +343,7 @@ export const DRIVING_CLASS_HIGHLIGHTS = [
   { label: "Timings", value: "Flexible 6 AM - 8 PM" }
 ];
 
-// Default Registered Driver Partners Fleet (for testing & demo)
-export const DEFAULT_REGISTERED_DRIVERS = [
-  {
-    id: "DRV-1001",
-    name: "Manjunath Gowda",
-    phone: "+91 98860 12345",
-    dlNumber: "KA-04-2021-0098745",
-    vehicleType: "Manual & Automatic Cars",
-    area: "Indiranagar",
-    experienceYears: "12 Years",
-    rating: 4.98,
-    trips: 3420,
-    status: "Active",
-    earningsToday: 2450,
-    isOnline: true,
-    createdAt: "2026-08-15"
-  },
-  {
-    id: "DRV-1002",
-    name: "Venkatesh Prasad",
-    phone: "+91 98450 67890",
-    dlNumber: "KA-05-2020-0081234",
-    vehicleType: "Automatic Luxury & SUVs",
-    area: "Koramangala",
-    experienceYears: "9 Years",
-    rating: 4.95,
-    trips: 2890,
-    status: "Active",
-    earningsToday: 1800,
-    isOnline: true,
-    createdAt: "2026-08-20"
-  },
-  {
-    id: "DRV-1003",
-    name: "Suresh Kumar",
-    phone: "+91 99002 55667",
-    dlNumber: "KA-01-2019-0043120",
-    vehicleType: "All Cars & Heavy Sedans",
-    area: "Whitefield",
-    experienceYears: "14 Years",
-    rating: 4.96,
-    trips: 4150,
-    status: "Active",
-    earningsToday: 2100,
-    isOnline: true,
-    createdAt: "2026-08-22"
-  }
-];
+// Initial registered drivers fleet (empty on clean boot; populated via registration)
+export const DEFAULT_REGISTERED_DRIVERS = [];
 
 

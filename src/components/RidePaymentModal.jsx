@@ -46,9 +46,9 @@ export default function RidePaymentModal({
   const [showQrCode, setShowQrCode] = useState(false);
 
   // Card inputs
-  const [cardNumber, setCardNumber] = useState('4532 •••• •••• 8812');
-  const [cardExpiry, setCardExpiry] = useState('08/28');
-  const [cardCvv, setCardCvv] = useState('•••');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
 
   // Fare calculations
   const effectiveTip = isCustomTip ? (Number(customTip) || 0) : selectedTip;
@@ -550,6 +550,7 @@ export default function RidePaymentModal({
                         type="text"
                         value={cardNumber}
                         onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="Enter 16-digit Card Number"
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
                       />
                     </div>
@@ -560,6 +561,7 @@ export default function RidePaymentModal({
                           type="text"
                           value={cardExpiry}
                           onChange={(e) => setCardExpiry(e.target.value)}
+                          placeholder="MM/YY"
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
                         />
                       </div>
@@ -570,6 +572,7 @@ export default function RidePaymentModal({
                           maxLength={3}
                           value={cardCvv}
                           onChange={(e) => setCardCvv(e.target.value)}
+                          placeholder="•••"
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
                         />
                       </div>

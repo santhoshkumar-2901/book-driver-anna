@@ -5,11 +5,25 @@ import { db } from '../server/db/database.js';
 
 describe('Authentication & Password Security Tests', () => {
   let server, baseUrl;
+  const fixtureUser = {
+    name: 'Auth Fixture User',
+    email: `auth_fixture_${Date.now()}@example.com`,
+    phone: `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`,
+    password: 'securePassword123',
+    area: 'Indiranagar'
+  };
 
   before(async () => {
     const s = await startTestServer();
     server = s.server;
     baseUrl = s.baseUrl;
+
+    // Register an inline test fixture user so tests are self-contained
+    await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fixtureUser)
+    });
   });
 
   after(() => {
@@ -63,7 +77,7 @@ describe('Authentication & Password Security Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Duplicate Attempt',
-        email: 'rahul.sharma@example.com',
+        email: fixtureUser.email,
         phone: '+91 98765 99999',
         password: 'password123'
       })
@@ -80,7 +94,7 @@ describe('Authentication & Password Security Tests', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        identifier: 'rahul.sharma@example.com',
+        identifier: fixtureUser.email,
         password: 'wrong_password_attempt'
       })
     });
@@ -97,15 +111,15 @@ describe('Authentication & Password Security Tests', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        identifier: 'rahul.sharma@example.com',
-        password: 'password123'
+        identifier: fixtureUser.email,
+        password: fixtureUser.password
       })
     });
 
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.success, true);
-    assert.strictEqual(data.data.user.name, 'Rahul Sharma');
+    assert.strictEqual(data.data.user.name, fixtureUser.name);
     assert.ok(data.data.token, 'Must return JWT token');
   });
 });

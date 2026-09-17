@@ -7,8 +7,8 @@ import { SteeringWheel } from '../components/Icons';
 import { BANGALORE_AREAS, DEFAULT_REGISTERED_DRIVERS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 
-// Shared mock registered driver accounts
-const DEFAULT_DRIVERS = DEFAULT_REGISTERED_DRIVERS;
+// Registered driver partners directory (empty on clean boot)
+const DEFAULT_DRIVERS = [];
 
 
 export default function DriverAuthPage({ 
@@ -170,34 +170,11 @@ export default function DriverAuthPage({
           onLoginSuccess(matched);
         }
       } else {
-        // Allow demo driver if not found
-        const fallbackDriver = {
-          ...DEFAULT_DRIVERS[0],
-          name: "Manjunath Gowda",
-          phone: submittedIdentifier.startsWith('+91') ? submittedIdentifier : `+91 ${submittedIdentifier}`
-        };
-        resetForm();
-        setSuccessMessage(`Verified successfully. Welcome, Anna ${fallbackDriver.name}!`);
-        if (onLoginSuccess) {
-          onLoginSuccess(fallbackDriver);
-        }
+        setIsLoading(false);
+        setErrorMessage('Driver account not found. Please register or verify your credentials.');
+        return;
       }
     }, 600);
-  };
-
-  // 1-Click Quick Demo Driver Login
-  const handleQuickDemoLogin = () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    setTimeout(() => {
-      setIsLoading(false);
-      const demoDriver = DEFAULT_DRIVERS[0];
-      resetForm();
-      setSuccessMessage(`Logged in as Top Rated Anna: ${demoDriver.name}`);
-      if (onLoginSuccess) {
-        onLoginSuccess(demoDriver);
-      }
-    }, 400);
   };
 
   // Signup submission
@@ -480,21 +457,7 @@ export default function DriverAuthPage({
                   )}
                 </button>
 
-                {/* Quick 1-Click Demo Driver Login */}
-                <div className="pt-2 border-t border-slate-800 text-center">
-                  <button
-                    type="button"
-                    onClick={handleQuickDemoLogin}
-                    disabled={isLoading}
-                    className="w-full py-1.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-400 transition-all flex items-center justify-center gap-2 cursor-pointer shadow"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                    <span>⚡ 1-Click Demo Login (Manjunath Gowda)</span>
-                  </button>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Click to log in immediately with active demo driver profile
-                  </p>
-                </div>
+
 
               </form>
             ) : (

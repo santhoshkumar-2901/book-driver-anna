@@ -5,11 +5,26 @@ import { db } from '../server/db/database.js';
 
 describe('Booking Security, Integrity, & Concurrency Tests', () => {
   let server, baseUrl;
+  const testDriverId = 'DRV-TEST-CONCURRENCY';
 
   before(async () => {
     const s = await startTestServer();
     server = s.server;
     baseUrl = s.baseUrl;
+
+    // Ensure a test driver fixture exists for slot-locking concurrency testing
+    const existingDriver = db.prepare('SELECT id FROM drivers WHERE id = ?').get(testDriverId);
+    if (!existingDriver) {
+      db.prepare(`
+        INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+        VALUES (?, ?, ?, ?, ?, 'driver', 'Indiranagar', 'Active')
+      `).run('USR-DRV-TEST', 'Test Driver Fixture', 'test_driver_fixture@driveranna.com', '+91 98860 99999', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy');
+
+      db.prepare(`
+        INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, status)
+        VALUES (?, ?, 'Test Driver Fixture', '+91 98860 99999', 'KA-TEST-001', 'Indiranagar', 'Active')
+      `).run(testDriverId, 'USR-DRV-TEST');
+    }
   });
 
   after(() => {
@@ -71,7 +86,7 @@ describe('Booking Security, Integrity, & Concurrency Tests', () => {
   test('3. Concurrency & Double Booking Defense: Slot locking prevents simultaneous conflicting bookings', async () => {
     const targetDate = `2027-${String(Math.floor(1 + Math.random() * 12)).padStart(2, '0')}-${String(Math.floor(1 + Math.random() * 28)).padStart(2, '0')}`;
     const targetTime = `11:${String(Math.floor(10 + Math.random() * 49))} AM`;
-    const driverId = 'DRV-1001';
+    const driverId = testDriverId;
 
     // First booking requests DRV-1001
     const res1 = await fetch(`${baseUrl}/api/bookings`, {

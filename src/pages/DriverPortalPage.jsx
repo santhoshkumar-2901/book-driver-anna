@@ -24,8 +24,8 @@ export default function DriverPortalPage({
   });
   const [acceptedTrips, setAcceptedTrips] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
-  const [todayEarnings, setTodayEarnings] = useState(driverUser?.earningsToday || 2450);
-  const [lifetimeTrips, setLifetimeTrips] = useState(driverUser?.trips || 3420);
+  const [todayEarnings, setTodayEarnings] = useState(driverUser?.earningsToday || 0);
+  const [lifetimeTrips, setLifetimeTrips] = useState(driverUser?.trips || 0);
   const [settlementTrip, setSettlementTrip] = useState(null);
   const [settlementMethod, setSettlementMethod] = useState('online'); // 'online' or 'cash'
 
@@ -109,44 +109,29 @@ export default function DriverPortalPage({
     } catch (e) {}
   }, [driverUser, isOnline]);
 
-  const [availableDuties, setAvailableDuties] = useState([
-    {
-      id: "DUTY-8841",
-      customerName: "Rahul Sharma",
-      tripType: "Airport Drop (One-Way)",
-      pickup: "Koramangala 4th Block, Bengaluru",
-      destination: "Kempegowda Intl Airport (BLR T1)",
-      scheduledTime: "Today, 03:30 PM",
-      carModel: "Honda City (Automatic)",
-      payout: "₹749",
-      urgency: "High Demand",
-      distance: "41 km"
-    },
-    {
-      id: "DUTY-8842",
-      customerName: "Priya Sharma",
-      tripType: "In-City Hourly Errand (4 Hours)",
-      pickup: "Indiranagar 100 Feet Road",
-      destination: "MG Road, Malleshwaram & Return",
-      scheduledTime: "Today, Immediate Pickup",
-      carModel: "Hyundai Creta (Manual)",
-      payout: "₹499",
-      urgency: "Instant Dispatch",
-      distance: "Multiple City Stops"
-    },
-    {
-      id: "DUTY-8843",
-      customerName: "Vikram Reddy",
-      tripType: "Weekend Outstation Roundtrip",
-      pickup: "Whitefield ITPL Main Road",
-      destination: "Nandi Hills Sunrise & Return",
-      scheduledTime: "Tomorrow, 05:00 AM",
-      carModel: "Innova Crysta SUV",
-      payout: "₹1,850",
-      urgency: "Advance Booking",
-      distance: "140 km Roundtrip"
-    }
-  ]);
+  const [availableDuties, setAvailableDuties] = useState(() => {
+    try {
+      const savedBookings = localStorage.getItem('bda_driver_bookings');
+      if (savedBookings) {
+        const parsed = JSON.parse(savedBookings);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(b => b.status === 'Pending' || b.status === 'Confirmed').map(b => ({
+            id: b.id || b.bookingId || `DUTY-${Math.floor(1000 + Math.random() * 9000)}`,
+            customerName: b.customerName || b.name || "Customer",
+            tripType: b.serviceType === 'driver' ? `${b.tripType || 'Driver'} Service` : 'Driver Duty',
+            pickup: b.pickupArea || b.pickup || "Pickup Location",
+            destination: b.dropLocation || b.drop || "Drop Location",
+            scheduledTime: b.time ? `${b.date || 'Today'}, ${b.time}` : 'Scheduled',
+            carModel: b.vehicleCategory || b.carModel || 'Customer Vehicle',
+            payout: `₹${b.fare || b.totalFare || 499}`,
+            urgency: b.urgency || 'Standard Booking',
+            distance: b.distance || 'City Route'
+          }));
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
 
   const handleAcceptDuty = (duty) => {
     if (!isOnline) {
@@ -180,9 +165,9 @@ export default function DriverPortalPage({
       window.dispatchEvent(new CustomEvent('bda_ride_completed', {
         detail: {
           id: settlementTrip.id,
-          driverName: driverUser?.name || "Manjunath Gowda",
-          driverPhone: driverUser?.phone || "+91 98860 12345",
-          driverRating: driverUser?.rating || 4.98,
+          driverName: driverUser?.name || "Driver Assigned",
+          driverPhone: driverUser?.phone || "+91 80 2555 0199",
+          driverRating: driverUser?.rating || 5.0,
           carModel: settlementTrip.carModel,
           pickupArea: settlementTrip.pickup,
           dropLocation: settlementTrip.destination,
@@ -281,7 +266,7 @@ export default function DriverPortalPage({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
                 <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
-                  Namaskara, Anna {driverUser?.name || 'Manjunath Gowda'}!
+                  Namaskara, Anna {driverUser?.name || 'Partner'}!
                 </h1>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -357,7 +342,7 @@ export default function DriverPortalPage({
                   </div>
                   <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                     <button 
-                      onClick={() => alert(`Connecting to customer ${trip.customerName} at +91 98860 12345`)}
+                      onClick={() => alert(`Connecting to customer ${trip.customerName}...`)}
                       className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
                     >
                       <Phone className="w-3.5 h-3.5 text-emerald-400" />
@@ -517,16 +502,17 @@ export default function DriverPortalPage({
             </div>
             <div className="flex items-center gap-3 pt-2">
               <a
-                href="https://wa.me/919886012345?text=Hi%20Dispatch%2C%20this%20is%20Driver%20Anna.%20Need%20assistance%20with%20duty."
+                href="https://wa.me/918025550199?text=Hi%20Dispatch%2C%20this%20is%20Driver%20Anna.%20Need%20assistance%20with%20duty."
                 target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                rel="noopener noreferrer"
+                className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg"
               >
-                <WhatsAppIcon className="w-4 h-4 fill-current" />
-                <span>WhatsApp Dispatcher</span>
+                <WhatsAppIcon className="w-4 h-4 fill-white" />
+                <span>WhatsApp Dispatch</span>
               </a>
-              <a
-                href="tel:+919886012345"
+
+              <a 
+                href="tel:+918025550199"
                 className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700"
               >
                 <Phone className="w-3.5 h-3.5 text-amber-400" />

@@ -15,350 +15,20 @@ import AdminClassTab from './admin/AdminClassTab';
 import AdminUsersTab from './admin/AdminUsersTab';
 import AdminModals from './admin/AdminModals';
 
-// Default Mock Driver Bookings
-const DEFAULT_DRIVER_BOOKINGS = [
-  {
-    id: 'BDA-DRV-9801',
-    customerName: 'Rahul Dravid',
-    phone: '+91 98450 12345',
-    tripType: 'one-way',
-    tripTitle: 'One Way Trip',
-    pickupArea: 'Indiranagar',
-    dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
-    passengers: '2',
-    luggage: '3 bags',
-    acPreference: 'AC',
-    date: '2026-09-02',
-    time: '06:30 AM',
-    fare: 249,
-    status: 'Pending',
-    assignedDriver: '',
-    bookedAt: '10 Mins ago'
-  },
-  {
-    id: 'BDA-DRV-9802',
-    customerName: 'Priya Sharma',
-    phone: '+91 97312 88490',
-    tripType: 'round-trip',
-    tripTitle: 'Round Trip (4hr)',
-    pickupArea: 'Koramangala',
-    dropLocation: 'Koramangala 5th Block (Multiple Stops)',
-    passengers: '1',
-    luggage: '1 bag',
-    acPreference: 'AC',
-    date: '2026-09-01',
-    time: '02:00 PM',
-    fare: 349,
-    status: 'Assigned',
-    assignedDriver: "Manjunath 'Manja' Gowda",
-    bookedAt: '35 Mins ago'
-  },
-  {
-    id: 'BDA-DRV-9803',
-    customerName: 'Vikram Mehta',
-    phone: '+91 99001 54321',
-    tripType: 'outstation',
-    tripTitle: 'Outstation Trip (Round trip 46hr)',
-    pickupArea: 'Whitefield',
-    dropLocation: 'Coorg (Madikeri Homestay)',
-    passengers: '4',
-    luggage: '4 bags',
-    acPreference: 'AC',
-    date: '2026-09-05',
-    time: '05:00 AM',
-    fare: 2398,
-    status: 'Assigned',
-    assignedDriver: 'Ramesh Kumar K.',
-    bookedAt: '2 Hours ago'
-  },
-  {
-    id: 'BDA-DRV-9804',
-    customerName: 'Sanjana Rao',
-    phone: '+91 98861 09876',
-    tripType: 'one-way',
-    tripTitle: 'One Way Trip',
-    pickupArea: 'HSR Layout',
-    dropLocation: 'Electronic City Phase 1',
-    passengers: '1',
-    luggage: '0 bags',
-    acPreference: 'Non-AC',
-    date: '2026-09-01',
-    time: '07:15 PM',
-    fare: 249,
-    status: 'Completed',
-    assignedDriver: 'Venkatesh Prasad',
-    bookedAt: '4 Hours ago'
-  },
-  {
-    id: 'BDA-DRV-9805',
-    customerName: 'Rajesh Shenoy',
-    phone: '+91 98451 22334',
-    tripType: 'round-trip',
-    tripTitle: 'Round Trip (6hr)',
-    pickupArea: 'Jayanagar',
-    dropLocation: 'Bannerghatta National Park & Return',
-    passengers: '3',
-    luggage: '2 bags',
-    acPreference: 'AC',
-    vehicleType: 'Automatic',
-    date: '2026-09-02',
-    time: '09:00 AM',
-    fare: 549,
-    status: 'Cancelled',
-    cancelReason: 'Change of family weekend travel plans',
-    assignedDriver: '',
-    assignedDriverPhone: '',
-    bookedAt: '5 Hours ago'
-  },
-  {
-    id: 'BDA-DRV-9806',
-    customerName: 'Ananth Padmanabhan',
-    phone: '+91 97422 67890',
-    tripType: 'outstation',
-    tripTitle: 'Outstation Trip (One Way Drop Up to 300 km)',
-    pickupArea: 'Indiranagar',
-    dropLocation: 'Mysuru (Gokulam)',
-    passengers: '2',
-    luggage: '2 bags',
-    acPreference: 'AC',
-    vehicleType: 'Manual',
-    date: '2026-09-06',
-    time: '06:30 AM',
-    fare: 1889,
-    status: 'Pending',
-    assignedDriver: '',
-    assignedDriverPhone: '',
-    bookedAt: '40 Mins ago'
-  }
-];
-
-// Default Mock Vehicle Bookings
-const DEFAULT_VEHICLE_BOOKINGS = [
-  {
-    id: 'BDA-VEH-4101',
-    customerName: 'Kavitha N.',
-    phone: '+91 98440 99887',
-    vehicleName: 'Sedan (Dzire / Honda City)',
-    category: 'Sedan',
-    rentalType: 'Full Day (24 hrs)',
-    pickupArea: 'Indiranagar',
-    dropLocation: 'City Tour & Airport Return',
-    passengers: '3',
-    luggage: '2 bags',
-    acPreference: 'AC',
-    date: '2026-09-02',
-    time: '08:00 AM',
-    fare: 1999,
-    status: 'Confirmed',
-    vehicleRegNumber: 'KA-01-MJ-4321',
-    bookedAt: '25 Mins ago'
-  },
-  {
-    id: 'BDA-VEH-4102',
-    customerName: 'Infosys Team (Deepak)',
-    phone: '+91 99800 11223',
-    vehicleName: 'SUV (Toyota Innova Crysta)',
-    category: 'SUV',
-    rentalType: 'Outstation Trip',
-    pickupArea: 'Electronic City',
-    dropLocation: 'Mysuru Expressway Run',
-    passengers: '6',
-    luggage: '5 bags',
-    acPreference: 'AC',
-    date: '2026-09-04',
-    time: '06:00 AM',
-    fare: 4549,
-    status: 'Pending',
-    vehicleRegNumber: 'Unassigned',
-    bookedAt: '1 Hour ago'
-  },
-  {
-    id: 'BDA-VEH-4103',
-    customerName: 'Suresh Gowda',
-    phone: '+91 97400 55443',
-    vehicleName: '12 Seater Luxury Tempo',
-    category: '12 Seater',
-    rentalType: 'Outstation Trip',
-    pickupArea: 'Yelahanka',
-    dropLocation: 'Nandi Hills & Chikmagalur',
-    passengers: '11',
-    luggage: '8 bags',
-    acPreference: 'AC',
-    date: '2026-09-06',
-    time: '04:30 AM',
-    fare: 7148,
-    status: 'Confirmed',
-    vehicleRegNumber: 'KA-04-TP-9988',
-    bookedAt: '3 Hours ago'
-  },
-  {
-    id: 'BDA-VEH-4104',
-    customerName: 'Pooja Hegde',
-    phone: '+91 99160 44556',
-    vehicleName: 'Sedan (Dzire / Honda City)',
-    category: 'Sedan',
-    rentalType: 'Round Trip Rental',
-    pickupArea: 'Malleshwaram',
-    dropLocation: 'Mysuru Palace Tour',
-    passengers: '2',
-    luggage: '2 bags',
-    acPreference: 'AC',
-    date: '2026-09-03',
-    time: '07:00 AM',
-    fare: 2899,
-    status: 'Cancelled',
-    cancelReason: 'Flight delayed / Meeting rescheduled',
-    vehicleRegNumber: 'Unassigned',
-    bookedAt: '4 Hours ago'
-  }
-];
-
-// Default Mock Class Enrollments
-const DEFAULT_CLASS_ENROLLMENTS = [
-  {
-    enrollmentId: 'ENR-CLS-884102',
-    fullName: 'Ananya Deshmukh',
-    dateOfBirth: '12/04/1998',
-    gender: 'Female',
-    mobileNumber: '9845012345',
-    emailAddress: 'ananya.d@gmail.com',
-    address: '#42, 12th Main, Indiranagar, Bengaluru',
-    drivingExperience: 'No Experience',
-    gearPreference: 'Manual',
-    learnersLicenseStatus: 'Yes',
-    drivingLicenseStatus: 'No',
-    preferredStartDate: '05/09/2026',
-    preferredTime: 'Morning',
-    pickupRequired: 'Yes',
-    pickupLocation: 'Near Defence Colony Play Ground, Indiranagar',
-    additionalNotes: 'Need a patient female/senior instructor if available.',
-    submittedAt: '02/09/2026',
-    status: 'In Training',
-    assignedInstructor: 'Syed Nizamuddin',
-    assignedInstructorPhone: '+91 98860 54321'
-  },
-  {
-    enrollmentId: 'ENR-CLS-884103',
-    fullName: 'Kiran Varun',
-    dateOfBirth: '23/11/1995',
-    gender: 'Male',
-    mobileNumber: '9731288490',
-    emailAddress: 'kiran.varun@yahoo.com',
-    address: 'Flat 304, Prestige Ozone, Whitefield, Bengaluru',
-    drivingExperience: 'Some Experience',
-    gearPreference: 'Automatic',
-    learnersLicenseStatus: 'Yes',
-    drivingLicenseStatus: 'Yes',
-    preferredStartDate: '07/09/2026',
-    preferredTime: 'Evening',
-    pickupRequired: 'No',
-    pickupLocation: '',
-    additionalNotes: 'Want refresher practice on Silk Board and Outer Ring Road flyovers.',
-    submittedAt: '02/09/2026',
-    status: 'In Training',
-    assignedInstructor: 'Manjunath Gowda',
-    assignedInstructorPhone: '+91 98451 99882'
-  },
-  {
-    enrollmentId: 'ENR-CLS-884104',
-    fullName: 'Deepa Srinivas',
-    dateOfBirth: '19/08/2001',
-    gender: 'Female',
-    mobileNumber: '9900154321',
-    emailAddress: 'deepa.s@outlook.com',
-    address: '7th Cross, 4th Block, Koramangala, Bengaluru',
-    drivingExperience: 'Beginner',
-    gearPreference: 'Manual',
-    learnersLicenseStatus: 'No',
-    drivingLicenseStatus: 'No',
-    preferredStartDate: '10/09/2026',
-    preferredTime: 'Morning',
-    pickupRequired: 'Yes',
-    pickupLocation: 'Near Sony World Signal, Koramangala',
-    additionalNotes: 'Need guidance for Learner License application as well.',
-    submittedAt: '02/09/2026',
-    status: 'Pending',
-    assignedInstructor: '',
-    assignedInstructorPhone: ''
-  },
-  {
-    enrollmentId: 'ENR-CLS-884105',
-    fullName: 'Rahul Nair',
-    dateOfBirth: '14/06/1997',
-    gender: 'Male',
-    mobileNumber: '98452 77889',
-    emailAddress: 'rahul.nair@techblr.com',
-    address: '#18, 5th Main, BTM 2nd Stage, Bengaluru',
-    drivingExperience: 'No Experience',
-    gearPreference: 'Automatic',
-    learnersLicenseStatus: 'No',
-    drivingLicenseStatus: 'No',
-    preferredStartDate: '08/09/2026',
-    preferredTime: 'Morning',
-    pickupRequired: 'Yes',
-    pickupLocation: 'Near Udupi Garden Signal, BTM',
-    additionalNotes: 'Want early morning 6:30 AM batch slot.',
-    submittedAt: '02/09/2026',
-    status: 'Cancelled',
-    cancelReason: 'Work transfer to Hyderabad office',
-    assignedInstructor: '',
-    assignedInstructorPhone: ''
-  }
-];
-
-// Default Registered Clients / Users (Exactly 2 Demo Clients)
-const DEFAULT_REGISTERED_CLIENTS = [
-  {
-    id: 'CLI-901',
-    name: 'Rahul Sharma',
-    email: 'rahul.sharma@example.com',
-    phone: '+91 98860 12345',
-    area: 'Indiranagar',
-    status: 'Active',
-    createdAt: '2026-09-01'
-  },
-  {
-    id: 'CLI-902',
-    name: 'Priya Sharma',
-    email: 'priya@gmail.com',
-    phone: '+91 98441 56789',
-    area: 'Koramangala',
-    status: 'Active',
-    createdAt: '2026-09-02'
-  }
-];
+// Initial state for bookings, rentals, academy enrollments, and clients (empty on clean boot)
+const DEFAULT_DRIVER_BOOKINGS = [];
+const DEFAULT_VEHICLE_BOOKINGS = [];
+const DEFAULT_CLASS_ENROLLMENTS = [];
+const DEFAULT_REGISTERED_CLIENTS = [];
 
 export const sanitizeClients = (list) => {
-  if (!Array.isArray(list)) return DEFAULT_REGISTERED_CLIENTS;
-  const filtered = list.filter(u => {
-    if (!u) return false;
-    const id = u.id || '';
-    const email = (u.email || '').toLowerCase();
-    if (['CLI-903', 'CLI-904', 'CLI-905'].includes(id)) return false;
-    if (['anand.rao@outlook.com', 'deepika.nair@gmail.com', 'karthik.s@gmail.com'].includes(email)) return false;
-    if (
-      email.startsWith('newuser_') ||
-      email.startsWith('brand_new_user_') ||
-      email.startsWith('test_new_client_') ||
-      email.startsWith('user_a_') ||
-      email.startsWith('user_b_')
-    ) {
-      return false;
-    }
-    return true;
-  });
-  return filtered.length > 0 ? filtered : DEFAULT_REGISTERED_CLIENTS;
+  if (!Array.isArray(list)) return [];
+  return list.filter(u => Boolean(u && (u.id || u.email || u.phone)));
 };
 
 export const sanitizeDrivers = (list) => {
-  if (!Array.isArray(list)) return DEFAULT_REGISTERED_DRIVERS;
-  const filtered = list.filter(d => {
-    if (!d) return false;
-    const id = d.id || '';
-    if (['DRV-1004', 'DRV-1005'].includes(id)) return false;
-    return true;
-  });
-  return filtered.length > 0 ? filtered : DEFAULT_REGISTERED_DRIVERS;
+  if (!Array.isArray(list)) return [];
+  return list.filter(d => Boolean(d && (d.id || d.phone || d.name)));
 };
 
 // SPA Route Paths for Admin Sections
@@ -468,10 +138,10 @@ export default function AdminPage({ onReturnToClient }) {
   
   // Logged-in Admin Info
   const [loggedInAdminName, setLoggedInAdminName] = useState(() => {
-    return localStorage.getItem('bda_admin_name') || 'Manjunath Anna';
+    return localStorage.getItem('bda_admin_name') || 'Admin Anna';
   });
   const [loggedInAdminPhone, setLoggedInAdminPhone] = useState(() => {
-    return localStorage.getItem('bda_admin_phone') || '+91 98860 12345';
+    return localStorage.getItem('bda_admin_phone') || '+91 98765 00000';
   });
 
   // Sidebar Tab State (after login) - derived from URL path for full SPA experience
@@ -951,7 +621,7 @@ export default function AdminPage({ onReturnToClient }) {
         return;
       }
       if (submittedSecretKey !== 'ANNA2026') {
-        setAuthError('Invalid Admin Secret Key (Demo Key: ANNA2026)');
+        setAuthError('Invalid Admin Secret Key.');
         return;
       }
     }
@@ -1029,20 +699,8 @@ export default function AdminPage({ onReturnToClient }) {
     } catch (apiErr) {
       // 1. Invalid credentials from backend (401)
       if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
-        const emailLower = submittedEmail.toLowerCase();
-        let localMatch = false;
-        try {
-          const saved = localStorage.getItem('bda_registered_admins');
-          if (saved) {
-            const registeredAdmins = JSON.parse(saved);
-            localMatch = registeredAdmins.some(a => a.email === emailLower && a.password === submittedPassword);
-          }
-        } catch (e) {}
-
-        if (!localMatch && !(emailLower === 'admin@bookdriveranna.com' && submittedPassword === 'admin123')) {
-          setAuthError(apiErr.message || 'Invalid admin email or password.');
-          return;
-        }
+        setAuthError(apiErr.message || 'Invalid admin email or password.');
+        return;
       } else if (apiErr.status === 403 || apiErr.code === 'INSUFFICIENT_PRIVILEGES') {
         setAuthError('Access denied: You do not have administrator privileges.');
         return;
@@ -1054,35 +712,31 @@ export default function AdminPage({ onReturnToClient }) {
         return;
       }
 
-      // If network, 500, or local demo credential match, proceed to offline demo fallback below
-      console.warn('[ADMIN AUTH] Engaging offline/local fallback check.');
+      // If network error or 500, proceed to offline fallback check below
+      console.warn('[ADMIN AUTH] Backend unreachable; checking local fallback.');
     }
 
-    // In offline/demo fallback mode, verify credentials match demo credentials or a registered admin
+    // In offline fallback mode, verify credentials against locally registered admin
     const emailLower = submittedEmail.toLowerCase();
     let isMatch = false;
-    let nameToSave = 'Admin Anna';
-    let phoneToSave = '+91 98765 00000';
+    let nameToSave = 'Administrator';
+    let phoneToSave = '+91 80 2555 0199';
 
-    if (emailLower === 'admin@bookdriveranna.com' && submittedPassword === 'admin123') {
-      isMatch = true;
-    } else {
-      try {
-        const saved = localStorage.getItem('bda_registered_admins');
-        if (saved) {
-          const registeredAdmins = JSON.parse(saved);
-          const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
-          if (found) {
-            isMatch = true;
-            nameToSave = found.name;
-            phoneToSave = found.phone;
-          }
+    try {
+      const saved = localStorage.getItem('bda_registered_admins');
+      if (saved) {
+        const registeredAdmins = JSON.parse(saved);
+        const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
+        if (found) {
+          isMatch = true;
+          nameToSave = found.name;
+          phoneToSave = found.phone;
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
 
     if (!isMatch) {
-      setAuthError('Invalid credentials. (Demo: admin@bookdriveranna.com / admin123)');
+      setAuthError('Invalid administrator credentials.');
       return;
     }
 

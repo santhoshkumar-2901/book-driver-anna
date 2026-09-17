@@ -9,27 +9,8 @@ import { BANGALORE_AREAS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 import { useScrollLock } from '../utils/useScrollLock';
 
-// Default seeded demo clients for instant testing
-const DEFAULT_REGISTERED_CLIENTS = [
-  {
-    id: 'CLI-901',
-    name: 'Rahul Sharma',
-    email: 'rahul.sharma@example.com',
-    phone: '+91 98860 12345',
-    area: 'Indiranagar',
-    password: 'password123',
-    createdAt: '2026-09-01'
-  },
-  {
-    id: 'CLI-902',
-    name: 'Priya Sharma',
-    email: 'priya@gmail.com',
-    phone: '+91 98441 56789',
-    area: 'Koramangala',
-    password: 'password123',
-    createdAt: '2026-09-02'
-  }
-];
+// Initial registered clients directory (empty on clean boot)
+const DEFAULT_REGISTERED_CLIENTS = [];
 
 export default function ClientAuthPage({
   initialMode = 'login',
@@ -118,15 +99,7 @@ export default function ClientAuthPage({
     };
   }, [initialMode, prefillData]);
 
-  // Seed default registered clients if not present
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('bda_registered_clients');
-      if (!stored) {
-        localStorage.setItem('bda_registered_clients', JSON.stringify(DEFAULT_REGISTERED_CLIENTS));
-      }
-    } catch (e) { }
-  }, []);
+
 
   // Synchronize registered/authenticated customer with localStorage and notify Admin in real-time
   const syncUserToRegisteredClients = (user) => {
@@ -182,32 +155,7 @@ export default function ClientAuthPage({
     }
   };
 
-  // 1-Click Quick Demo Login (for reviewer/testing convenience)
-  const handleQuickDemoLogin = () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    setTimeout(() => {
-      const demoUser = DEFAULT_REGISTERED_CLIENTS[0];
-      const sessionData = {
-        id: demoUser.id,
-        name: demoUser.name,
-        email: demoUser.email,
-        phone: demoUser.phone,
-        area: demoUser.area,
-        token: 'bda_tok_' + Date.now(),
-        loggedInAt: new Date().toISOString()
-      };
-      localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
-      syncUserToRegisteredClients(sessionData);
-      setSuccessMessage(`Welcome back, ${demoUser.name}! Logging you in...`);
-      // Wipe input boxes immediately so returning to signin page starts completely empty
-      resetForm();
-      setTimeout(() => {
-        setIsLoading(false);
-        onLoginSuccess(sessionData);
-      }, 600);
-    }, 400);
-  };
+
 
   // Handle Client Sign In
   const handleLoginSubmit = async (e) => {
@@ -263,8 +211,7 @@ export default function ClientAuthPage({
     } catch (apiErr) {
       let hasLocalProfileMatch = false;
       try {
-        const stored = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
-        const allClients = [...stored, ...DEFAULT_REGISTERED_CLIENTS];
+        const allClients = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
         const cleanInput = submittedIdentifier.toLowerCase();
         const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
         const matched = allClients.find(u =>
@@ -289,7 +236,7 @@ export default function ClientAuthPage({
       try {
         registeredUsers = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
       } catch (err) {
-        registeredUsers = DEFAULT_REGISTERED_CLIENTS;
+        registeredUsers = [];
       }
 
       const cleanInput = submittedIdentifier.toLowerCase();
@@ -411,7 +358,7 @@ export default function ClientAuthPage({
     setTimeout(() => {
       setIsLoading(false);
 
-      let registeredClients = DEFAULT_REGISTERED_CLIENTS;
+      let registeredClients = [];
       try {
         const saved = localStorage.getItem('bda_registered_clients');
         if (saved) {
@@ -419,7 +366,7 @@ export default function ClientAuthPage({
           if (Array.isArray(parsed)) registeredClients = parsed;
         }
       } catch (err) {
-        registeredClients = DEFAULT_REGISTERED_CLIENTS;
+        registeredClients = [];
       }
 
       // Check if email or phone already registered
@@ -652,21 +599,7 @@ export default function ClientAuthPage({
                   )}
                 </button>
 
-                {/* Quick 1-Click Demo Login */}
-                <div className="pt-2 border-t border-slate-800 text-center">
-                  <button
-                    type="button"
-                    onClick={handleQuickDemoLogin}
-                    disabled={isLoading}
-                    className="w-full py-1.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 font-bold text-xs border border-amber-500/30 hover:border-amber-400 transition-all flex items-center justify-center gap-2 cursor-pointer shadow"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                    <span>⚡ 1-Click Demo Login (Rahul Sharma)</span>
-                  </button>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Click to instantly log in without typing passwords
-                  </p>
-                </div>
+
 
               </form>
             ) : (

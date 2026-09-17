@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Car, Phone, ShieldAlert, ArrowRight, CreditCard, CheckCircle2, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
-import { SteeringWheel } from './Icons';
+import { Car, Phone, ArrowRight, CreditCard, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function ActiveRideBanner({ 
   activeRide, 
-  onOpenPayment, 
-  onSimulateDemoRide 
+  onOpenPayment 
 }) {
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -14,10 +12,10 @@ export default function ActiveRideBanner({
     return null;
   }
 
-  const driverName = activeRide.driverName || activeRide.assignedDriver || activeRide.assignedAnna || "Manjunath Gowda";
-  const carModel = activeRide.carModel || activeRide.vehicleName || "Honda City (White)";
-  const destination = activeRide.dropLocation || activeRide.destination || "Kempegowda Intl Airport";
-  const fare = activeRide.totalFare || activeRide.fare || 549;
+  const driverName = activeRide.driverName || activeRide.assignedDriver || activeRide.assignedAnna || "Driver Assigned";
+  const carModel = activeRide.carModel || activeRide.vehicleName || "Assigned Vehicle";
+  const destination = activeRide.dropLocation || activeRide.destination || "Destination";
+  const fare = activeRide.totalFare || activeRide.fare || 0;
 
   return (
     <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] max-w-xl animate-in slide-in-from-bottom-5 duration-300">
