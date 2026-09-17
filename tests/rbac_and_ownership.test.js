@@ -141,7 +141,7 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
     assert.strictEqual(data.data.booking.id, fixtureBookingId);
   });
 
-  test('6. Newly registered user has 0 bookings on default (isolation from demo bookings)', async () => {
+  test('6. Newly registered user has 0 bookings on default (isolated from other accounts)', async () => {
     // Register a fresh customer
     const newEmail = `brand_new_user_${Date.now()}@example.com`;
     const regRes = await fetch(`${baseUrl}/api/auth/register`, {
@@ -170,7 +170,7 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
     assert.strictEqual(myBookingsData.data.bookings.length, 0, 'New user must have exactly 0 bookings on default');
   });
 
-  test('7. Demo user has access to seeded demo bookings', async () => {
+  test('7. Authenticated user has access to their authorized bookings', async () => {
     // Call /api/bookings/my with userToken for fixture user
     const res = await fetch(`${baseUrl}/api/bookings/my`, {
       headers: { 'Authorization': `Bearer ${userToken}` }

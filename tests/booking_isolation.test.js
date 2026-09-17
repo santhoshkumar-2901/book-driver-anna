@@ -54,7 +54,7 @@ describe('Booking Isolation: Demo Users vs New Users', () => {
     server.close();
   });
 
-  test('Demo user login returns exactly the seeded demo bookings', async () => {
+  test('Existing customer login returns their authorized bookings', async () => {
     // Query bookings for existing customer
     const bookingsRes = await fetch(`${baseUrl}/api/bookings/my`, {
       headers: { 'Authorization': `Bearer ${existingUserToken}` }
