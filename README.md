@@ -57,10 +57,10 @@ openssl rand -base64 32
 
 ## Production Readiness & Security Controls
 
-### 1. Production Seed Protection
-- In development/test environments, initial driver fleet and verified demo accounts are seeded automatically if the database is empty.
-- In production (`NODE_ENV=production`), **automatic seeding is strictly disabled** to prevent default accounts (`admin@bookdriveranna.com` / `admin123`) from being created.
-- To force seeding in a staging environment, set `ALLOW_DB_SEED=true`.
+### 1. Zero-Demo Database & Seed Protection
+- The database starts completely empty with 0 demo accounts or mock bookings across all environments (development, test, and production).
+- In production (`NODE_ENV=production`), automatic seeding is strictly disabled by default (overrideable via `ALLOW_DB_SEED=true`).
+- Administrator accounts—whether in local development or production—must be created explicitly via the standalone CLI script (`npm run bootstrap:admin`) with a secure password.
 
 ### 2. Production Admin Account Bootstrapping
 To create an administrator account in production, run the standalone bootstrap script:
