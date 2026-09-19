@@ -823,19 +823,58 @@ export default function AdminPage({ onReturnToClient }) {
     const typedName = driverInputState[bookingId]?.name?.trim();
     const typedPhone = driverInputState[bookingId]?.phone?.trim();
 
-    setDriverBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        const finalName = typedName || b.assignedDriver || "Driver Assigned";
-        const finalPhone = typedPhone || b.assignedDriverPhone || "+91 80 2555 0199";
-        return {
-          ...b,
-          assignedDriver: finalName,
-          assignedDriverPhone: finalPhone,
-          status: 'Assigned'
-        };
-      }
-      return b;
+    const finalName = typedName || "Driver Assigned";
+    const finalPhone = typedPhone || "+91 80 2555 0199";
+
+    let assignedBookingItem = null;
+
+    setDriverBookings(prev => {
+      const updated = prev.map(b => {
+        if (b.id === bookingId) {
+          const item = {
+            ...b,
+            assignedDriver: finalName,
+            assignedDriverPhone: finalPhone,
+            status: 'Assigned'
+          };
+          assignedBookingItem = item;
+          return item;
+        }
+        return b;
+      });
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Notify client site in real time across the app & active tabs
+    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
+      detail: { bookingId, status: 'Assigned', assignedDriver: finalName, assignedDriverPhone: finalPhone, booking: assignedBookingItem }
     }));
+    window.dispatchEvent(new CustomEvent('bda_driver_assigned', {
+      detail: { bookingId, status: 'Assigned', driverName: finalName, driverPhone: finalPhone, booking: assignedBookingItem }
+    }));
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('bda_realtime_channel');
+        bc.postMessage({
+          type: 'BOOKING_ASSIGNED',
+          bookingId,
+          status: 'Assigned',
+          driverName: finalName,
+          driverPhone: finalPhone,
+          booking: assignedBookingItem
+        });
+        bc.close();
+      }
+    } catch (e) {}
+
+    // Persist to authoritative backend database if available
+    apiClient.updateAdminBooking(bookingId, {
+      status: 'ASSIGNED',
+      assignedDriverName: finalName,
+      assignedDriverPhone: finalPhone
+    }).catch(() => {});
   };
 
   // WhatsApp Sender ONLY to Client (Enabled ONLY after Accept & Assign)
@@ -909,22 +948,64 @@ export default function AdminPage({ onReturnToClient }) {
 
   // Quick Action: Update driver booking status
   const handleUpdateDriverStatus = (bookingId, newStatus) => {
-    setDriverBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        return { ...b, status: newStatus };
-      }
-      return b;
+    let updatedItem = null;
+    setDriverBookings(prev => {
+      const updated = prev.map(b => {
+        if (b.id === bookingId) {
+          const item = { ...b, status: newStatus };
+          updatedItem = item;
+          return item;
+        }
+        return b;
+      });
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      return updated;
+    });
+
+    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
+      detail: { bookingId, status: newStatus, booking: updatedItem }
     }));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('bda_realtime_channel');
+        bc.postMessage({ type: 'BOOKING_STATUS_CHANGED', bookingId, status: newStatus, booking: updatedItem });
+        bc.close();
+      }
+    } catch (e) {}
+
+    const backendStatus = newStatus === 'In Progress' ? 'IN_PROGRESS' : newStatus.toUpperCase();
+    apiClient.updateAdminBooking(bookingId, { status: backendStatus }).catch(() => {});
   };
 
   // Quick Action: Update vehicle booking status
   const handleUpdateVehicleStatus = (bookingId, newStatus) => {
-    setVehicleBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        return { ...b, status: newStatus };
-      }
-      return b;
+    let updatedItem = null;
+    setVehicleBookings(prev => {
+      const updated = prev.map(b => {
+        if (b.id === bookingId) {
+          const item = { ...b, status: newStatus };
+          updatedItem = item;
+          return item;
+        }
+        return b;
+      });
+      localStorage.setItem('bda_vehicle_bookings', JSON.stringify(updated));
+      return updated;
+    });
+
+    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
+      detail: { bookingId, status: newStatus, booking: updatedItem }
     }));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('bda_realtime_channel');
+        bc.postMessage({ type: 'BOOKING_STATUS_CHANGED', bookingId, status: newStatus, booking: updatedItem });
+        bc.close();
+      }
+    } catch (e) {}
+
+    const backendStatus = newStatus === 'In Progress' ? 'IN_PROGRESS' : newStatus.toUpperCase();
+    apiClient.updateAdminBooking(bookingId, { status: backendStatus }).catch(() => {});
   };
 
   // Quick Action: Update class enrollment status (Pending, In Training, Completed, Cancelled)
@@ -932,21 +1013,35 @@ export default function AdminPage({ onReturnToClient }) {
     const typedName = instructorInputState[enrollmentId]?.name?.trim();
     const typedPhone = instructorInputState[enrollmentId]?.phone?.trim();
 
+    let updatedItem = null;
     setClassEnrollments(prev => {
       const updated = prev.map(e => {
         if (e.enrollmentId === enrollmentId) {
-          return {
+          const item = {
             ...e,
             status: newStatus,
             assignedInstructor: typedName !== undefined && typedName !== '' ? typedName : (e.assignedInstructor || ''),
             assignedInstructorPhone: typedPhone !== undefined && typedPhone !== '' ? typedPhone : (e.assignedInstructorPhone || '')
           };
+          updatedItem = item;
+          return item;
         }
         return e;
       });
       localStorage.setItem('bda_class_enrollments', JSON.stringify(updated));
       return updated;
     });
+
+    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
+      detail: { enrollmentId, status: newStatus, enrollment: updatedItem }
+    }));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('bda_realtime_channel');
+        bc.postMessage({ type: 'CLASS_STATUS_CHANGED', enrollmentId, status: newStatus, enrollment: updatedItem });
+        bc.close();
+      }
+    } catch (e) {}
   };
 
   // WhatsApp Sender to Candidate (Enabled for In Training, Completed, or Cancelled)

@@ -42,6 +42,14 @@ if (isTiDB) {
     sqliteDb.exec(schemaSql);
   }
 
+  // Safe non-destructive column migrations for driver assignment
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_name TEXT;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
+  } catch (e) {}
+
   console.log(`[DATABASE] Connected to local SQLite at ${dbFilePath} (WAL mode, foreign keys enabled)`);
 }
 

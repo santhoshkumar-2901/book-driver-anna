@@ -5,9 +5,9 @@ import { logAuditEvent } from './auditService.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
-  'PENDING': ['ASSIGNED', 'CANCELLED'],
+  'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
   'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
-  'ASSIGNED': ['IN_PROGRESS', 'CANCELLED'],
+  'ASSIGNED': ['CONFIRMED', 'IN_PROGRESS', 'CANCELLED'],
   'IN_PROGRESS': ['COMPLETED', 'CANCELLED'],
   'COMPLETED': [], // Terminal
   'CANCELLED': []  // Terminal
@@ -206,7 +206,15 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   return { booking: updated, alreadyCancelled: false };
 }
 
-export async function updateBookingStatus({ bookingId, newStatus, assignedDriverId = undefined, requesterUser, ipAddress = null }) {
+export async function updateBookingStatus({ 
+  bookingId, 
+  newStatus, 
+  assignedDriverId = undefined, 
+  assignedDriverName = undefined, 
+  assignedDriverPhone = undefined, 
+  requesterUser, 
+  ipAddress = null 
+}) {
   const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
   if (!booking) {
     const err = new Error('Booking not found.');
@@ -215,9 +223,9 @@ export async function updateBookingStatus({ bookingId, newStatus, assignedDriver
     throw err;
   }
 
-  // Validate state machine transition
+  // Validate state machine transition (allow idempotent same-state updates e.g. updating assigned driver details)
   const allowed = ALLOWED_STATE_TRANSITIONS[booking.status] || [];
-  if (!allowed.includes(newStatus)) {
+  if (booking.status !== newStatus && !allowed.includes(newStatus)) {
     const err = new Error(`Cannot transition booking from '${booking.status}' to '${newStatus}'.`);
     err.statusCode = 400;
     err.code = 'INVALID_STATE_TRANSITION';
@@ -232,6 +240,16 @@ export async function updateBookingStatus({ bookingId, newStatus, assignedDriver
     params.push(assignedDriverId);
   }
 
+  if (assignedDriverName !== undefined) {
+    updateSql += `, assigned_driver_name = ?`;
+    params.push(assignedDriverName);
+  }
+
+  if (assignedDriverPhone !== undefined) {
+    updateSql += `, assigned_driver_phone = ?`;
+    params.push(assignedDriverPhone);
+  }
+
   updateSql += ` WHERE id = ?`;
   params.push(bookingId);
 
@@ -242,7 +260,7 @@ export async function updateBookingStatus({ bookingId, newStatus, assignedDriver
     action: 'BOOKING_STATUS_UPDATED',
     resourceType: 'booking',
     resourceId: bookingId,
-    details: { from: booking.status, to: newStatus },
+    details: { from: booking.status, to: newStatus, driver: assignedDriverName },
     ipAddress
   });
 

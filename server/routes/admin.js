@@ -77,7 +77,7 @@ router.get('/bookings', async (req, res, next) => {
 router.patch('/bookings/:id', async (req, res, next) => {
   try {
     const bookingId = req.params.id;
-    const { status, assignedDriverId } = req.body;
+    const { status, assignedDriverId, assignedDriverName, assignedDriverPhone } = req.body;
 
     const existing = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
     if (!existing) {
@@ -87,32 +87,17 @@ router.patch('/bookings/:id', async (req, res, next) => {
       });
     }
 
-    let updated;
-    if (status) {
-      updated = await updateBookingStatus({
-        bookingId,
-        newStatus: status,
-        assignedDriverId,
-        requesterUser: req.user,
-        ipAddress: req.ip
-      });
-    } else if (assignedDriverId !== undefined) {
-      await execute('UPDATE bookings SET assigned_driver_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
-        assignedDriverId,
-        'ASSIGNED',
-        bookingId
-      ]);
-      updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    const newStatus = status ? status.toUpperCase() : (assignedDriverId || assignedDriverName ? 'ASSIGNED' : existing.status);
 
-      await logAuditEvent({
-        userId: req.user.id,
-        action: 'ADMIN_ASSIGNED_DRIVER',
-        resourceType: 'booking',
-        resourceId: bookingId,
-        details: { driverId: assignedDriverId },
-        ipAddress: req.ip
-      });
-    }
+    const updated = await updateBookingStatus({
+      bookingId,
+      newStatus,
+      assignedDriverId,
+      assignedDriverName,
+      assignedDriverPhone,
+      requesterUser: req.user,
+      ipAddress: req.ip
+    });
 
     res.json({
       success: true,

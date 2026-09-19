@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   cancellation_reason TEXT,
   assigned_driver_id TEXT REFERENCES drivers(id) ON DELETE SET NULL,
+  assigned_driver_name TEXT,
+  assigned_driver_phone TEXT,
   idempotency_key TEXT UNIQUE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -31,6 +31,8 @@ import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
 import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
 import { apiClient } from './services/apiClient';
+import { X, ShieldCheck, Phone, CheckCircle2 } from 'lucide-react';
+import { SteeringWheel } from './components/Icons';
 
 /**
  * Resolves a given URL pathname into application route details:
@@ -317,6 +319,9 @@ export default function App() {
   // Client User Profile Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // Real-time notification banner state when admin accepts & assigns
+  const [assignedNotice, setAssignedNotice] = useState(null);
+
   // Sync profile edits to state, storage & registered clients database
   const handleUpdateProfile = (updatedUser) => {
     setClientUser(updatedUser);
@@ -350,6 +355,138 @@ export default function App() {
     window.addEventListener('bda_ride_completed', handleRideCompleted);
     return () => window.removeEventListener('bda_ride_completed', handleRideCompleted);
   }, []);
+
+  // Real-time synchronization: When admin accepts & assigns, update client site immediately
+  useEffect(() => {
+    const syncClientBookings = () => {
+      try {
+        const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        const vehicleBookings = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
+        const classBookings = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
+        const allBookings = [...driverBookings, ...vehicleBookings, ...classBookings];
+
+        // 1. Dynamically update activeBookingPass if currently displayed in BookingSuccessModal
+        setActiveBookingPass(prev => {
+          if (!prev) return null;
+          const currentId = prev.bookingId || prev.id || prev.enrollmentId;
+          const match = allBookings.find(b => (b.id || b.enrollmentId || b.bookingId) === currentId);
+          if (match) {
+            const assignedName = match.assignedDriver || match.assignedInstructor || match.assignedAnna;
+            const assignedPhone = match.assignedDriverPhone || match.assignedInstructorPhone || match.driverPhone;
+            const isUpdated = 
+              match.status !== prev.status ||
+              assignedName !== prev.assignedAnna ||
+              assignedPhone !== prev.driverPhone;
+
+            if (isUpdated) {
+              return {
+                ...prev,
+                status: match.status || prev.status,
+                assignedAnna: assignedName || prev.assignedAnna,
+                assignedDriver: assignedName || prev.assignedDriver,
+                driverPhone: assignedPhone || prev.driverPhone,
+                driverRating: match.driverRating || prev.driverRating || '5.0',
+                vehicleRegNumber: match.vehicleRegNumber || prev.vehicleRegNumber
+              };
+            }
+          }
+          return prev;
+        });
+
+        // 2. If clientUser is active, verify if an assigned trip should activate activeRide
+        if (clientUser) {
+          const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
+          const userEmailClean = (clientUser.email || '').toLowerCase().trim();
+
+          const myAssignedDriverBooking = driverBookings.find(b => {
+            if (b.status !== 'Assigned' && b.status !== 'IN_PROGRESS') return false;
+            const bUserId = b.userId ? String(b.userId).trim() : null;
+            const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
+            const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
+            return (clientUser.id && bUserId === clientUser.id) ||
+              (!bUserId && userEmailClean && bEmail === userEmailClean) ||
+              (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+          });
+
+          if (myAssignedDriverBooking) {
+            setActiveRide(prev => {
+              if (prev && prev.id === myAssignedDriverBooking.id && prev.driverName === myAssignedDriverBooking.assignedDriver) {
+                return prev;
+              }
+              return {
+                id: myAssignedDriverBooking.id,
+                driverName: myAssignedDriverBooking.assignedDriver || "Driver Assigned",
+                driverPhone: myAssignedDriverBooking.assignedDriverPhone || "+91 80 2555 0199",
+                driverRating: 5.0,
+                carModel: myAssignedDriverBooking.vehicleCategory || "Customer Vehicle",
+                pickupArea: myAssignedDriverBooking.pickupArea || "Pickup Location",
+                dropLocation: myAssignedDriverBooking.dropLocation || "Kempegowda Intl Airport",
+                totalFare: myAssignedDriverBooking.fare || 499,
+                distance: "City Route",
+                duration: "Scheduled Trip"
+              };
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error in client booking sync:', e);
+      }
+    };
+
+    const handleDriverAssignedEvent = (e) => {
+      syncClientBookings();
+      if (e?.detail) {
+        const { bookingId, driverName, driverPhone, status, booking } = e.detail;
+        let isRelevant = true;
+        if (clientUser && booking) {
+          const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
+          const userEmailClean = (clientUser.email || '').toLowerCase().trim();
+          const bUserId = booking.userId ? String(booking.userId).trim() : null;
+          const bEmail = (booking.customerEmail || booking.email || '').toLowerCase().trim();
+          const bPhone = (booking.phone || '').replace(/[^0-9]/g, '');
+          isRelevant = (clientUser.id && bUserId === clientUser.id) ||
+            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
+            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+        }
+
+        if (isRelevant) {
+          setAssignedNotice({
+            bookingId,
+            driverName: driverName || 'Driver Anna',
+            driverPhone: driverPhone || '+91 80 2555 0199',
+            status: status || 'Assigned'
+          });
+        }
+      }
+    };
+
+    window.addEventListener('bda_booking_updated', syncClientBookings);
+    window.addEventListener('bda_driver_assigned', handleDriverAssignedEvent);
+    window.addEventListener('storage', syncClientBookings);
+
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('bda_realtime_channel');
+        bc.onmessage = (msg) => {
+          syncClientBookings();
+          if (msg.data?.type === 'BOOKING_ASSIGNED') {
+            handleDriverAssignedEvent({ detail: msg.data });
+          }
+        };
+      }
+    } catch (e) {}
+
+    const interval = setInterval(syncClientBookings, 4000);
+
+    return () => {
+      window.removeEventListener('bda_booking_updated', syncClientBookings);
+      window.removeEventListener('bda_driver_assigned', handleDriverAssignedEvent);
+      window.removeEventListener('storage', syncClientBookings);
+      if (bc) bc.close();
+      clearInterval(interval);
+    };
+  }, [clientUser]);
 
   const openCancelModal = () => {
     setIsCancelModalOpen(true);
@@ -781,6 +918,9 @@ export default function App() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleClientLogout}
         openBookingModal={openBookingModal}
+        onViewTripTicket={(booking) => {
+          setActiveBookingPass(booking);
+        }}
       />
 
       {/* Post-Booking Modal: Prompt Customer to Login or Sign Up */}
@@ -790,6 +930,71 @@ export default function App() {
         onChooseLogin={handleChooseLoginAfterBooking}
         onChooseSignup={handleChooseSignupAfterBooking}
       />
+
+      {/* Real-Time Order Accepted & Assigned Notification Banner */}
+      {assignedNotice && (
+        <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-slate-900 border-2 border-amber-400 rounded-2xl p-3.5 sm:p-4 shadow-2xl shadow-black/90 backdrop-blur-xl flex items-center justify-between gap-3 text-slate-100">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-extrabold flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/20">
+                <SteeringWheel className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                    Booking Accepted & Assigned!
+                  </span>
+                </div>
+                <div className="text-xs sm:text-sm font-extrabold text-white truncate font-['Outfit']">
+                  {assignedNotice.driverName} has been assigned to trip #{assignedNotice.bookingId}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  Call: <span className="font-mono text-amber-300 font-bold">{assignedNotice.driverPhone}</span> • Anna is on his way!
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  // Find full booking details and open ticket
+                  const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+                  const match = driverBookings.find(b => b.id === assignedNotice.bookingId);
+                  if (match) {
+                    setActiveBookingPass({
+                      bookingId: match.id,
+                      status: match.status,
+                      serviceName: match.tripTitle || 'Personal Driver',
+                      pickupArea: match.pickupArea,
+                      dropLocation: match.dropLocation,
+                      bookingDate: match.date,
+                      bookingTime: match.time,
+                      totalFare: match.fare,
+                      customerName: match.customerName,
+                      customerPhone: match.phone,
+                      assignedAnna: match.assignedDriver,
+                      driverPhone: match.assignedDriverPhone
+                    });
+                  }
+                  setAssignedNotice(null);
+                }}
+                className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-400/20 transition-all cursor-pointer shrink-0"
+              >
+                View Ticket
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssignedNotice(null)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

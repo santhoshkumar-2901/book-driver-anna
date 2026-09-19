@@ -48,23 +48,26 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
     setShowCancelConfirm(false);
   };
 
+  const assignedDriverName = booking?.assignedAnna || booking?.assignedDriver || booking?.assignedInstructor;
+  const driverContact = booking?.driverPhone || booking?.assignedDriverPhone || booking?.assignedInstructorPhone || '+91 80 2555 0199';
+
   const isAssignedOrConfirmed = Boolean(
     booking &&
     !isCancelled &&
     (booking.status === 'Confirmed' || booking.status === 'Assigned' || booking.status === 'Dispatched' || booking.status === 'Completed') &&
-    booking.assignedAnna &&
-    !booking.assignedAnna.toLowerCase().includes('pending')
+    assignedDriverName &&
+    !assignedDriverName.toLowerCase().includes('pending')
   );
 
   const handleCopyPass = () => {
-    let passText = `BOOK DRIVER ANNA ${isAssignedOrConfirmed ? 'CONFIRMATION' : 'REQUEST SUMMARY'}\nBooking ID: ${booking.bookingId}\nStatus: ${booking.status || 'Pending'}\nService: ${booking.serviceName}\nPickup Area: ${booking.pickupArea}\n`;
+    let passText = `BOOK DRIVER ANNA ${isAssignedOrConfirmed ? 'CONFIRMATION' : 'REQUEST SUMMARY'}\nBooking ID: ${booking.bookingId || booking.id}\nStatus: ${booking.status || 'Pending'}\nService: ${booking.serviceName || booking.tripTitle}\nPickup Area: ${booking.pickupArea}\n`;
     if (booking.bookingType === 'class') {
       passText += `Vehicle: ${booking.classTrainingCar} (${booking.classTransmission})\nBatch Slot: ${booking.classTimeSlot}\n`;
     }
     if (booking.passengers) {
       passText += `Passengers: ${booking.passengers}\nLuggage: ${booking.luggage || 'No Luggage'}\nAC Preference: ${booking.acPreference || 'AC'}\n`;
     }
-    passText += `Date/Time: ${toDDMMYYYY(booking.bookingDate || booking.date)} at ${booking.bookingTime || booking.time}\nCustomer: ${booking.customerName} (${booking.customerPhone})\nTotal Fare: ₹${booking.totalFare} (${booking.paymentMode ? booking.paymentMode.toUpperCase() : 'CASH'})\nAssigned Anna: ${isAssignedOrConfirmed ? booking.assignedAnna : 'Awaiting Admin Assignment'}`;
+    passText += `Date/Time: ${toDDMMYYYY(booking.bookingDate || booking.date)} at ${booking.bookingTime || booking.time}\nCustomer: ${booking.customerName} (${booking.customerPhone || booking.phone})\nTotal Fare: ₹${booking.totalFare || booking.fare} (${booking.paymentMode ? booking.paymentMode.toUpperCase() : 'CASH'})\nAssigned Anna: ${isAssignedOrConfirmed ? assignedDriverName : 'Awaiting Admin Assignment'}`;
     navigator.clipboard.writeText(passText);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
@@ -119,7 +122,7 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
               : (booking.bookingType === 'class' ? 'Enrollment Request Placed!' : 'Booking Request Placed!')}
           </h3>
           <p className="text-xs text-white/90 font-medium">
-            Booking ID: <span className="font-mono font-bold bg-slate-950/60 px-2 py-0.5 rounded text-amber-300">{booking.bookingId}</span>
+            Booking ID: <span className="font-mono font-bold bg-slate-950/60 px-2 py-0.5 rounded text-amber-300">{booking.bookingId || booking.id}</span>
           </p>
         </div>
 
@@ -137,7 +140,7 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
                   <ShieldCheck className="w-3.5 h-3.5" /> {booking.bookingType === 'class' ? 'Assigned Driving Instructor' : 'Assigned Driver Anna'}
                 </div>
                 <div className="text-sm font-extrabold text-white">
-                  {isAssignedOrConfirmed ? (booking.assignedAnna || 'Driver Assigned on Dispatch') : 'Awaiting Admin Assignment'}
+                  {isAssignedOrConfirmed ? (assignedDriverName || 'Driver Assigned on Dispatch') : 'Awaiting Admin Assignment'}
                 </div>
                 <div className="text-[11px] text-slate-400 flex items-center gap-1">
                   {isAssignedOrConfirmed ? (
@@ -153,7 +156,7 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
 
             {isAssignedOrConfirmed ? (
               <a 
-                href={`tel:${booking.customerPhone}`}
+                href={`tel:${driverContact}`}
                 className="p-3 bg-emerald-500 text-slate-950 font-bold rounded-xl shadow-lg hover:bg-emerald-400 transition-colors flex items-center gap-1.5 text-xs"
               >
                 <Phone className="w-4 h-4 fill-slate-950" /> Call
