@@ -137,6 +137,7 @@ export const apiClient = {
   getAdminDrivers: () => request('/admin/drivers', { method: 'GET' }),
   createAdminDriver: (driverData) => request('/admin/drivers', { method: 'POST', body: driverData }),
   deleteAdminDriver: (driverId) => request(`/admin/drivers/${driverId}`, { method: 'DELETE' }),
+  clearAllData: () => request('/admin/system/clear-data', { method: 'POST' }),
 
   // 5. Chatbot Endpoint
   sendChatMessage: (message, history = []) => 

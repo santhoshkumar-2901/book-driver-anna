@@ -375,4 +375,34 @@ router.delete('/drivers/:id', async (req, res, next) => {
   }
 });
 
+// POST /api/admin/system/clear-data (Production Reset: Clear all bookings, drivers, customers, keeping current admin)
+router.post('/system/clear-data', async (req, res, next) => {
+  try {
+    const currentAdminId = req.user.id;
+
+    await withTransaction(async (tx) => {
+      await tx.execute('DELETE FROM bookings');
+      await tx.execute('DELETE FROM drivers');
+      await tx.execute("DELETE FROM users WHERE role != 'admin' OR (id != ? AND email = 'admin@bookdriveranna.com')", [currentAdminId]);
+      await tx.execute('DELETE FROM audit_logs');
+    });
+
+    await logAuditEvent({
+      userId: req.user.id,
+      action: 'ADMIN_PURGED_TEST_DATA',
+      resourceType: 'system',
+      resourceId: 'all',
+      details: { executedBy: req.user.email },
+      ipAddress: req.ip
+    });
+
+    res.json({
+      success: true,
+      message: 'All test bookings, dummy customers, and test drivers have been permanently cleared for production.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

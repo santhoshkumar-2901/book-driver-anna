@@ -66,7 +66,18 @@ export default function AdminDriverTab({
       </div>
 
       {/* Driver Booking Cards */}
-      <div className="space-y-4 min-w-0">
+      {filteredDriverBookings.length === 0 ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-10 sm:p-14 text-center space-y-3">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-400/10 text-amber-400 flex items-center justify-center mx-auto">
+            <SteeringWheel className="w-7 h-7 sm:w-8 sm:h-8" />
+          </div>
+          <h3 className="text-base sm:text-lg font-extrabold text-white font-['Outfit']">No Driver Bookings Yet</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            The platform is in a clean production state. New customer driver requests across Bangalore will appear here live with instant dispatch actions.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4 min-w-0">
         {filteredDriverBookings.map((b) => (
           <div key={b.id} className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
             
@@ -260,6 +271,7 @@ export default function AdminDriverTab({
           </div>
         ))}
       </div>
+      )}
 
     </div>
   );

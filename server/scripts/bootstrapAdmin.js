@@ -33,7 +33,7 @@ export function parseArgs(argv) {
 
 export async function bootstrapAdmin(options = {}) {
   const email = (options.email || process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@bookdriveranna.com').trim().toLowerCase();
-  const password = options.password || process.env.BOOTSTRAP_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+  const password = options.password !== undefined ? options.password : (process.env.BOOTSTRAP_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD);
   const name = (options.name || process.env.BOOTSTRAP_ADMIN_NAME || process.env.ADMIN_NAME || 'Production Administrator').trim();
   const phone = (options.phone || process.env.BOOTSTRAP_ADMIN_PHONE || process.env.ADMIN_PHONE || '+91 98765 00000').trim();
   const area = (options.area || process.env.BOOTSTRAP_ADMIN_AREA || process.env.ADMIN_AREA || 'Bengaluru HQ').trim();
