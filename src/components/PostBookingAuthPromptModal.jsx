@@ -1,13 +1,12 @@
 import React from 'react';
-import { LogIn, UserPlus, ShieldCheck, ArrowRight } from 'lucide-react';
+import { LogIn, UserPlus, ShieldCheck } from 'lucide-react';
 import { useScrollLock } from '../utils/useScrollLock';
 
 export default function PostBookingAuthPromptModal({
   isOpen,
   bookingInfo,
   onChooseLogin,
-  onChooseSignup,
-  onContinueAsGuest
+  onChooseSignup
 }) {
   useScrollLock(isOpen);
 
@@ -66,18 +65,6 @@ export default function PostBookingAuthPromptModal({
             </div>
             <span className="font-extrabold text-xs">Signup</span>
             <span className="text-[10px] text-slate-900/80 font-medium">New Account</span>
-          </button>
-        </div>
-
-        {/* Continue as guest */}
-        <div className="pt-2 border-t border-slate-800/80">
-          <button
-            type="button"
-            onClick={onContinueAsGuest}
-            className="text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer inline-flex items-center gap-1"
-          >
-            <span>Or continue as guest to confirm booking</span>
-            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

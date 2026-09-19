@@ -254,9 +254,8 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       userId: clientUser?.id || null,
       paymentMode,
       totalFare: finalFare,
-      assignedAnna: bookingCategory === 'class'
-        ? "Syed Nizamuddin (Certified Driving Instructor Anna)"
-        : (bookingCategory === 'vehicle' ? "Manjunath Gowda (Assigned Vehicle Captain)" : "Manjunath Gowda (Assigned Driver)")
+      status: 'Pending',
+      assignedAnna: 'Pending Admin Assignment'
     };
 
     // If client is not logged in, intercept at confirmation and prompt login/signup

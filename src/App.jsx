@@ -224,10 +224,11 @@ export default function App() {
           customerName: submission.bookingDetails.customerName || userData.name || '',
           customerPhone: submission.bookingDetails.customerPhone || userData.phone || '',
           customerEmail: submission.bookingDetails.customerEmail || userData.email || '',
-          status: 'Confirmed'
+          status: 'Pending',
+          assignedAnna: 'Pending Admin Assignment'
         };
 
-        // Close the booking modal, return to home, and complete the booking as Confirmed
+        // Close the booking modal, return to home, and complete the booking as Pending
         setIsBookingModalOpen(false);
         changePage('home');
         handleBookingComplete(finalBooking);
@@ -249,8 +250,8 @@ export default function App() {
           date: submission.enrollmentData.preferredStartDate || new Date().toISOString().split('T')[0],
           time: submission.enrollmentData.preferredTime === 'Morning' ? '07:00 AM' : (submission.enrollmentData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
           totalFare: 5999,
-          status: 'Confirmed',
-          assignedAnna: 'Syed Nizamuddin (Certified Driving Instructor Anna)'
+          status: 'Pending',
+          assignedAnna: 'Pending Instructor Assignment'
         };
         setActiveBookingPass(classPass);
       }
@@ -397,7 +398,8 @@ export default function App() {
       serviceTitle,
       bookingDetails: {
         ...bookingDetails,
-        status: 'Confirmed'
+        status: 'Pending',
+        assignedAnna: 'Pending Admin Assignment'
       }
     });
     setPostBookingPromptInfo({
@@ -434,22 +436,6 @@ export default function App() {
   const handleChooseSignupAfterBooking = () => {
     setIsPostBookingPromptOpen(false);
     changePage('signup');
-  };
-
-  const handleContinueAsGuestAfterBooking = () => {
-    setIsPostBookingPromptOpen(false);
-    if (!pendingBookingSubmission) return;
-
-    if (pendingBookingSubmission.kind === 'booking') {
-      const b = pendingBookingSubmission.bookingDetails;
-      setIsBookingModalOpen(false);
-      handleBookingComplete(b);
-    } else if (pendingBookingSubmission.kind === 'enrollment') {
-      if (pendingBookingSubmission.callback) {
-        pendingBookingSubmission.callback(null);
-      }
-    }
-    setPendingBookingSubmission(null);
   };
 
   // Redirect authenticated users away from auth pages
@@ -517,7 +503,8 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 1999,
-        status: 'Confirmed',
+        status: bookingDetails.status || 'Pending',
+        assignedDriver: bookingDetails.assignedAnna || 'Pending Admin Assignment',
         vehicleRegNumber: 'Unassigned',
         bookedAt: 'Just Now'
       };
@@ -544,8 +531,8 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 349,
-        status: 'Confirmed',
-        assignedDriver: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
+        status: bookingDetails.status || 'Pending',
+        assignedDriver: bookingDetails.assignedAnna || 'Pending Admin Dispatch',
         bookedAt: 'Just Now'
       };
 
@@ -555,19 +542,21 @@ export default function App() {
       window.dispatchEvent(new CustomEvent('bda_booking_updated'));
     }
 
-    // Set active ride for real-time tracking and post-ride fare settlement
-    setActiveRide({
-      id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
-      driverName: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
-      driverPhone: bookingDetails.driverPhone || '+91 80 2555 0199',
-      driverRating: 5.0,
-      carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
-      pickupArea: bookingDetails.pickupArea || 'Pickup Location',
-      dropLocation: bookingDetails.dropLocation || 'Drop Location',
-      totalFare: bookingDetails.totalFare || 549,
-      distance: bookingDetails.distance || 'City Route',
-      duration: bookingDetails.duration || 'Scheduled Duration'
-    });
+    // Only set active ride tracking banner when booking is in progress or assigned
+    if (bookingDetails.status === 'Assigned' || bookingDetails.status === 'IN_PROGRESS') {
+      setActiveRide({
+        id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
+        driverName: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
+        driverPhone: bookingDetails.driverPhone || '+91 80 2555 0199',
+        driverRating: 5.0,
+        carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
+        pickupArea: bookingDetails.pickupArea || 'Pickup Location',
+        dropLocation: bookingDetails.dropLocation || 'Drop Location',
+        totalFare: bookingDetails.totalFare || 549,
+        distance: bookingDetails.distance || 'City Route',
+        duration: bookingDetails.duration || 'Scheduled Duration'
+      });
+    }
   };
 
   // 1. Dedicated layout for Admin Portal (/admin)
@@ -794,13 +783,12 @@ export default function App() {
         openBookingModal={openBookingModal}
       />
 
-      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}
+      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up */}
       <PostBookingAuthPromptModal
         isOpen={isPostBookingPromptOpen}
         bookingInfo={postBookingPromptInfo}
         onChooseLogin={handleChooseLoginAfterBooking}
         onChooseSignup={handleChooseSignupAfterBooking}
-        onContinueAsGuest={handleContinueAsGuestAfterBooking}
       />
 
     </div>

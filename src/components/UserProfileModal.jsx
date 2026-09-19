@@ -109,7 +109,7 @@ export default function UserProfileModal({
                 pickup: b.pickup_area || 'Indiranagar',
                 drop: b.drop_location || '',
                 amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
-                status: b.status || 'Confirmed'
+                status: b.status || 'Pending'
               });
             }
           });
@@ -148,7 +148,7 @@ export default function UserProfileModal({
               pickup: b.pickupArea || 'Indiranagar',
               drop: b.dropLocation || '',
               amount: b.estimatedPrice || b.fare || '₹299',
-              status: b.status || 'Confirmed'
+              status: b.status || 'Pending'
             });
           }
         });
@@ -181,7 +181,7 @@ export default function UserProfileModal({
               pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
               drop: b.dropLocation || '',
               amount: b.totalPrice ? `₹${b.totalPrice}` : '₹1,499',
-              status: b.status || 'Confirmed'
+              status: b.status || 'Pending'
             });
           }
         });
@@ -215,7 +215,7 @@ export default function UserProfileModal({
               pickup: b.pickupArea || 'Doorstep',
               drop: '',
               amount: b.courseFee || '₹3,999',
-              status: b.status || 'Active'
+              status: b.status || 'Pending'
             });
           }
         });
