@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogIn, UserPlus, CheckCircle2, ArrowRight } from 'lucide-react';
+import { LogIn, UserPlus, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useScrollLock } from '../utils/useScrollLock';
 
 export default function PostBookingAuthPromptModal({
@@ -22,21 +22,21 @@ export default function PostBookingAuthPromptModal({
       onTouchMove={(e) => e.stopPropagation()}
     >
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 text-center space-y-4">
-        {/* Success Status Icon */}
+        {/* Verification Status Icon */}
         <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-inner">
-          <CheckCircle2 className="w-7 h-7 text-amber-400" />
+          <ShieldCheck className="w-7 h-7 text-amber-400" />
         </div>
 
         {/* Badge & Title */}
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
-            <span>Booking Placed • #{bookingId}</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
+            <span>Almost Done • Final Step</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
             Login or Signup
           </h2>
           <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1 leading-relaxed">
-            {customerName ? `Hello ${customerName}, ` : ''}your booking for <strong className="text-amber-400">{serviceTitle || 'Transit Service'}</strong> is saved! Choose an option below to view your driver dispatch pass and track updates:
+            {customerName ? `Hello ${customerName}, ` : ''}please log in or sign up to confirm your booking for <strong className="text-amber-400">{serviceTitle || 'Transit Service'}</strong> and access your live driver dispatch pass:
           </p>
         </div>
 
@@ -76,7 +76,7 @@ export default function PostBookingAuthPromptModal({
             onClick={onContinueAsGuest}
             className="text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer inline-flex items-center gap-1"
           >
-            <span>Or continue as guest to view booking pass</span>
+            <span>Or continue as guest to confirm booking</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

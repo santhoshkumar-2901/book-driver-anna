@@ -622,7 +622,7 @@ export default function App() {
           onBackToHome={() => changePage('home')}
           bookingBanner={
             pendingBookingSubmission?.serviceTitle 
-              ? `Your booking for ${pendingBookingSubmission.serviceTitle} is saved! Please ${activePage === 'signup' ? 'sign up' : 'log in'} to confirm & access your pass.`
+              ? `Please ${activePage === 'signup' ? 'sign up' : 'log in'} to confirm your booking for ${pendingBookingSubmission.serviceTitle} & access your pass.`
               : null
           }
           prefillData={
