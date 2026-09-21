@@ -44,10 +44,13 @@ export function verifyToken(token) {
 }
 
 export async function registerCustomer({ name, email, phone, password, area = 'Indiranagar', ipAddress = null }) {
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+
   // Check duplicate email or phone (using LOWER() for cross-DB compatibility)
   const existing = await queryOne(
-    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
-    [email.trim(), phone.trim()]
+    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?',
+    [email.trim(), phone.trim(), `%${last10}`]
   );
 
   if (existing) {

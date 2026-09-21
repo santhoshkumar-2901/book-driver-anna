@@ -245,10 +245,17 @@ export default function DriverAuthPage({
         window.dispatchEvent(new CustomEvent('bda_driver_registered'));
       } catch (err) {}
 
+      const sessionData = {
+        ...newDriver,
+        token: 'driver-session-' + Date.now(),
+        loggedInAt: new Date().toISOString()
+      };
+      localStorage.setItem('bda_driver_user', JSON.stringify(sessionData));
+
       resetForm();
       setSuccessMessage(`Driver partner profile registered! Welcome to the fleet, Anna ${newDriver.name}.`);
       if (onLoginSuccess) {
-        onLoginSuccess(newDriver);
+        onLoginSuccess(sessionData);
       }
     }, 700);
   };

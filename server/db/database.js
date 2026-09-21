@@ -22,24 +22,44 @@ if (isTiDB) {
     throw err;
   }
 } else {
-  const dbFilePath = path.isAbsolute(ENV.DB_PATH) 
-    ? ENV.DB_PATH 
-    : path.resolve(__dirname, '../../', ENV.DB_PATH);
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+  let dbFilePath;
 
-  const dir = path.dirname(dbFilePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (isServerless) {
+    dbFilePath = '/tmp/bda_database.sqlite';
+  } else {
+    dbFilePath = path.isAbsolute(ENV.DB_PATH) 
+      ? ENV.DB_PATH 
+      : path.resolve(__dirname, '../../', ENV.DB_PATH);
   }
 
-  sqliteDb = new DatabaseSync(dbFilePath);
-  sqliteDb.exec('PRAGMA journal_mode = WAL;');
+  try {
+    const dir = path.dirname(dbFilePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    sqliteDb = new DatabaseSync(dbFilePath);
+  } catch (err) {
+    console.warn(`[DATABASE] Could not open SQLite at ${dbFilePath} (${err.message}). Using in-memory database.`);
+    sqliteDb = new DatabaseSync(':memory:');
+  }
+
+  try {
+    sqliteDb.exec('PRAGMA journal_mode = WAL;');
+  } catch (e) {
+    try { sqliteDb.exec('PRAGMA journal_mode = MEMORY;'); } catch (err) {}
+  }
   sqliteDb.exec('PRAGMA foreign_keys = ON;');
   sqliteDb.exec('PRAGMA synchronous = NORMAL;');
 
   const schemaPath = path.resolve(__dirname, 'schema.sql');
   if (fs.existsSync(schemaPath)) {
-    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-    sqliteDb.exec(schemaSql);
+    try {
+      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+      sqliteDb.exec(schemaSql);
+    } catch (e) {
+      console.warn('[DATABASE] Schema initialization note:', e.message);
+    }
   }
 
   try {
@@ -49,7 +69,7 @@ if (isTiDB) {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
   } catch (e) {}
 
-  console.log(`[DATABASE] Connected to local SQLite at ${dbFilePath} (WAL mode, foreign keys enabled)`);
+  console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
 
 /**

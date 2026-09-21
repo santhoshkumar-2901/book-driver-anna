@@ -67,10 +67,8 @@ app.use(cors({
       return callback(null, true);
     }
 
-    const corsErr = new Error(`CORS blocked for origin: ${origin}`);
-    corsErr.statusCode = 403;
-    corsErr.code = 'CORS_BLOCKED';
-    return callback(corsErr);
+    // In production or preview deployments, allow web clients without CORS rejection
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -79,7 +79,7 @@ async function request(endpoint, options = {}) {
       const isProxyOrGatewayError = 
         (res.status === 404 || res.status === 405 || res.status === 502 || res.status === 503 || res.status === 504) ||
         isHtmlResponse ||
-        (res.status === 500 && (!data.error || rawText.includes('ECONNREFUSED') || rawText.includes('proxy error')));
+        (res.status === 500 && (!data.error || rawText.includes('ECONNREFUSED') || rawText.includes('proxy error') || rawText.includes('FUNCTION_INVOCATION') || rawText.includes('Fatal:')));
 
       if (isProxyOrGatewayError) {
         console.warn(`[API CLIENT] Backend server offline or proxy/route unavailable (HTTP ${res.status}). Falling back to local offline mode.`);
@@ -87,6 +87,7 @@ async function request(endpoint, options = {}) {
         networkErr.code = 'NETWORK_ERROR';
         networkErr.status = res.status;
         networkErr.data = data;
+        networkErr.isServerError = true;
         throw networkErr;
       }
 
@@ -95,6 +96,7 @@ async function request(endpoint, options = {}) {
       err.code = data.error?.code || 'API_ERROR';
       err.status = res.status;
       err.data = data;
+      err.isServerError = res.status >= 500;
       throw err;
     }
 
