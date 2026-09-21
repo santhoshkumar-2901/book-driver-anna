@@ -83,7 +83,7 @@ app.use(cookieParser());
 app.use('/api', generalRateLimiter);
 
 // 5. Healthcheck Endpoint
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'healthy',
     service: 'Book Driver Anna Production API',
@@ -92,19 +92,31 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 6. Mount API Route Modules
+// 6. Mount API Route Modules (supporting both /api/ and direct paths for Vercel/proxy rewrite resilience)
 app.use('/api/auth', authRouter);
+app.use('/auth', authRouter);
 app.use('/api/bookings', bookingsRouter);
+app.use('/bookings', bookingsRouter);
 app.use('/api/drivers', driversRouter);
+app.use('/drivers', driversRouter);
 app.use('/api/admin', adminRouter);
+app.use('/admin', adminRouter);
 app.use('/api/chat', chatRouter);
+app.use('/chat', chatRouter);
 
 // 7. Serve Production Frontend Static Assets (if dist exists)
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.use((req, res, next) => {
-    // If request is a GET and does not target /api, serve the SPA entrypoint
-    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    // If request is a GET and does not target an API route, serve the SPA entrypoint
+    const isApiRequest = req.path.startsWith('/api') || 
+      req.path.startsWith('/auth') || 
+      req.path.startsWith('/bookings') || 
+      req.path.startsWith('/drivers') || 
+      req.path.startsWith('/admin') || 
+      req.path.startsWith('/chat');
+
+    if (req.method === 'GET' && !isApiRequest) {
       return res.sendFile(path.join(distDir, 'index.html'));
     }
     next();

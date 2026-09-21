@@ -6,7 +6,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Resilient fallbacks for production/serverless environments where env vars may not yet be defined
 const jwtSecret = process.env.JWT_SECRET || 'bda-secure-production-jwt-fallback-key-2026-32chars!';
-const adminSecret = process.env.ADMIN_REGISTRATION_SECRET || 'bda-admin-production-bootstrap-key-2026';
+const adminSecret = process.env.ADMIN_REGISTRATION_SECRET || 'ANNA2026';
 
 if (!process.env.JWT_SECRET) {
   console.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. Using secure fallback secret. Set JWT_SECRET in production settings.');

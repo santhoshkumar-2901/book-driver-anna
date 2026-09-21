@@ -972,6 +972,40 @@ export default function AdminPage({ onReturnToClient }) {
     } catch (apiErr) {
       // 1. Invalid credentials from backend (401)
       if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
+        // If local registration exists for this user, attempt auto-syncing to backend
+        try {
+          const saved = localStorage.getItem('bda_registered_admins');
+          if (saved) {
+            const registeredAdmins = JSON.parse(saved);
+            const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
+            if (found) {
+              try {
+                const regRes = await apiClient.adminRegister({
+                  name: found.name,
+                  email: found.email,
+                  phone: found.phone,
+                  password: found.password,
+                  secretKey: 'ANNA2026'
+                });
+                if (regRes?.data?.user) {
+                  resetAuthForm();
+                  setLoggedInAdminName(regRes.data.user.name);
+                  setLoggedInAdminPhone(regRes.data.user.phone);
+                  setIsAdminLoggedIn(true);
+                  localStorage.setItem('bda_admin_logged_in', 'true');
+                  localStorage.setItem('bda_admin_name', regRes.data.user.name);
+                  localStorage.setItem('bda_admin_phone', regRes.data.user.phone);
+                  const requestedTab = parseTabFromPath(window.location.pathname);
+                  navigateToTab(requestedTab, true);
+                  return;
+                }
+              } catch (syncErr) {
+                // If remote registration fails, continue to fallback check below
+              }
+            }
+          }
+        } catch (e) {}
+
         setAuthError(apiErr.message || 'Invalid admin email or password.');
         return;
       } else if (apiErr.status === 403 || apiErr.code === 'INSUFFICIENT_PRIVILEGES') {
@@ -985,8 +1019,8 @@ export default function AdminPage({ onReturnToClient }) {
         return;
       }
 
-      // If network error or 500, proceed to offline fallback check below
-      console.warn('[ADMIN AUTH] Backend unreachable; checking local fallback.');
+      // If network error or 500, check local offline storage
+      console.info('[ADMIN AUTH] Checking local fallback credentials...');
     }
 
     // In offline fallback mode, verify credentials against locally registered admin

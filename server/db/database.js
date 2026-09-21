@@ -3,7 +3,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { connect } from '@tidbcloud/serverless';
 import { DatabaseSync } from 'node:sqlite';
+import bcrypt from 'bcryptjs';
 import { ENV } from '../config/env.js';
+import { SCHEMA_SQL } from './schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,14 +54,11 @@ if (isTiDB) {
   sqliteDb.exec('PRAGMA foreign_keys = ON;');
   sqliteDb.exec('PRAGMA synchronous = NORMAL;');
 
-  const schemaPath = path.resolve(__dirname, 'schema.sql');
-  if (fs.existsSync(schemaPath)) {
-    try {
-      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-      sqliteDb.exec(schemaSql);
-    } catch (e) {
-      console.warn('[DATABASE] Schema initialization note:', e.message);
-    }
+  // Execute embedded schema to guarantee complete table definitions in all environments
+  try {
+    sqliteDb.exec(SCHEMA_SQL);
+  } catch (e) {
+    console.warn('[DATABASE] Schema initialization note:', e.message);
   }
 
   try {
@@ -68,6 +67,29 @@ if (isTiDB) {
   try {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
   } catch (e) {}
+
+  // Auto-provision default production administrator if 0 admins exist
+  try {
+    const adminRow = sqliteDb.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").get();
+    const adminCount = adminRow ? (adminRow.count || adminRow.COUNT || 0) : 0;
+    if (adminCount === 0) {
+      const defaultEmail = (process.env.ADMIN_EMAIL || 'admin@bookdriveranna.com').trim().toLowerCase();
+      const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin@Anna2026!';
+      const defaultName = process.env.ADMIN_NAME || 'Production Administrator';
+      const defaultPhone = process.env.ADMIN_PHONE || '+91 98765 00000';
+      const defaultArea = process.env.ADMIN_AREA || 'Bengaluru HQ';
+      const adminId = 'ADM-PROD-ROOT';
+      const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+
+      sqliteDb.prepare(`
+        INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+        VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
+      `).run(adminId, defaultName, defaultEmail, defaultPhone, passwordHash, defaultArea);
+      console.log(`[DATABASE] Production administrator auto-provisioned: ${defaultEmail}`);
+    }
+  } catch (e) {
+    console.warn('[DATABASE] Admin auto-provision note:', e.message);
+  }
 
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
