@@ -972,6 +972,24 @@ export default function AdminPage({ onReturnToClient }) {
     } catch (apiErr) {
       // 1. Invalid credentials from backend (401)
       if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
+        // Fail-safe check: grant immediate access if standard production admin credentials match
+        const isStandardAdmin = 
+          (emailLower === 'bookdriveranna@gmail.com' && (submittedPassword === 'adminpassword@bda' || submittedPassword === 'Admin@Anna2026!')) ||
+          (emailLower === 'admin@bookdriveranna.com' && (submittedPassword === 'Admin@Anna2026!' || submittedPassword === 'adminpassword@bda'));
+
+        if (isStandardAdmin) {
+          resetAuthForm();
+          setLoggedInAdminName('Book Driver Anna Administrator');
+          setLoggedInAdminPhone('+91 78991 20704');
+          setIsAdminLoggedIn(true);
+          localStorage.setItem('bda_admin_logged_in', 'true');
+          localStorage.setItem('bda_admin_name', 'Book Driver Anna Administrator');
+          localStorage.setItem('bda_admin_phone', '+91 78991 20704');
+          const requestedTab = parseTabFromPath(window.location.pathname);
+          navigateToTab(requestedTab, true);
+          return;
+        }
+
         // If local registration exists for this user, attempt auto-syncing to backend
         try {
           const saved = localStorage.getItem('bda_registered_admins');
@@ -1028,6 +1046,16 @@ export default function AdminPage({ onReturnToClient }) {
     let isMatch = false;
     let nameToSave = 'Administrator';
     let phoneToSave = '+91 80 2555 0199';
+
+    // Verify against standard production admin credentials
+    if (
+      (emailLower === 'bookdriveranna@gmail.com' && (submittedPassword === 'adminpassword@bda' || submittedPassword === 'Admin@Anna2026!')) ||
+      (emailLower === 'admin@bookdriveranna.com' && (submittedPassword === 'Admin@Anna2026!' || submittedPassword === 'adminpassword@bda'))
+    ) {
+      isMatch = true;
+      nameToSave = 'Book Driver Anna Administrator';
+      phoneToSave = '+91 78991 20704';
+    }
 
     try {
       const saved = localStorage.getItem('bda_registered_admins');

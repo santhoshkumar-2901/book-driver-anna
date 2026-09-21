@@ -68,24 +68,36 @@ if (isTiDB) {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
   } catch (e) {}
 
-  // Auto-provision default production administrator if 0 admins exist
+  // Auto-provision standard production administrator accounts
   try {
-    const adminRow = sqliteDb.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").get();
-    const adminCount = adminRow ? (adminRow.count || adminRow.COUNT || 0) : 0;
-    if (adminCount === 0) {
-      const defaultEmail = (process.env.ADMIN_EMAIL || 'admin@bookdriveranna.com').trim().toLowerCase();
-      const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin@Anna2026!';
-      const defaultName = process.env.ADMIN_NAME || 'Production Administrator';
-      const defaultPhone = process.env.ADMIN_PHONE || '+91 98765 00000';
-      const defaultArea = process.env.ADMIN_AREA || 'Bengaluru HQ';
-      const adminId = 'ADM-PROD-ROOT';
-      const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+    const adminsToProvision = [
+      {
+        id: 'ADM-PROD-PRIMARY',
+        name: 'Book Driver Anna Administrator',
+        email: (process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com').trim().toLowerCase(),
+        password: process.env.ADMIN_PASSWORD || 'adminpassword@bda',
+        phone: (process.env.ADMIN_PHONE || '+91 78991 20704').trim(),
+        area: 'Bengaluru HQ'
+      },
+      {
+        id: 'ADM-PROD-ROOT',
+        name: 'System Operations Admin',
+        email: 'admin@bookdriveranna.com',
+        password: process.env.ADMIN_PASSWORD || 'Admin@Anna2026!',
+        phone: '+91 98765 00000',
+        area: 'Bengaluru HQ'
+      }
+    ];
 
-      sqliteDb.prepare(`
-        INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
-        VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
-      `).run(adminId, defaultName, defaultEmail, defaultPhone, passwordHash, defaultArea);
-      console.log(`[DATABASE] Production administrator auto-provisioned: ${defaultEmail}`);
+    for (const adm of adminsToProvision) {
+      const hash = bcrypt.hashSync(adm.password, 10);
+      try {
+        sqliteDb.prepare(`
+          INSERT OR IGNORE INTO users (id, name, email, phone, password_hash, role, area, status)
+          VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
+        `).run(adm.id, adm.name, adm.email, adm.phone, hash, adm.area);
+        console.log(`[DATABASE] Production administrator ensured: ${adm.email}`);
+      } catch (err) {}
     }
   } catch (e) {
     console.warn('[DATABASE] Admin auto-provision note:', e.message);

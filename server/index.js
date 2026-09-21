@@ -27,6 +27,15 @@ export const app = express();
 // Trust proxy for rate limiters behind reverse proxies
 app.set('trust proxy', 1);
 
+// URL restoration middleware for Vercel Serverless Function rewrites
+app.use((req, res, next) => {
+  const matchedPath = req.headers['x-matched-path'] || req.headers['x-forwarded-uri'];
+  if (matchedPath && (req.url === '/api/index.js' || req.url === '/index.js' || req.url === '/api' || req.url === '/api/' || req.url === '/')) {
+    req.url = matchedPath;
+  }
+  next();
+});
+
 // 1. Security Headers with Helmet
 app.use(helmet({
   contentSecurityPolicy: {
