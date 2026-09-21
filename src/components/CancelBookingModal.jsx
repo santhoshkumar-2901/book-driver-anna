@@ -62,6 +62,14 @@ export default function CancelBookingModal({ isOpen, onClose }) {
       const res = await apiClient.lookupBooking(bId, phone);
       if (res && res.data && res.data.booking) {
         const b = res.data.booking;
+        const rawStatus = (b.status || 'PENDING').toUpperCase();
+        let displayStatus = 'Pending';
+        if (rawStatus === 'ASSIGNED' || rawStatus === 'CONFIRMED') displayStatus = 'Confirmed';
+        else if (rawStatus === 'IN_PROGRESS') displayStatus = 'Ride In Progress';
+        else if (rawStatus === 'COMPLETED') displayStatus = 'Completed';
+        else if (rawStatus === 'CANCELLED') displayStatus = 'Cancelled';
+        else displayStatus = 'Pending';
+
         setSearchResults([{
           refId: b.id,
           customerName: b.customer_name,
@@ -71,8 +79,10 @@ export default function CancelBookingModal({ isOpen, onClose }) {
           displayDate: b.date,
           displayTime: b.time,
           location: b.pickup_area,
-          status: b.status,
-          fare: b.calculated_fare
+          status: displayStatus,
+          fare: b.calculated_fare,
+          assignedDriver: b.assigned_driver_name || (rawStatus === 'ASSIGNED' ? 'Driver Assigned' : null),
+          assignedPhone: b.assigned_driver_phone || null
         }]);
         setIsSearching(false);
         return;
@@ -105,6 +115,14 @@ export default function CancelBookingModal({ isOpen, onClose }) {
           const id = (b.id || b.enrollmentId || '').trim();
           const p = (b.phone || b.customerPhone || b.mobileNumber || '').replace(/[^0-9]/g, '').slice(-10);
           if (id.toLowerCase() === bId.toLowerCase() && p === cleanPhone) {
+            const rawStatus = (b.status || 'Pending').toUpperCase();
+            let displayStatus = 'Pending';
+            if (rawStatus.includes('ASSIGN') || rawStatus.includes('CONFIRM')) displayStatus = 'Confirmed';
+            else if (rawStatus.includes('PROGRESS')) displayStatus = 'Ride In Progress';
+            else if (rawStatus.includes('COMPLET')) displayStatus = 'Completed';
+            else if (rawStatus.includes('CANCEL')) displayStatus = 'Cancelled';
+            else displayStatus = b.status || 'Pending';
+
             matched.push({
               refId: id,
               customerName: b.customerName || b.fullName,
@@ -114,8 +132,10 @@ export default function CancelBookingModal({ isOpen, onClose }) {
               displayDate: b.date || b.bookingDate || b.startDate || b.preferredStartDate,
               displayTime: b.time || b.bookingTime || b.preferredTime || '',
               location: b.pickupArea || b.address || 'Bengaluru',
-              status: b.status || 'Pending',
-              fare: b.fare || b.totalPrice || b.courseFee
+              status: displayStatus,
+              fare: b.fare || b.totalPrice || b.courseFee,
+              assignedDriver: b.assignedDriver || null,
+              assignedPhone: b.assignedDriverPhone || null
             });
           }
         }
@@ -417,12 +437,12 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-amber-400">{item.refId}</span>
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                          (item.status || '').toLowerCase() === 'cancelled'
-                            ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                            : (item.status || '').toLowerCase() === 'completed'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                          (item.status || '').toLowerCase().includes('cancel')
+                            ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                            : (item.status || '').toLowerCase().includes('complete') || (item.status || '').toLowerCase().includes('accept') || (item.status || '').toLowerCase().includes('assign') || (item.status || '').toLowerCase().includes('confirm')
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold'
+                            : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                         }`}>
                           {item.status || 'Active'}
                         </span>
@@ -456,6 +476,12 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                       <MapPin className="w-3.5 h-3.5 text-slate-500" />
                       <span className="truncate">{item.location}</span>
                     </div>
+                    {item.assignedDriver && (
+                      <div className="col-span-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-emerald-400 font-medium">
+                        <span>Assigned: <strong className="text-white font-bold">{item.assignedDriver}</strong></span>
+                        {item.assignedPhone && <span className="font-mono text-emerald-300">{item.assignedPhone}</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

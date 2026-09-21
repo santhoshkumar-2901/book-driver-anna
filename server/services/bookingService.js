@@ -6,8 +6,8 @@ import { logAuditEvent } from './auditService.js';
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
   'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
-  'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
-  'ASSIGNED': ['CONFIRMED', 'IN_PROGRESS', 'CANCELLED'],
+  'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED', 'PENDING'],
+  'ASSIGNED': ['IN_PROGRESS', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING'],
   'IN_PROGRESS': ['COMPLETED', 'CANCELLED'],
   'COMPLETED': [], // Terminal
   'CANCELLED': []  // Terminal
@@ -210,8 +210,8 @@ export async function updateBookingStatus({
   bookingId, 
   newStatus, 
   assignedDriverId = undefined, 
-  assignedDriverName = undefined, 
-  assignedDriverPhone = undefined, 
+  assignedDriverName = undefined,
+  assignedDriverPhone = undefined,
   requesterUser, 
   ipAddress = null 
 }) {
@@ -223,28 +223,43 @@ export async function updateBookingStatus({
     throw err;
   }
 
-  // Validate state machine transition (allow idempotent same-state updates e.g. updating assigned driver details)
-  const allowed = ALLOWED_STATE_TRANSITIONS[booking.status] || [];
-  if (booking.status !== newStatus && !allowed.includes(newStatus)) {
-    const err = new Error(`Cannot transition booking from '${booking.status}' to '${newStatus}'.`);
+  let normalizedNewStatus = String(newStatus).toUpperCase().trim();
+  if (normalizedNewStatus.includes('ASSIGN')) {
+    normalizedNewStatus = 'ASSIGNED';
+  } else if (normalizedNewStatus.includes('CONFIRM')) {
+    normalizedNewStatus = 'CONFIRMED';
+  } else if (normalizedNewStatus.includes('PROGRESS')) {
+    normalizedNewStatus = 'IN_PROGRESS';
+  } else if (normalizedNewStatus.includes('COMPLETE')) {
+    normalizedNewStatus = 'COMPLETED';
+  } else if (normalizedNewStatus.includes('CANCEL')) {
+    normalizedNewStatus = 'CANCELLED';
+  } else if (normalizedNewStatus.includes('PEND')) {
+    normalizedNewStatus = 'PENDING';
+  }
+
+  const currentStatus = String(booking.status).toUpperCase();
+
+  // Validate state machine transition (allow same status or permitted transition)
+  const allowed = ALLOWED_STATE_TRANSITIONS[currentStatus] || [];
+  if (normalizedNewStatus !== currentStatus && !allowed.includes(normalizedNewStatus)) {
+    const err = new Error(`Cannot transition booking from '${booking.status}' to '${normalizedNewStatus}'.`);
     err.statusCode = 400;
     err.code = 'INVALID_STATE_TRANSITION';
     throw err;
   }
 
   let updateSql = `UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP`;
-  const params = [newStatus];
+  const params = [normalizedNewStatus];
 
   if (assignedDriverId !== undefined) {
     updateSql += `, assigned_driver_id = ?`;
     params.push(assignedDriverId);
   }
-
   if (assignedDriverName !== undefined) {
     updateSql += `, assigned_driver_name = ?`;
     params.push(assignedDriverName);
   }
-
   if (assignedDriverPhone !== undefined) {
     updateSql += `, assigned_driver_phone = ?`;
     params.push(assignedDriverPhone);
@@ -260,17 +275,31 @@ export async function updateBookingStatus({
     action: 'BOOKING_STATUS_UPDATED',
     resourceType: 'booking',
     resourceId: bookingId,
-    details: { from: booking.status, to: newStatus, driver: assignedDriverName },
+    details: { from: booking.status, to: normalizedNewStatus, assignedDriverName },
     ipAddress
   });
 
-  return await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+  return await queryOne(`
+    SELECT b.*, 
+           COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+           COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+    FROM bookings b
+    LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+    WHERE b.id = ?
+  `, [bookingId]);
 }
 
 export async function getUserBookings(userId, phone = null) {
   if (!userId && !phone) return [];
+  const selectSql = `
+    SELECT b.*, 
+           COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+           COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+    FROM bookings b
+    LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+  `;
   if (userId) {
-    return await queryAll('SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+    return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC`, [userId]);
   }
-  return await queryAll('SELECT * FROM bookings WHERE customer_phone = ? ORDER BY created_at DESC', [phone]);
+  return await queryAll(`${selectSql} WHERE b.customer_phone = ? ORDER BY b.created_at DESC`, [phone]);
 }

@@ -8,6 +8,7 @@ import { SteeringWheel } from '../components/Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 import { useScrollLock } from '../utils/useScrollLock';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
 // Initial registered clients directory (empty on clean boot)
 const DEFAULT_REGISTERED_CLIENTS = [];
@@ -46,6 +47,7 @@ export default function ClientAuthPage({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
   // Form input element refs for direct DOM clearing if browser injects values
   const loginIdentifierRef = React.useRef(null);
@@ -307,8 +309,8 @@ export default function ClientAuthPage({
       setErrorMessage('Please enter a valid email address');
       return;
     }
-    if (!signupPassword || signupPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long');
+    if (!signupPassword || signupPassword.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long');
       return;
     }
     if (signupPassword !== signupConfirmPassword) {
@@ -578,9 +580,13 @@ export default function ClientAuthPage({
                     <span>Remember me</span>
                   </label>
 
-                  <span className="text-amber-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset password, please verify your mobile number via WhatsApp support (+91 80 2555 0199).")}>
+                  <button 
+                    type="button" 
+                    className="text-amber-400/90 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[11px]" 
+                    onClick={() => setShowForgotPasswordModal(true)}
+                  >
                     Forgot Password?
-                  </span>
+                  </button>
                 </div>
 
                 {/* Submit Button */}
@@ -724,7 +730,7 @@ export default function ClientAuthPage({
                         name="bda_client_reg_pwd"
                         required
                         autoComplete="new-password"
-                        placeholder="Min 6 chars"
+                        placeholder="Min 8 chars"
                         value={signupPassword}
                         onChange={(e) => setSignupPassword(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
@@ -807,6 +813,14 @@ export default function ClientAuthPage({
         <div className="relative z-10 w-full max-w-md my-auto animate-in zoom-in-95 duration-150">
           {cardElement}
         </div>
+        <ForgotPasswordModal
+          isOpen={showForgotPasswordModal}
+          onClose={() => setShowForgotPasswordModal(false)}
+          onBackToLogin={() => {
+            setShowForgotPasswordModal(false);
+            switchMode('login');
+          }}
+        />
       </div>
     );
   }
@@ -851,6 +865,14 @@ export default function ClientAuthPage({
       {/* Central Auth Container */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
         {cardElement}
+        <ForgotPasswordModal
+          isOpen={showForgotPasswordModal}
+          onClose={() => setShowForgotPasswordModal(false)}
+          onBackToLogin={() => {
+            setShowForgotPasswordModal(false);
+            switchMode('login');
+          }}
+        />
       </main>
 
       {/* Footer copyright */}

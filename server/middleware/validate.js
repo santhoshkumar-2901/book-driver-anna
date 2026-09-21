@@ -48,10 +48,10 @@ export function validateRegisterInput(req, res, next) {
     });
   }
 
-  if (!password || typeof password !== 'string' || password.length < 6) {
+  if (!password || typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({
       success: false,
-      error: { code: 'INVALID_INPUT', message: 'Password must be at least 6 characters long.' }
+      error: { code: 'INVALID_INPUT', message: 'Password must be at least 8 characters long.' }
     });
   }
 
@@ -63,8 +63,62 @@ export function validateRegisterInput(req, res, next) {
   next();
 }
 
+export function validateForgotPasswordInput(req, res, next) {
+  const { email } = req.body;
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'Please provide a valid email address.' }
+    });
+  }
+  req.body.email = email.trim().toLowerCase();
+  next();
+}
+
+export function validateResetPasswordInput(req, res, next) {
+  const { token, newPassword } = req.body;
+  if (!token || typeof token !== 'string' || !token.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'Password reset token is required.' }
+    });
+  }
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'Password must be at least 8 characters long.' }
+    });
+  }
+  req.body.token = token.trim();
+  next();
+}
+
+export function validateChangePasswordInput(req, res, next) {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'Current password is required.' }
+    });
+  }
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'New password must be at least 8 characters long.' }
+    });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_INPUT', message: 'New password must be different from current password.' }
+    });
+  }
+  next();
+}
+
 export function validateLoginInput(req, res, next) {
-  const { identifier, password } = req.body;
+  const identifier = req.body.identifier || req.body.email || req.body.phone;
+  const password = req.body.password;
 
   if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
     return res.status(400).json({

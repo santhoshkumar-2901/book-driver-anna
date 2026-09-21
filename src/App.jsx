@@ -11,6 +11,8 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ClientAuthPage = lazy(() => import('./pages/ClientAuthPage'));
 const DriverAuthPage = lazy(() => import('./pages/DriverAuthPage'));
 const DriverPortalPage = lazy(() => import('./pages/DriverPortalPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RouteLoadingFallback() {
   return (
@@ -31,8 +33,7 @@ import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
 import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
 import { apiClient } from './services/apiClient';
-import { X, ShieldCheck, Phone, CheckCircle2 } from 'lucide-react';
-import { SteeringWheel } from './components/Icons';
+import { broadcastBookingUpdate, onBookingUpdate } from './utils/broadcastSync';
 
 /**
  * Resolves a given URL pathname into application route details:
@@ -78,11 +79,15 @@ export function resolveRoute(pathname = '') {
   if (clean === '/contact') {
     return { role: 'client', page: 'contact', authRole: 'user', resetAuth: false };
   }
+  if (clean === '/reset-password') {
+    return { role: 'client', page: 'reset-password', authRole: 'user', resetAuth: false };
+  }
   if (clean === '/') {
     return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
   }
 
-  return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
+  // Catch-all route for any unmapped path: render 404 Not Found page
+  return { role: 'client', page: 'not-found', authRole: null, resetAuth: false };
 }
 
 /**
@@ -196,6 +201,8 @@ export default function App() {
       window.history.pushState({}, '', '/about');
     } else if (newPage === 'contact') {
       window.history.pushState({}, '', '/contact');
+    } else if (newPage === 'reset-password') {
+      window.history.pushState({}, '', '/reset-password' + window.location.search);
     } else {
       if (window.location.pathname !== '/') {
         window.history.pushState({}, '', '/');
@@ -208,7 +215,7 @@ export default function App() {
   const [postBookingPromptInfo, setPostBookingPromptInfo] = useState(null);
   const [pendingBookingSubmission, setPendingBookingSubmission] = useState(null);
 
-  const handleClientLoginSuccess = (userData) => {
+  const handleClientLoginSuccess = async (userData) => {
     setClientUser(userData);
     setSelectedRole('user');
     setAuthSessionKey(k => k + 1);
@@ -220,17 +227,56 @@ export default function App() {
       setPendingBookingSubmission(null);
 
       if (submission.kind === 'booking') {
-        const finalBooking = {
-          ...submission.bookingDetails,
-          userId: userData.id || null,
-          customerName: submission.bookingDetails.customerName || userData.name || '',
-          customerPhone: submission.bookingDetails.customerPhone || userData.phone || '',
-          customerEmail: submission.bookingDetails.customerEmail || userData.email || '',
-          status: 'Pending',
-          assignedAnna: 'Pending Admin Assignment'
+        const b = submission.bookingDetails;
+        const apiPayload = b.rawPayload ? {
+          ...b.rawPayload,
+          customerName: userData.name || b.customerName,
+          customerPhone: userData.phone || b.customerPhone,
+          customerEmail: userData.email || b.customerEmail
+        } : {
+          customerName: userData.name || b.customerName,
+          customerPhone: userData.phone || b.customerPhone,
+          customerEmail: userData.email || b.customerEmail,
+          bookingCategory: b.bookingType || 'driver',
+          selectedClassId: b.selectedClassId,
+          vehicleCategory: b.vehicleCategory,
+          driverTripOption: b.driverTripOption,
+          dropLocation: b.dropLocation,
+          roundTripDuration: b.roundTripDuration,
+          outstationTripType: b.outstationTripType,
+          outstationPackage: b.outstationPackage,
+          outstationDestination: b.outstationDestination,
+          pickupArea: b.pickupArea,
+          date: new Date().toISOString().split('T')[0],
+          time: b.bookingTime || '09:00 AM',
+          paymentMode: b.paymentMode || 'cash'
         };
 
-        // Close the booking modal, return to home, and complete the booking as Pending
+        // Create booking in backend database now that client is authenticated
+        let serverBooking = null;
+        try {
+          const res = await apiClient.createBooking(apiPayload);
+          if (res && res.data && res.data.booking) {
+            serverBooking = res.data.booking;
+          }
+        } catch (err) {
+          console.warn('[AUTH LOGIN] Backend booking creation note:', err.message);
+        }
+
+        const finalBooking = {
+          ...b,
+          id: serverBooking ? serverBooking.id : b.bookingId,
+          bookingId: serverBooking ? serverBooking.id : b.bookingId,
+          userId: userData.id || null,
+          customerName: userData.name || b.customerName,
+          customerPhone: userData.phone || b.customerPhone,
+          customerEmail: userData.email || b.customerEmail,
+          totalFare: serverBooking ? serverBooking.calculated_fare : b.totalFare,
+          fare: serverBooking ? serverBooking.calculated_fare : b.totalFare,
+          status: 'Pending'
+        };
+
+        // Close the booking modal, return to home, and complete the booking
         setIsBookingModalOpen(false);
         changePage('home');
         handleBookingComplete(finalBooking);
@@ -253,7 +299,7 @@ export default function App() {
           time: submission.enrollmentData.preferredTime === 'Morning' ? '07:00 AM' : (submission.enrollmentData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
           totalFare: 5999,
           status: 'Pending',
-          assignedAnna: 'Pending Instructor Assignment'
+          assignedAnna: 'Syed Nizamuddin (Certified Driving Instructor Anna)'
         };
         setActiveBookingPass(classPass);
       }
@@ -319,9 +365,6 @@ export default function App() {
   // Client User Profile Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Real-time notification banner state when admin accepts & assigns
-  const [assignedNotice, setAssignedNotice] = useState(null);
-
   // Sync profile edits to state, storage & registered clients database
   const handleUpdateProfile = (updatedUser) => {
     setClientUser(updatedUser);
@@ -356,137 +399,43 @@ export default function App() {
     return () => window.removeEventListener('bda_ride_completed', handleRideCompleted);
   }, []);
 
-  // Real-time synchronization: When admin accepts & assigns, update client site immediately
+  // Synchronize real-time driver assignment and booking status updates to active ride
   useEffect(() => {
-    const syncClientBookings = () => {
-      try {
-        const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-        const vehicleBookings = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
-        const classBookings = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
-        const allBookings = [...driverBookings, ...vehicleBookings, ...classBookings];
-
-        // 1. Dynamically update activeBookingPass if currently displayed in BookingSuccessModal
-        setActiveBookingPass(prev => {
-          if (!prev) return null;
-          const currentId = prev.bookingId || prev.id || prev.enrollmentId;
-          const match = allBookings.find(b => (b.id || b.enrollmentId || b.bookingId) === currentId);
-          if (match) {
-            const assignedName = match.assignedDriver || match.assignedInstructor || match.assignedAnna;
-            const assignedPhone = match.assignedDriverPhone || match.assignedInstructorPhone || match.driverPhone;
-            const isUpdated = 
-              match.status !== prev.status ||
-              assignedName !== prev.assignedAnna ||
-              assignedPhone !== prev.driverPhone;
-
-            if (isUpdated) {
-              return {
-                ...prev,
-                status: match.status || prev.status,
-                assignedAnna: assignedName || prev.assignedAnna,
-                assignedDriver: assignedName || prev.assignedDriver,
-                driverPhone: assignedPhone || prev.driverPhone,
-                driverRating: match.driverRating || prev.driverRating || '5.0',
-                vehicleRegNumber: match.vehicleRegNumber || prev.vehicleRegNumber
-              };
-            }
-          }
-          return prev;
-        });
-
-        // 2. If clientUser is active, verify if an assigned trip should activate activeRide
-        if (clientUser) {
-          const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
-          const userEmailClean = (clientUser.email || '').toLowerCase().trim();
-
-          const myAssignedDriverBooking = driverBookings.find(b => {
-            if (b.status !== 'Assigned' && b.status !== 'IN_PROGRESS') return false;
-            const bUserId = b.userId ? String(b.userId).trim() : null;
-            const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-            const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
-            return (clientUser.id && bUserId === clientUser.id) ||
-              (!bUserId && userEmailClean && bEmail === userEmailClean) ||
-              (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
-          });
-
-          if (myAssignedDriverBooking) {
-            setActiveRide(prev => {
-              if (prev && prev.id === myAssignedDriverBooking.id && prev.driverName === myAssignedDriverBooking.assignedDriver) {
-                return prev;
-              }
-              return {
-                id: myAssignedDriverBooking.id,
-                driverName: myAssignedDriverBooking.assignedDriver || "Driver Assigned",
-                driverPhone: myAssignedDriverBooking.assignedDriverPhone || "+91 80 2555 0199",
-                driverRating: 5.0,
-                carModel: myAssignedDriverBooking.vehicleCategory || "Customer Vehicle",
-                pickupArea: myAssignedDriverBooking.pickupArea || "Pickup Location",
-                dropLocation: myAssignedDriverBooking.dropLocation || "Kempegowda Intl Airport",
-                totalFare: myAssignedDriverBooking.fare || 499,
-                distance: "City Route",
-                duration: "Scheduled Trip"
-              };
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Error in client booking sync:', e);
-      }
-    };
-
-    const handleDriverAssignedEvent = (e) => {
-      syncClientBookings();
-      if (e?.detail) {
-        const { bookingId, driverName, driverPhone, status, booking } = e.detail;
-        let isRelevant = true;
-        if (clientUser && booking) {
-          const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
-          const userEmailClean = (clientUser.email || '').toLowerCase().trim();
-          const bUserId = booking.userId ? String(booking.userId).trim() : null;
-          const bEmail = (booking.customerEmail || booking.email || '').toLowerCase().trim();
-          const bPhone = (booking.phone || '').replace(/[^0-9]/g, '');
-          isRelevant = (clientUser.id && bUserId === clientUser.id) ||
-            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
-            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
-        }
-
-        if (isRelevant) {
-          setAssignedNotice({
-            bookingId,
-            driverName: driverName || 'Driver Anna',
-            driverPhone: driverPhone || '+91 80 2555 0199',
-            status: status || 'Assigned'
-          });
-        }
-      }
-    };
-
-    window.addEventListener('bda_booking_updated', syncClientBookings);
-    window.addEventListener('bda_driver_assigned', handleDriverAssignedEvent);
-    window.addEventListener('storage', syncClientBookings);
-
-    let bc = null;
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        bc = new BroadcastChannel('bda_realtime_channel');
-        bc.onmessage = (msg) => {
-          syncClientBookings();
-          if (msg.data?.type === 'BOOKING_ASSIGNED') {
-            handleDriverAssignedEvent({ detail: msg.data });
-          }
+    const unsubscribe = onBookingUpdate((detail) => {
+      if (!detail || !detail.bookingId) return;
+      setActiveRide((current) => {
+        if (!current || current.id !== detail.bookingId) return current;
+        const updated = {
+          ...current,
+          driverName: detail.assignedDriver || current.driverName,
+          driverPhone: detail.assignedDriverPhone || current.driverPhone,
+          status: detail.status || current.status
         };
-      }
-    } catch (e) {}
 
-    const interval = setInterval(syncClientBookings, 4000);
+        // If driver initiated fare settlement or completed ride, open customer payment modal automatically
+        if (detail.status === 'Fare Settlement' || detail.status === 'Completed') {
+          const numericFare = Number(String(detail.totalFare || current.fare || current.price || '749').replace(/[^0-9]/g, '')) || 749;
+          setPaymentRideData({
+            id: current.id,
+            driverName: detail.assignedDriver || current.driverName || "Driver Assigned",
+            driverPhone: detail.assignedDriverPhone || current.driverPhone || "+91 80 2555 0199",
+            driverUpi: detail.assignedDriverUpi || current.assignedDriverUpi || detail.driverUpi || '',
+            driverRating: 5.0,
+            carModel: current.carModel || current.vehicleType || "Sedan",
+            pickupArea: current.pickup || current.pickupLocation || "Pickup",
+            dropLocation: current.dropoff || current.dropoffLocation || "Destination",
+            distance: current.distance || "18 km",
+            totalFare: numericFare,
+            settlementMethod: detail.settlementMethod || 'online'
+          });
+          setIsPaymentModalOpen(true);
+        }
 
-    return () => {
-      window.removeEventListener('bda_booking_updated', syncClientBookings);
-      window.removeEventListener('bda_driver_assigned', handleDriverAssignedEvent);
-      window.removeEventListener('storage', syncClientBookings);
-      if (bc) bc.close();
-      clearInterval(interval);
-    };
-  }, [clientUser]);
+        return updated;
+      });
+    });
+    return unsubscribe;
+  }, []);
 
   const openCancelModal = () => {
     setIsCancelModalOpen(true);
@@ -535,8 +484,7 @@ export default function App() {
       serviceTitle,
       bookingDetails: {
         ...bookingDetails,
-        status: 'Pending',
-        assignedAnna: 'Pending Admin Assignment'
+        status: 'Confirmed'
       }
     });
     setPostBookingPromptInfo({
@@ -575,6 +523,12 @@ export default function App() {
     changePage('signup');
   };
 
+  const handleClosePostBookingPrompt = () => {
+    setIsPostBookingPromptOpen(false);
+    setPendingBookingSubmission(null);
+    setPostBookingPromptInfo(null);
+  };
+
   // Redirect authenticated users away from auth pages
   useEffect(() => {
     if (clientUser && (activePage === 'login' || activePage === 'signup')) {
@@ -595,32 +549,30 @@ export default function App() {
 
     if (bookingDetails.bookingType === 'class') {
       const newClassBooking = {
-        id: bookingDetails.bookingId || ('BDA-CLS-' + Math.floor(1000 + Math.random() * 9000)),
+        enrollmentId: bookingDetails.bookingId || ('BDA-CLS-' + Math.floor(1000 + Math.random() * 9000)),
         userId: bookingUserId,
-        customerEmail: bookingUserEmail,
-        customerName: bookingDetails.customerName,
-        phone: bookingUserPhone,
-        tripType: 'class',
-        tripTitle: bookingDetails.serviceName || 'Driving Class',
-        pickupArea: bookingDetails.pickupArea || 'Indiranagar',
-        dropLocation: `Doorstep Training in ${bookingDetails.pickupArea || 'Bangalore'}`,
-        classCourseName: bookingDetails.classCourseName || 'Beginner Course',
-        classDuration: bookingDetails.classDuration || '15 Days',
-        classTrainingCar: bookingDetails.classTrainingCar || "Anna's Dual-Control Car",
-        classTransmission: bookingDetails.classTransmission || 'Manual',
-        classTimeSlot: bookingDetails.classTimeSlot || 'Morning (07:00 AM - 08:00 AM)',
-        date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
-        time: bookingDetails.bookingTime || '07:00 AM',
-        fare: bookingDetails.totalFare || 5999,
-        assignedDriver: bookingDetails.assignedInstructor || 'Instructor Assigned on Dispatch',
-        assignedDriverPhone: bookingDetails.assignedInstructorPhone || '+91 80 2555 0199',
+        emailAddress: bookingUserEmail,
+        fullName: bookingDetails.customerName,
+        mobileNumber: bookingUserPhone,
+        address: bookingDetails.pickupArea || 'Indiranagar, Bangalore',
+        pickupLocation: bookingDetails.pickupArea || 'Indiranagar',
+        courseName: bookingDetails.classCourseName || 'Beginner Driving Course',
+        duration: bookingDetails.classDuration || '15 Days',
+        trainingCar: bookingDetails.classTrainingCar || "Anna's Dual-Control Car",
+        gearPreference: bookingDetails.classTransmission || 'Manual',
+        preferredTime: bookingDetails.classTimeSlot || 'Morning',
+        preferredStartDate: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
+        courseFee: bookingDetails.totalFare || 5999,
+        status: 'Pending',
+        assignedInstructor: '',
+        assignedInstructorPhone: '',
         bookedAt: 'Just Now'
       };
 
-      const existingDriver = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updatedDriver = [newClassBooking, ...existingDriver];
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updatedDriver));
-      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      const existingClasses = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
+      const updatedClasses = [newClassBooking, ...existingClasses];
+      localStorage.setItem('bda_class_enrollments', JSON.stringify(updatedClasses));
+      broadcastBookingUpdate({ bookingId: newClassBooking.enrollmentId, status: 'Pending' });
 
     } else if (bookingDetails.bookingType === 'vehicle') {
       const newVehicleBooking = {
@@ -640,16 +592,15 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 1999,
-        status: bookingDetails.status || 'Pending',
-        assignedDriver: bookingDetails.assignedAnna || 'Pending Admin Assignment',
-        vehicleRegNumber: 'Unassigned',
+        status: 'Pending',
+        vehicleRegNumber: 'Pending Assignment',
         bookedAt: 'Just Now'
       };
 
       const existingVehicle = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
       const updatedVehicle = [newVehicleBooking, ...existingVehicle];
       localStorage.setItem('bda_vehicle_bookings', JSON.stringify(updatedVehicle));
-      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      broadcastBookingUpdate({ bookingId: newVehicleBooking.id, status: 'Pending' });
 
     } else {
       const newDriverBooking = {
@@ -668,32 +619,34 @@ export default function App() {
         date: bookingDetails.bookingDate || new Date().toISOString().split('T')[0],
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 349,
-        status: bookingDetails.status || 'Pending',
-        assignedDriver: bookingDetails.assignedAnna || 'Pending Admin Dispatch',
+        status: 'Pending',
+        assignedDriver: 'Pending Admin Acceptance',
         bookedAt: 'Just Now'
       };
 
       const existingDriver = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
       const updatedDriver = [newDriverBooking, ...existingDriver];
       localStorage.setItem('bda_driver_bookings', JSON.stringify(updatedDriver));
-      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      broadcastBookingUpdate({ bookingId: newDriverBooking.id, status: 'Pending' });
     }
 
-    // Only set active ride tracking banner when booking is in progress or assigned
-    if (bookingDetails.status === 'Assigned' || bookingDetails.status === 'IN_PROGRESS') {
-      setActiveRide({
-        id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
-        driverName: bookingDetails.assignedAnna || 'Driver Assigned on Dispatch',
-        driverPhone: bookingDetails.driverPhone || '+91 80 2555 0199',
-        driverRating: 5.0,
-        carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
-        pickupArea: bookingDetails.pickupArea || 'Pickup Location',
-        dropLocation: bookingDetails.dropLocation || 'Drop Location',
-        totalFare: bookingDetails.totalFare || 549,
-        distance: bookingDetails.distance || 'City Route',
-        duration: bookingDetails.duration || 'Scheduled Duration'
-      });
-    }
+    // Set active ride for real-time tracking and post-ride fare settlement
+    setActiveRide({
+      id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
+      driverName: 'Pending Admin Acceptance',
+      driverPhone: '+91 80 2555 0199',
+      driverRating: 5.0,
+      carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
+      pickupArea: bookingDetails.pickupArea || 'Pickup Location',
+      dropLocation: bookingDetails.dropLocation || 'Drop Location',
+      totalFare: bookingDetails.totalFare || 549,
+      distance: bookingDetails.distance || 'City Route',
+      duration: bookingDetails.duration || 'Scheduled Duration'
+    });
+
+    // Dispatch bda_order_created & bda_booking_updated so the Admin portal reflects the new order immediately
+    window.dispatchEvent(new CustomEvent('bda_order_created'));
+    window.dispatchEvent(new CustomEvent('bda_booking_updated'));
   };
 
   // 1. Dedicated layout for Admin Portal (/admin)
@@ -736,7 +689,19 @@ export default function App() {
     );
   }
 
-  // 4. Client Auth Pages (/login, /signup, /client-auth)
+  // 4. Password Reset Page (/reset-password?token=...)
+  if (activePage === 'reset-password') {
+    return (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <ResetPasswordPage
+          onNavigateLogin={() => changePage('login')}
+          onNavigateHome={() => changePage('home')}
+        />
+      </Suspense>
+    );
+  }
+
+  // 5. Client Auth Pages (/login, /signup, /client-auth)
   if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth') {
     return (
       <Suspense fallback={<RouteLoadingFallback />}>
@@ -747,9 +712,7 @@ export default function App() {
           onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
           onBackToHome={() => changePage('home')}
           bookingBanner={
-            pendingBookingSubmission?.serviceTitle 
-              ? `Please ${activePage === 'signup' ? 'sign up' : 'log in'} to confirm your booking for ${pendingBookingSubmission.serviceTitle} & access your pass.`
-              : null
+            pendingBookingSubmission?.serviceTitle || null
           }
           prefillData={
             pendingBookingSubmission?.bookingDetails
@@ -818,6 +781,15 @@ export default function App() {
           {activePage === 'contact' && (
             <ContactPage 
               openBookingModal={openBookingModal} 
+            />
+          )}
+
+          {activePage === 'not-found' && (
+            <NotFound 
+              onNavigateHome={() => changePage('home')}
+              onNavigateServices={() => changePage('services')}
+              onNavigateContact={() => changePage('contact')}
+              openBookingModal={openBookingModal}
             />
           )}
         </Suspense>
@@ -918,83 +890,16 @@ export default function App() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleClientLogout}
         openBookingModal={openBookingModal}
-        onViewTripTicket={(booking) => {
-          setActiveBookingPass(booking);
-        }}
       />
 
-      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up */}
+      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}
       <PostBookingAuthPromptModal
         isOpen={isPostBookingPromptOpen}
         bookingInfo={postBookingPromptInfo}
         onChooseLogin={handleChooseLoginAfterBooking}
         onChooseSignup={handleChooseSignupAfterBooking}
+        onClose={handleClosePostBookingPrompt}
       />
-
-      {/* Real-Time Order Accepted & Assigned Notification Banner */}
-      {assignedNotice && (
-        <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-slate-900 border-2 border-amber-400 rounded-2xl p-3.5 sm:p-4 shadow-2xl shadow-black/90 backdrop-blur-xl flex items-center justify-between gap-3 text-slate-100">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-extrabold flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/20">
-                <SteeringWheel className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-                    Booking Accepted & Assigned!
-                  </span>
-                </div>
-                <div className="text-xs sm:text-sm font-extrabold text-white truncate font-['Outfit']">
-                  {assignedNotice.driverName} has been assigned to trip #{assignedNotice.bookingId}
-                </div>
-                <div className="text-[11px] text-slate-400 truncate">
-                  Call: <span className="font-mono text-amber-300 font-bold">{assignedNotice.driverPhone}</span> • Anna is on his way!
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  // Find full booking details and open ticket
-                  const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-                  const match = driverBookings.find(b => b.id === assignedNotice.bookingId);
-                  if (match) {
-                    setActiveBookingPass({
-                      bookingId: match.id,
-                      status: match.status,
-                      serviceName: match.tripTitle || 'Personal Driver',
-                      pickupArea: match.pickupArea,
-                      dropLocation: match.dropLocation,
-                      bookingDate: match.date,
-                      bookingTime: match.time,
-                      totalFare: match.fare,
-                      customerName: match.customerName,
-                      customerPhone: match.phone,
-                      assignedAnna: match.assignedDriver,
-                      driverPhone: match.assignedDriverPhone
-                    });
-                  }
-                  setAssignedNotice(null);
-                }}
-                className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-400/20 transition-all cursor-pointer shrink-0"
-              >
-                View Ticket
-              </button>
-              <button
-                type="button"
-                onClick={() => setAssignedNotice(null)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

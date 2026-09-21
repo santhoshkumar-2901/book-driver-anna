@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Car, ShieldCheck, CheckCircle2, MapPin, Phone, LogOut, ArrowUpRight, 
   DollarSign, TrendingUp, Calendar, Clock, Award, AlertCircle, Check, X, 
-  ChevronRight, RefreshCw, Power
+  ChevronRight, RefreshCw, Power, QrCode, Smartphone, Sparkles, Save, Edit2, Copy
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import useScrollLock from '../utils/useScrollLock';
+import { broadcastBookingUpdate, onBookingUpdate } from '../utils/broadcastSync';
+import { 
+  isDutyAssignedToDriver, 
+  isDutyAssignedToOtherDriver, 
+  formatDuty, 
+  getDriverDuties 
+} from '../utils/driverDutyHelpers';
+
+export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
 export default function DriverPortalPage({ 
   driverUser, 
@@ -22,14 +31,107 @@ export default function DriverPortalPage({
     } catch (e) {}
     return true;
   });
-  const [acceptedTrips, setAcceptedTrips] = useState([]);
+  const [acceptedTrips, setAcceptedTrips] = useState(() => {
+    return getDriverDuties(driverUser).myAssigned;
+  });
   const [toastMessage, setToastMessage] = useState(null);
   const [todayEarnings, setTodayEarnings] = useState(driverUser?.earningsToday || 0);
   const [lifetimeTrips, setLifetimeTrips] = useState(driverUser?.trips || 0);
   const [settlementTrip, setSettlementTrip] = useState(null);
   const [settlementMethod, setSettlementMethod] = useState('online'); // 'online' or 'cash'
 
+  // Driver UPI ID state for generating dynamic QR codes
+  const [driverUpi, setDriverUpi] = useState(() => {
+    if (driverUser?.upiId) return driverUser.upiId;
+    try {
+      const savedUser = localStorage.getItem('bda_driver_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed?.upiId) return parsed.upiId;
+      }
+      const savedDrivers = localStorage.getItem('bda_registered_drivers');
+      if (savedDrivers) {
+        const list = JSON.parse(savedDrivers);
+        const currentPhone = (driverUser?.phone || '').replace(/[^0-9]/g, '');
+        const currentId = driverUser?.id;
+        const found = list.find(d => (currentId && d.id === currentId) || (currentPhone && d.phone && d.phone.replace(/[^0-9]/g, '') === currentPhone));
+        if (found?.upiId) return found.upiId;
+      }
+    } catch (e) {}
+    return 'anna.driver@oksbi';
+  });
+  const [upiSaveSuccess, setUpiSaveSuccess] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const handleCopyUpi = (text) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2000);
+    }
+  };
+
   useScrollLock(Boolean(settlementTrip));
+
+  const handleSaveUpi = (e) => {
+    if (e) e.preventDefault();
+    const cleanUpi = driverUpi.trim();
+    if (!cleanUpi || !cleanUpi.includes('@')) {
+      setToastMessage("Please enter a valid UPI ID (e.g. yourname@oksbi or phone@paytm)");
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
+    // 1. Update active driver user session
+    try {
+      const savedUser = localStorage.getItem('bda_driver_user');
+      const parsed = savedUser ? JSON.parse(savedUser) : { ...(driverUser || {}) };
+      parsed.upiId = cleanUpi;
+      localStorage.setItem('bda_driver_user', JSON.stringify(parsed));
+    } catch (e) {}
+
+    // 2. Update fleet directory in bda_registered_drivers
+    try {
+      const savedDrivers = localStorage.getItem('bda_registered_drivers');
+      let driversList = savedDrivers ? JSON.parse(savedDrivers) : [];
+      if (Array.isArray(driversList)) {
+        const currentId = driverUser?.id;
+        const currentPhone = (driverUser?.phone || '').replace(/[^0-9]/g, '');
+        let found = false;
+        const updated = driversList.map(d => {
+          const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+          if ((currentId && d.id === currentId) || (currentPhone && dPhone && (dPhone === currentPhone || dPhone.includes(currentPhone) || currentPhone.includes(dPhone)))) {
+            found = true;
+            return { ...d, upiId: cleanUpi };
+          }
+          return d;
+        });
+        if (!found && driverUser) {
+          updated.unshift({ ...driverUser, upiId: cleanUpi });
+        }
+        localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
+      }
+    } catch (e) {}
+
+    // 3. Dispatch real-time event for RidePaymentModal & Admin
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bda_driver_upi_updated', {
+        detail: {
+          driverId: driverUser?.id,
+          phone: driverUser?.phone,
+          name: driverUser?.name,
+          upiId: cleanUpi
+        }
+      }));
+    }
+
+    setUpiSaveSuccess(true);
+    setToastMessage(`✓ UPI ID updated to ${cleanUpi}. Live QR code generated!`);
+    setTimeout(() => {
+      setUpiSaveSuccess(false);
+      setTimeout(() => setToastMessage(null), 1000);
+    }, 3000);
+  };
 
   // Sync duty status to persistent database and notify admin in real-time
   const handleToggleOnline = () => {
@@ -110,28 +212,38 @@ export default function DriverPortalPage({
   }, [driverUser, isOnline]);
 
   const [availableDuties, setAvailableDuties] = useState(() => {
-    try {
-      const savedBookings = localStorage.getItem('bda_driver_bookings');
-      if (savedBookings) {
-        const parsed = JSON.parse(savedBookings);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(b => b.status === 'Pending' || b.status === 'Confirmed').map(b => ({
-            id: b.id || b.bookingId || `DUTY-${Math.floor(1000 + Math.random() * 9000)}`,
-            customerName: b.customerName || b.name || "Customer",
-            tripType: b.serviceType === 'driver' ? `${b.tripType || 'Driver'} Service` : 'Driver Duty',
-            pickup: b.pickupArea || b.pickup || "Pickup Location",
-            destination: b.dropLocation || b.drop || "Drop Location",
-            scheduledTime: b.time ? `${b.date || 'Today'}, ${b.time}` : 'Scheduled',
-            carModel: b.vehicleCategory || b.carModel || 'Customer Vehicle',
-            payout: `₹${b.fare || b.totalFare || 499}`,
-            urgency: b.urgency || 'Standard Booking',
-            distance: b.distance || 'City Route'
-          }));
+    return getDriverDuties(driverUser).openPool;
+  });
+
+  // Real-time synchronization when admin assigns or modifies bookings across tabs and windows
+  useEffect(() => {
+    const reloadDuties = (payload) => {
+      const { myAssigned, openPool } = getDriverDuties(driverUser);
+      setAcceptedTrips(myAssigned);
+      setAvailableDuties(openPool);
+
+      // Notify if a duty was just assigned to THIS driver by admin
+      if (payload && (payload.bookingId || payload.id)) {
+        const currentDriver = driverUser || (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('bda_driver_user') || 'null') : null) || {};
+        if (isDutyAssignedToDriver(payload, currentDriver)) {
+          setToastMessage(`🔔 New Trip Assigned! Duty #${payload.bookingId || payload.id} has been assigned to you by Dispatch Admin.`);
+          setTimeout(() => setToastMessage(null), 6000);
         }
       }
-    } catch (e) {}
-    return [];
-  });
+    };
+
+    const unsubscribe = onBookingUpdate(reloadDuties);
+    window.addEventListener('storage', reloadDuties);
+    window.addEventListener('bda_booking_updated', reloadDuties);
+    window.addEventListener('bda_order_created', reloadDuties);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+      window.removeEventListener('storage', reloadDuties);
+      window.removeEventListener('bda_booking_updated', reloadDuties);
+      window.removeEventListener('bda_order_created', reloadDuties);
+    };
+  }, [driverUser]);
 
   const handleAcceptDuty = (duty) => {
     if (!isOnline) {
@@ -140,8 +252,37 @@ export default function DriverPortalPage({
       return;
     }
 
-    const acceptedDuty = { ...duty, status: 'Accepted' };
-    setAcceptedTrips(prev => [acceptedDuty, ...prev]);
+    const currentDriver = driverUser || (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('bda_driver_user') || 'null') : null) || {};
+    const acceptedDuty = { 
+      ...duty, 
+      status: 'Assigned',
+      assignedDriver: currentDriver.name || 'Driver Assigned',
+      assignedDriverPhone: currentDriver.phone || '',
+      assignedDriverUpi: driverUpi || currentDriver.upiId || ''
+    };
+
+    // Update persistent bda_driver_bookings
+    try {
+      const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+      const updated = savedBookings.map(b => (b.id === duty.id || b.bookingId === duty.id) ? {
+        ...b,
+        status: 'Assigned',
+        assignedDriver: currentDriver.name || 'Driver Assigned',
+        assignedDriverPhone: currentDriver.phone || '',
+        assignedDriverUpi: driverUpi || currentDriver.upiId || ''
+      } : b);
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+    } catch (e) {}
+
+    broadcastBookingUpdate({
+      bookingId: duty.id,
+      status: 'Assigned',
+      assignedDriver: currentDriver.name,
+      assignedDriverPhone: currentDriver.phone,
+      assignedDriverUpi: driverUpi || currentDriver.upiId
+    });
+
+    setAcceptedTrips(prev => [acceptedDuty, ...prev.filter(d => d.id !== duty.id)]);
     setAvailableDuties(prev => prev.filter(d => d.id !== duty.id));
     setToastMessage(`✓ Duty ${duty.id} accepted! Customer ${duty.customerName} notified that Anna is on the way.`);
     setTimeout(() => setToastMessage(null), 5000);
@@ -149,6 +290,15 @@ export default function DriverPortalPage({
 
   const handleStartTrip = (tripId) => {
     setAcceptedTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'In Progress' } : t));
+
+    // Update persistent bda_driver_bookings
+    try {
+      const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+      const updated = savedBookings.map(b => (b.id === tripId || b.bookingId === tripId) ? { ...b, status: 'In Progress' } : b);
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+    } catch (e) {}
+
+    broadcastBookingUpdate({ bookingId: tripId, status: 'In Progress' });
     setToastMessage(`🚗 Trip ${tripId} started! Meter is running.`);
     setTimeout(() => setToastMessage(null), 4000);
   };
@@ -159,6 +309,15 @@ export default function DriverPortalPage({
 
     setTodayEarnings(prev => prev + numericFare);
     setLifetimeTrips(prev => prev + 1);
+
+    // Update persistent bda_driver_bookings
+    try {
+      const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+      const updated = savedBookings.map(b => (b.id === settlementTrip.id || b.bookingId === settlementTrip.id) ? { ...b, status: 'Completed' } : b);
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+    } catch (e) {}
+
+    broadcastBookingUpdate({ bookingId: settlementTrip.id, status: 'Completed' });
 
     // Notify customer app via CustomEvent
     if (typeof window !== 'undefined') {
@@ -182,6 +341,41 @@ export default function DriverPortalPage({
     setToastMessage(`✓ Trip ${settlementTrip.id} completed! Payout of ${settlementTrip.payout} recorded.`);
     setSettlementTrip(null);
     setTimeout(() => setToastMessage(null), 5000);
+  };
+
+  const handleOpenSettlement = (trip) => {
+    setSettlementTrip(trip);
+    setSettlementMethod('online');
+    const numericFare = Number(trip.payout?.replace(/[^0-9]/g, '')) || 749;
+    const activeUpi = (driverUpi || driverUser?.upiId || '').trim() || 'anna.driver@oksbi';
+
+    broadcastBookingUpdate({
+      bookingId: trip.id,
+      status: 'Fare Settlement',
+      assignedDriver: driverUser?.name || 'Driver Assigned',
+      assignedDriverPhone: driverUser?.phone || '',
+      assignedDriverUpi: activeUpi,
+      driverUpi: activeUpi,
+      totalFare: numericFare
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bda_ride_completed', {
+        detail: {
+          id: trip.id,
+          driverName: driverUser?.name || "Driver Assigned",
+          driverPhone: driverUser?.phone || "+91 80 2555 0199",
+          driverRating: driverUser?.rating || 5.0,
+          driverUpi: activeUpi,
+          carModel: trip.carModel,
+          pickupArea: trip.pickup,
+          dropLocation: trip.destination,
+          distance: trip.distance,
+          totalFare: numericFare,
+          settlementMethod: 'online'
+        }
+      }));
+    }
   };
 
   return (
@@ -306,13 +500,135 @@ export default function DriverPortalPage({
           </div>
         </div>
 
-        {/* Accepted Active Trips (if any) */}
-        {acceptedTrips.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <h2 className="text-base font-extrabold text-white font-['Outfit']">Your Active Assigned Trips</h2>
+        {/* Driver Payment UPI & Auto-Generated QR Section */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-400/15 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white font-['Outfit'] flex items-center gap-2">
+                  <span>Your Direct Payment UPI & Scannable QR</span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    Auto Generated
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Enter your personal UPI ID (GPay / PhonePe / Paytm). Customers on your rides will scan this QR to pay you directly.
+                </p>
+              </div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-2 border-t border-slate-800/80 items-center">
+            {/* Input Form */}
+            <div className="md:col-span-7 space-y-3">
+              <form onSubmit={handleSaveUpi} className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 block uppercase tracking-wider">
+                    Your UPI ID / VPA
+                  </label>
+                  <div className="relative">
+                    <input 
+                      id="driver-upi-input"
+                      type="text"
+                      value={driverUpi}
+                      onChange={(e) => setDriverUpi(e.target.value)}
+                      placeholder="e.g. yourname@oksbi or 9845012345@paytm"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400/50 transition-all pr-24"
+                    />
+                    <button
+                      id="save-driver-upi-btn"
+                      type="submit"
+                      className={`absolute right-1.5 top-1.5 bottom-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        upiSaveSuccess
+                          ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                          : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-sm'
+                      }`}
+                    >
+                      {upiSaveSuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Saved</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save UPI</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Works with Google Pay, PhonePe, Paytm, BHIM, CRED & all Indian banking UPI apps.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-400">
+                  <span className="font-semibold text-slate-300">Supported:</span>
+                  <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">@oksbi</span>
+                  <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">@okaxis</span>
+                  <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">@ybl</span>
+                  <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">@paytm</span>
+                  <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">@ibl</span>
+                </div>
+              </form>
+            </div>
+
+            {/* Generated QR Code Preview */}
+            <div className="md:col-span-5 flex flex-col sm:flex-row items-center gap-4 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800">
+              <div className="w-28 h-28 bg-white p-1.5 rounded-xl border border-slate-200 flex items-center justify-center shrink-0 shadow-md">
+                {driverUpi.trim() ? (
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(driverUpi.trim())}&pn=${encodeURIComponent(driverUser?.name || "Driver Anna")}&cu=INR`)}`}
+                    alt="Driver UPI QR"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <QrCode className="w-16 h-16 text-slate-400" />
+                )}
+              </div>
+              <div className="space-y-1 text-center sm:text-left min-w-0">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md inline-block">
+                  Live QR Preview
+                </span>
+                <div className="text-xs font-bold text-white font-mono truncate max-w-[170px]">
+                  {driverUpi.trim() || 'Enter UPI ID'}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  When you are assigned, customers can scan this QR code to settle fare directly to you.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Assigned Trips (Duties assigned to this driver by admin or accepted) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${acceptedTrips.length > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+              <h2 className="text-base sm:text-lg font-extrabold text-white font-['Outfit']">Your Active Assigned Trips</h2>
+            </div>
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+              acceptedTrips.length > 0
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-extrabold'
+                : 'bg-slate-900 text-slate-400 border-slate-800'
+            }`}>
+              {acceptedTrips.length} Assigned
+            </span>
+          </div>
+
+          {acceptedTrips.length === 0 ? (
+            <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-6 text-center space-y-1.5">
+              <Car className="w-7 h-7 text-slate-600 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-300">No Duties Assigned Yet</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                When dispatch admin accepts & assigns a customer booking to you ({driverUser?.name || 'Driver'}), it will appear here instantly.
+              </p>
+            </div>
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {acceptedTrips.map(trip => (
                 <div key={trip.id} className="bg-emerald-950/20 border-2 border-emerald-500/40 rounded-3xl p-5 space-y-3 shadow-lg">
@@ -327,27 +643,34 @@ export default function DriverPortalPage({
                             ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
                             : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
                         }`}>
-                          {trip.status || 'Accepted'}
+                          {trip.status === 'In Progress' ? 'Ride In Progress' : 'Assigned to You'}
                         </span>
                       </div>
                       <h3 className="text-base font-black text-white font-['Outfit'] mt-1">{trip.tripType}</h3>
                     </div>
                     <div className="text-lg font-black text-emerald-400 font-mono">{trip.payout}</div>
                   </div>
+
                   <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                    <div><strong>Customer:</strong> {trip.customerName}</div>
+                    <div className="flex items-center justify-between text-[11px] text-amber-400 font-bold border-b border-slate-800/80 pb-1">
+                      <span>Assigned Driver: {trip.assignedDriver || driverUser?.name || 'You'}</span>
+                      <span className="text-slate-400 font-normal">{trip.scheduledTime}</span>
+                    </div>
+                    <div><strong>Customer:</strong> {trip.customerName} {trip.customerPhone ? `(${trip.customerPhone})` : ''}</div>
                     <div><strong>Pickup:</strong> {trip.pickup}</div>
                     <div><strong>Destination:</strong> {trip.destination}</div>
-                    <div><strong>Car:</strong> {trip.carModel}</div>
+                    <div><strong>Vehicle:</strong> {trip.carModel}</div>
                   </div>
+
                   <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
-                    <button 
-                      onClick={() => alert(`Connecting to customer ${trip.customerName}...`)}
+                    <a 
+                      href={`tel:${trip.customerPhone || '+918025550199'}`}
                       className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
+                      title="Call Customer"
                     >
                       <Phone className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Call Customer</span>
-                    </button>
+                    </a>
 
                     {trip.status !== 'In Progress' ? (
                       <button
@@ -358,7 +681,7 @@ export default function DriverPortalPage({
                       </button>
                     ) : (
                       <button
-                        onClick={() => setSettlementTrip(trip)}
+                        onClick={() => handleOpenSettlement(trip)}
                         className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] cursor-pointer text-center flex items-center justify-center gap-1.5"
                       >
                         <Check className="w-4 h-4" />
@@ -369,8 +692,8 @@ export default function DriverPortalPage({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Live Available Bangalore Duties */}
         <div className="space-y-4">
@@ -523,125 +846,209 @@ export default function DriverPortalPage({
 
         </div>
 
-        {/* Driver Ride Settlement Modal */}
-        {settlementTrip && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-hidden touch-none overscroll-contain">
-            <div 
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm touch-none overscroll-contain"
-              onClick={() => setSettlementTrip(null)}
-              onTouchMove={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            />
-            <div className="relative bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y p-5 sm:p-6 shadow-2xl z-10 space-y-4 animate-in zoom-in-95 duration-200 text-slate-100">
-              
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+        {/* Driver Ride Settlement Modal with Customer UPI QR Code */}
+        {settlementTrip && (() => {
+          const settlementNumericFare = Number(settlementTrip.payout?.replace(/[^0-9]/g, '')) || 749;
+          const effectiveDriverUpi = (driverUpi || driverUser?.upiId || '').trim() || 'anna.driver@oksbi';
+          const settlementUpiData = `upi://pay?pa=${encodeURIComponent(effectiveDriverUpi)}&pn=${encodeURIComponent(driverUser?.name || 'Driver Anna')}&am=${settlementNumericFare}&cu=INR&tn=${encodeURIComponent('Driver Anna Trip ' + settlementTrip.id)}`;
+          const settlementQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(settlementUpiData)}`;
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-hidden touch-none overscroll-contain">
+              <div 
+                className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm touch-none overscroll-contain"
+                onClick={() => setSettlementTrip(null)}
+                onTouchMove={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              />
+              <div className="relative bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y p-5 sm:p-6 shadow-2xl z-10 space-y-4 animate-in zoom-in-95 duration-200 text-slate-100">
+                
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-white font-['Outfit']">End Ride & Settle Fare</h3>
+                      <p className="text-[10px] text-slate-400 font-mono">Trip #{settlementTrip.id}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSettlementTrip(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+                    aria-label="Close settlement modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Trip Recap */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Customer:</span>
+                    <strong className="text-white">{settlementTrip.customerName}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Route:</span>
+                    <span className="text-slate-200 truncate max-w-[200px]">{settlementTrip.pickup} ➔ {settlementTrip.destination}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <span className="font-bold text-slate-300">Total Driver Payout:</span>
+                    <span className="text-xl font-black text-emerald-400 font-mono">₹{settlementNumericFare}</span>
+                  </div>
+                </div>
+
+                {/* Fare Collection Options Toggle */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-300 block">
+                    Select Fare Collection Method:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button 
+                      type="button"
+                      onClick={() => setSettlementMethod('online')}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all cursor-pointer text-left ${
+                        settlementMethod === 'online'
+                          ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-white text-xs">
+                        <QrCode className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>UPI QR Code</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Customer scans & pays</p>
+                    </button>
+
+                    <button 
+                      type="button"
+                      onClick={() => setSettlementMethod('cash')}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all cursor-pointer text-left ${
+                        settlementMethod === 'cash'
+                          ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-white text-xs">
+                        <DollarSign className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Cash Payment</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Paid directly to Anna</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dynamic QR Code Display for Customer Payment */}
+                {settlementMethod === 'online' ? (
+                  <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-4 text-center space-y-3 shadow-lg shadow-black/40">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>Customer Scan & Pay</span>
+                      </span>
+                      <span className="text-[11px] font-mono font-black text-white bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        ₹{settlementNumericFare}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-tight">
+                      Show this QR code to <strong className="text-slate-200">{settlementTrip.customerName}</strong>. Works with Google Pay, PhonePe, Paytm & BHIM.
+                    </p>
+
+                    {/* Scannable High-Contrast QR Code Card */}
+                    <div className="bg-white p-3.5 rounded-2xl inline-block shadow-2xl border-4 border-slate-800">
+                      <img 
+                        src={settlementQrUrl}
+                        alt="Customer UPI Payment QR"
+                        id="driver-settlement-qr-img"
+                        className="w-48 h-48 sm:w-56 sm:h-56 object-contain rounded-lg mx-auto"
+                      />
+                      <div className="pt-2 border-t border-slate-200 mt-2 flex items-center justify-center gap-1 text-[10px] font-extrabold text-slate-800">
+                        <span>UPI QR</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-emerald-700">Instant Driver Settlement</span>
+                      </div>
+                    </div>
+
+                    {/* Driver VPA / UPI ID Badge with Copy Option */}
+                    <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+                      <div className="text-left truncate">
+                        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Settlement VPA</span>
+                        <span className="font-mono text-emerald-400 font-bold text-xs truncate block">{effectiveDriverUpi}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUpi(effectiveDriverUpi)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 cursor-pointer shrink-0 transition-colors"
+                      >
+                        {copiedUpi ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy UPI</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Accepted App Pills */}
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1 text-[9px] text-slate-400 font-semibold">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">GPay</span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">PhonePe</span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">Paytm</span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">BHIM</span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">CRED</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-950 border border-amber-500/40 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold">
+                      <DollarSign className="w-4 h-4" />
+                      <span>Direct Cash Handover</span>
+                    </div>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      Please collect <strong className="text-white font-mono">₹{settlementNumericFare}</strong> in cash directly from <strong className="text-white">{settlementTrip.customerName}</strong> before concluding this ride duty.
+                    </p>
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-[11px] text-amber-200">
+                      ✓ No commission deduction. 100% of the cash fare belongs to Anna.
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirm buttons */}
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSettlementTrip(null)}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    id="confirm-settlement-btn"
+                    onClick={handleConfirmSettlement}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
                     <Check className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-extrabold text-white font-['Outfit']">End Ride & Settle Fare</h3>
-                    <p className="text-[10px] text-slate-400 font-mono">Trip #{settlementTrip.id}</p>
-                  </div>
+                    <span>
+                      {settlementMethod === 'online' 
+                        ? `Payment Received & Complete Trip` 
+                        : `Confirm Cash Collected (₹${settlementNumericFare})`}
+                    </span>
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setSettlementTrip(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+
               </div>
-
-              {/* Trip Recap */}
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Customer:</span>
-                  <strong className="text-white">{settlementTrip.customerName}</strong>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Route:</span>
-                  <span className="text-slate-200 truncate max-w-[200px]">{settlementTrip.pickup} ➔ {settlementTrip.destination}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="font-bold text-slate-300">Total Driver Payout:</span>
-                  <span className="text-lg font-black text-emerald-400 font-mono">{settlementTrip.payout}</span>
-                </div>
-              </div>
-
-              {/* Fare Collection Options */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">
-                  Select Fare Collection Method:
-                </label>
-                <div className="space-y-2 text-xs">
-                  <label 
-                    onClick={() => setSettlementMethod('online')}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      settlementMethod === 'online'
-                        ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <input 
-                      type="radio" 
-                      name="settlementMethod" 
-                      checked={settlementMethod === 'online'} 
-                      onChange={() => setSettlementMethod('online')}
-                      className="text-emerald-500" 
-                    />
-                    <div>
-                      <div className="font-bold text-white">Customer Paid Online (UPI / Card / Wallet)</div>
-                      <p className="text-[10px] text-slate-400">Customer completes payment on their screen</p>
-                    </div>
-                  </label>
-
-                  <label 
-                    onClick={() => setSettlementMethod('cash')}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      settlementMethod === 'cash'
-                        ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <input 
-                      type="radio" 
-                      name="settlementMethod" 
-                      checked={settlementMethod === 'cash'} 
-                      onChange={() => setSettlementMethod('cash')}
-                      className="text-emerald-500" 
-                    />
-                    <div>
-                      <div className="font-bold text-white">Cash Collected by Anna ({settlementTrip.payout})</div>
-                      <p className="text-[10px] text-slate-400">Customer handed over cash directly</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Confirm button */}
-              <div className="pt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSettlementTrip(null)}
-                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmSettlement}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Confirm Ride End & Credit Fare</span>
-                </button>
-              </div>
-
             </div>
-          </div>
-        )}
+          );
+        })()}
 
       </main>
 

@@ -1,18 +1,19 @@
 import React from 'react';
-import { LogIn, UserPlus, ShieldCheck } from 'lucide-react';
+import { LogIn, UserPlus, ShieldCheck, X } from 'lucide-react';
 import { useScrollLock } from '../utils/useScrollLock';
 
 export default function PostBookingAuthPromptModal({
   isOpen,
   bookingInfo,
   onChooseLogin,
-  onChooseSignup
+  onChooseSignup,
+  onClose
 }) {
   useScrollLock(isOpen);
 
   if (!isOpen || !bookingInfo) return null;
 
-  const { bookingId, serviceTitle, customerName } = bookingInfo;
+  const { serviceTitle, customerName } = bookingInfo;
 
   return (
     <div 
@@ -21,21 +22,33 @@ export default function PostBookingAuthPromptModal({
       onTouchMove={(e) => e.stopPropagation()}
     >
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 text-center space-y-4">
-        {/* Verification Status Icon */}
+        {/* Close Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Status Icon */}
         <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-inner">
           <ShieldCheck className="w-7 h-7 text-amber-400" />
         </div>
 
         {/* Badge & Title */}
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
-            <span>Almost Done • Final Step</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
+            <span>Login or Signup Required</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
-            Login or Signup
+            Login or Signup to Book
           </h2>
           <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1 leading-relaxed">
-            {customerName ? `Hello ${customerName}, ` : ''}please log in or sign up to confirm your booking for <strong className="text-amber-400">{serviceTitle || 'Transit Service'}</strong> and access your live driver dispatch pass:
+            {customerName ? `Hello ${customerName}, ` : ''}please <strong className="text-amber-400">log in</strong> to your account or <strong className="text-amber-400">sign up</strong> to confirm and place your booking for <span className="text-white font-semibold">{serviceTitle || 'Personal Driver Anna'}</span>.
           </p>
         </div>
 
@@ -67,6 +80,19 @@ export default function PostBookingAuthPromptModal({
             <span className="text-[10px] text-slate-900/80 font-medium">New Account</span>
           </button>
         </div>
+
+        {/* Cancel / Dismiss */}
+        {onClose && (
+          <div className="pt-2 border-t border-slate-800/80">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Cancel and return
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

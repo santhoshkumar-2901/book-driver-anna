@@ -158,43 +158,24 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      // Call Backend API for authoritative fare calculation and secure slot locking
-      let serverBooking = null;
-    try {
-      const serverRes = await apiClient.createBooking({
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        customerEmail: customerEmail ? customerEmail.trim() : null,
-        bookingCategory,
-        selectedClassId,
-        vehicleCategory,
-        driverTripOption,
-        dropLocation,
-        roundTripDuration,
-        outstationTripType,
-        outstationPackage,
-        outstationDestination,
-        pickupArea,
-        date: toYYYYMMDD(bookingDate),
-        time: bookingTime,
-        paymentMode
-      });
-      if (serverRes && serverRes.data && serverRes.data.booking) {
-        serverBooking = serverRes.data.booking;
-      }
-    } catch (apiErr) {
-      if (apiErr.code === 'SLOT_UNAVAILABLE' || apiErr.code === 'INVALID_DATE') {
-        setFormError(apiErr.message);
-        return;
-      }
-      console.warn('[BOOKING] API call fallback:', apiErr.message);
-    }
-
-    const bookingId = serverBooking ? serverBooking.id : ('BDA-' + Math.floor(100000 + Math.random() * 900000));
-    const finalFare = serverBooking ? serverBooking.calculated_fare : fareInfo.total;
+    const payloadForApi = {
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerEmail: customerEmail ? customerEmail.trim() : null,
+      bookingCategory,
+      selectedClassId,
+      vehicleCategory,
+      driverTripOption,
+      dropLocation,
+      roundTripDuration,
+      outstationTripType,
+      outstationPackage,
+      outstationDestination,
+      pickupArea,
+      date: toYYYYMMDD(bookingDate),
+      time: bookingTime,
+      paymentMode
+    };
 
     let tripSummary = '';
     let serviceName = '';
@@ -221,7 +202,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     }
 
     const bookingDetails = {
-      bookingId,
+      bookingId: 'BDA-' + Math.floor(100000 + Math.random() * 900000),
       bookingType: bookingCategory,
       driverTripOption: bookingCategory === 'driver' ? driverTripOption : undefined,
       vehicleCategory: bookingCategory === 'vehicle' ? vehicleCategory : undefined,
@@ -253,12 +234,14 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       customerEmail,
       userId: clientUser?.id || null,
       paymentMode,
-      totalFare: finalFare,
-      status: 'Pending',
-      assignedAnna: 'Pending Admin Assignment'
+      totalFare: fareInfo.total,
+      rawPayload: payloadForApi,
+      assignedAnna: bookingCategory === 'class'
+        ? "Syed Nizamuddin (Certified Driving Instructor Anna)"
+        : (bookingCategory === 'vehicle' ? "Manjunath Gowda (Assigned Vehicle Captain)" : "Manjunath Gowda (Assigned Driver)")
     };
 
-    // If client is not logged in, intercept at confirmation and prompt login/signup
+    // If client is not logged in, do NOT create server booking yet. Intercept and prompt login/signup!
     if (!clientUser && onRequireAuth) {
       onRequireAuth(bookingDetails);
       setIsSubmitting(false);
@@ -266,9 +249,31 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
-    onBookingComplete(bookingDetails);
-    resetForm();
-    onClose();
+    // Client IS logged in: call backend API for authoritative booking creation and slot locking
+    setIsSubmitting(true);
+    try {
+      let serverBooking = null;
+      try {
+        const serverRes = await apiClient.createBooking(payloadForApi);
+        if (serverRes && serverRes.data && serverRes.data.booking) {
+          serverBooking = serverRes.data.booking;
+        }
+      } catch (apiErr) {
+        if (apiErr.code === 'SLOT_UNAVAILABLE' || apiErr.code === 'INVALID_DATE') {
+          setFormError(apiErr.message);
+          return;
+        }
+        console.warn('[BOOKING] API call fallback:', apiErr.message);
+      }
+
+      if (serverBooking) {
+        bookingDetails.bookingId = serverBooking.id;
+        bookingDetails.totalFare = serverBooking.calculated_fare;
+      }
+
+      onBookingComplete(bookingDetails);
+      resetForm();
+      onClose();
     } finally {
       setIsSubmitting(false);
     }

@@ -65,4 +65,18 @@ describe('Driver Portal Isolation & Admin Online/Offline Duty Tracking', () => {
     assert.match(content, /h-\[100vh\]|h-screen/, 'AdminAuthView should set height to 100vh');
     assert.match(content, /overflow-hidden/, 'AdminAuthView should prevent overflow on 100vh');
   });
+
+  test('8. PostBookingAuthPromptModal must not show "Booking Placed" or "guest" option', () => {
+    const modalPath = path.resolve('src/components/PostBookingAuthPromptModal.jsx');
+    const content = fs.readFileSync(modalPath, 'utf8');
+    assert.doesNotMatch(content, /Booking Placed/i, 'Must not show "Booking Placed" before login/signup');
+    assert.doesNotMatch(content, /guest/i, 'Must not offer any "continue as guest" option');
+    assert.match(content, /Login or Signup Required/i, 'Should indicate authentication is required');
+  });
+
+  test('9. App.jsx does not offer guest booking bypass', () => {
+    const content = fs.readFileSync(appPath, 'utf8');
+    assert.doesNotMatch(content, /handleContinueAsGuestAfterBooking/, 'App.jsx must not have guest booking continuation');
+    assert.doesNotMatch(content, /onContinueAsGuest/, 'App.jsx must not pass onContinueAsGuest');
+  });
 });

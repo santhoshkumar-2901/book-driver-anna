@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Car, Menu, X, MapPin, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { Car, Menu, X, MapPin, LogOut, LogIn, UserPlus, Sun, Moon } from 'lucide-react';
 import { SteeringWheel } from './Icons';
+import { useTheme } from '../utils/themeContext';
 
 export default function Navbar({
   activePage,
@@ -13,6 +14,7 @@ export default function Navbar({
   onOpenAuth
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme, isDark } = useTheme();
 
   const navItems = [
     { id: 'home', label: 'Home' },
@@ -120,6 +122,22 @@ export default function Navbar({
                 </button>
               </div>
             )}
+
+            {/* Theme Toggle Button (Icon Only) */}
+            <button
+              type="button"
+              id="navbar-theme-toggle-btn"
+              onClick={toggleTheme}
+              className="p-2 sm:p-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center justify-center shadow-sm hover:scale-105 active:scale-95"
+              title="Toggle Theme"
+              aria-label="Toggle Theme"
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4 text-amber-400 stroke-[2.2]" />
+              ) : (
+                <Moon className="w-4 h-4 text-amber-500 stroke-[2.2]" />
+              )}
+            </button>
 
             {/* Mobile / Tablet Menu Button */}
             <button

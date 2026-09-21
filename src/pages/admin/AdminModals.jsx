@@ -51,7 +51,13 @@ export default function AdminModals({
   setDeleteConfirmText,
   isSecurityPhraseValid,
   canExecuteDelete,
-  handleConfirmDeleteUser
+  handleConfirmDeleteUser,
+
+  // Modal 4: Production Reset / Clear All Test Data Modal
+  isPurgeModalOpen,
+  setIsPurgeModalOpen,
+  handleConfirmPurgeData,
+  isPurgingData
 }) {
   return (
     <>
@@ -574,6 +580,92 @@ export default function AdminModals({
                   </span>
                 )}
               </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Modal 4: Production Reset / Clear All Test Data Modal */}
+      {/* ========================================================================= */}
+      {isPurgeModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in overflow-hidden overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isPurgingData) setIsPurgeModalOpen(false);
+          }}
+        >
+          <div className="bg-slate-900 border border-red-500/40 rounded-3xl p-5 sm:p-7 max-w-lg w-full space-y-5 shadow-2xl shadow-red-950/40 max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 text-red-400 flex items-center justify-center font-bold border border-red-500/30">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white font-['Outfit']">
+                    Clear All Test Data
+                  </h3>
+                  <p className="text-xs text-slate-400">Production-Ready System Purge</p>
+                </div>
+              </div>
+              <button 
+                disabled={isPurgingData}
+                onClick={() => setIsPurgeModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Warning Alert */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-xs text-red-300 space-y-2">
+              <div className="flex items-center gap-2 font-bold text-red-400">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Prepare System for Live Production Launch</span>
+              </div>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                This operation will completely wipe all test data from both the server database and browser storage:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px] pl-1">
+                <li>All test driver requests, vehicle rentals & driving class enrollments</li>
+                <li>All test registered customer accounts & demo driver profiles</li>
+                <li>All test telemetry and mock audit logs</li>
+              </ul>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-xs text-slate-400 space-y-1">
+              <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5" />
+                <span>Your Admin Account is Protected</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Your authenticated admin credentials remain 100% active and retained. You will stay securely logged in.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                disabled={isPurgingData}
+                onClick={() => setIsPurgeModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+              >
+                Cancel & Keep Data
+              </button>
+
+              <button
+                type="button"
+                disabled={isPurgingData}
+                onClick={handleConfirmPurgeData}
+                className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isPurgingData ? 'Clearing Data...' : 'Yes, Purge Everything for Production'}</span>
+              </button>
             </div>
 
           </div>

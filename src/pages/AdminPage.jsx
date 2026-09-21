@@ -5,6 +5,7 @@ import DrivingClassEnrollmentModal from '../components/DrivingClassEnrollmentMod
 import { toDDMMYYYY } from '../utils/dateUtils';
 import useScrollLock from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
+import { broadcastBookingUpdate } from '../utils/broadcastSync';
 
 import AdminAuthView from './admin/AdminAuthView';
 import AdminSidebar from './admin/AdminSidebar';
@@ -214,6 +215,17 @@ export default function AdminPage({ onReturnToClient }) {
     }
   }, [isAdminLoggedIn]);
 
+  // Ensure authentic admin token is active whenever admin portal is accessed
+  useEffect(() => {
+    if (isAdminLoggedIn) {
+      const storedToken = localStorage.getItem('bda_admin_token');
+      if (!storedToken) {
+        apiClient.adminSession({ phone: loggedInAdminPhone })
+          .catch(() => {});
+      }
+    }
+  }, [isAdminLoggedIn, loggedInAdminPhone]);
+
   // Persistent Driver Bookings State
   const [driverBookings, setDriverBookings] = useState(() => {
     const saved = localStorage.getItem('bda_driver_bookings');
@@ -221,16 +233,25 @@ export default function AdminPage({ onReturnToClient }) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasCancelled = parsed.some(b => b.status === 'Cancelled');
+          // Cleanse legacy fake placeholders and exclude driving classes from driver bookings
+          const sanitized = parsed
+            .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-')))
+            .map(b => ({
+              ...b,
+              assignedDriver: (b.assignedDriver && b.assignedDriver !== 'Driver Assigned on Dispatch' && b.assignedDriver !== 'Driver Assigned' && b.assignedDriver !== 'Pending Admin Acceptance') ? b.assignedDriver : '',
+              assignedDriverPhone: (b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') ? b.assignedDriverPhone : ''
+            }));
+          const hasCancelled = sanitized.some(b => b.status === 'Cancelled');
           if (!hasCancelled) {
             const cancelledExample = DEFAULT_DRIVER_BOOKINGS.find(b => b.status === 'Cancelled');
             if (cancelledExample) {
-              const merged = [...parsed, cancelledExample];
+              const merged = [...sanitized, cancelledExample];
               localStorage.setItem('bda_driver_bookings', JSON.stringify(merged));
               return merged;
             }
           }
-          return parsed;
+          localStorage.setItem('bda_driver_bookings', JSON.stringify(sanitized));
+          return sanitized;
         }
       } catch (e) { console.error(e); }
     }
@@ -344,7 +365,36 @@ export default function AdminPage({ onReturnToClient }) {
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletionReason, setDeletionReason] = useState('');
 
-  useScrollLock(Boolean(userToDelete || isAddUserModalOpen || isAddDriverModalOpen || isMobileSidebarOpen));
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+  const [isPurgingData, setIsPurgingData] = useState(false);
+
+  const handleConfirmPurgeData = async () => {
+    setIsPurgingData(true);
+    try {
+      await apiClient.clearAllData().catch((err) => {
+        console.warn('[PURGE] Backend clear notice:', err.message);
+      });
+      localStorage.setItem('bda_driver_bookings', JSON.stringify([]));
+      localStorage.setItem('bda_vehicle_bookings', JSON.stringify([]));
+      localStorage.setItem('bda_class_enrollments', JSON.stringify([]));
+      localStorage.setItem('bda_registered_clients', JSON.stringify([]));
+      localStorage.setItem('bda_registered_drivers', JSON.stringify([]));
+      setDriverBookings([]);
+      setVehicleBookings([]);
+      setClassEnrollments([]);
+      setRegisteredUsers([]);
+      setRegisteredDrivers([]);
+      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      setIsPurgeModalOpen(false);
+      triggerToast('All test bookings, dummy clients, and driver profiles permanently cleared. Ready for live Bangalore production.');
+    } catch (err) {
+      alert('Failed to clear data: ' + err.message);
+    } finally {
+      setIsPurgingData(false);
+    }
+  };
+
+  useScrollLock(Boolean(userToDelete || isAddUserModalOpen || isAddDriverModalOpen || isMobileSidebarOpen || isPurgeModalOpen));
   const [customDeletionReason, setCustomDeletionReason] = useState('');
   const [hasNoActiveTrips, setHasNoActiveTrips] = useState(false);
   const [hasSettledPayments, setHasSettledPayments] = useState(false);
@@ -453,10 +503,46 @@ export default function AdminPage({ onReturnToClient }) {
 
   // Real-time synchronization listener for client bookings submitted anywhere across tabs/app
   useEffect(() => {
-    const loadBookingsFromStorage = () => {
+    const loadBookingsFromStorage = (e) => {
+      // If a specific booking update is broadcast, apply directly to state & storage
+      if (e?.detail?.bookingId) {
+        const { bookingId, status, assignedDriver, assignedDriverPhone } = e.detail;
+        const validDriverName = (assignedDriver && assignedDriver !== 'Pending Admin Acceptance' && !assignedDriver.includes('Assigned on Dispatch') && assignedDriver !== 'Driver Assigned') ? assignedDriver : undefined;
+        
+        if (validDriverName || assignedDriverPhone) {
+          setDriverInputState(prev => ({
+            ...prev,
+            [bookingId]: {
+              name: validDriverName ?? prev[bookingId]?.name ?? '',
+              phone: assignedDriverPhone ?? prev[bookingId]?.phone ?? ''
+            }
+          }));
+        }
+
+        setDriverBookings(prev => {
+          const updated = prev.map(b => {
+            if (b.id === bookingId) {
+              return {
+                ...b,
+                status: status || b.status,
+                assignedDriver: validDriverName !== undefined ? validDriverName : (b.assignedDriver === 'Pending Admin Acceptance' ? '' : b.assignedDriver),
+                assignedDriverPhone: assignedDriverPhone !== undefined ? assignedDriverPhone : b.assignedDriverPhone
+              };
+            }
+            return b;
+          });
+          localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+          return updated;
+        });
+        return;
+      }
+
       const savedDriver = localStorage.getItem('bda_driver_bookings');
       if (savedDriver) {
-        try { setDriverBookings(JSON.parse(savedDriver)); } catch (e) {}
+        try { 
+          const list = JSON.parse(savedDriver);
+          setDriverBookings(Array.isArray(list) ? list.filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-'))) : []); 
+        } catch (e) {}
       }
       const savedVehicle = localStorage.getItem('bda_vehicle_bookings');
       if (savedVehicle) {
@@ -575,6 +661,193 @@ export default function AdminPage({ onReturnToClient }) {
             localStorage.setItem('bda_registered_clients', JSON.stringify(merged));
             return merged;
           });
+        }
+      })
+  }, [isAdminLoggedIn]);
+
+  // Sync server bookings with admin dashboard when admin is logged in
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    apiClient.getAdminBookings()
+      .then((res) => {
+        if (res && res.data && Array.isArray(res.data.bookings)) {
+          const serverDriverBookings = [];
+          const serverVehicleBookings = [];
+          const serverClassEnrollments = [];
+
+          res.data.bookings.forEach((b) => {
+            const rawStatus = (b.status || 'PENDING').toUpperCase();
+            const formattedStatus = 
+              rawStatus === 'ASSIGNED' ? 'Assigned' :
+              rawStatus === 'CONFIRMED' ? 'Confirmed' :
+              rawStatus === 'CANCELLED' ? 'Cancelled' : 'Pending';
+
+            if (b.booking_type === 'vehicle') {
+              serverVehicleBookings.push({
+                id: b.id,
+                customerName: b.customer_name,
+                phone: b.customer_phone,
+                email: b.customer_email,
+                category: b.trip_type,
+                vehicleName: b.service_name,
+                pickupArea: b.pickup_area,
+                dropLocation: b.drop_location,
+                date: b.date,
+                time: b.time,
+                fare: b.calculated_fare,
+                paymentMode: b.payment_mode,
+                status: formattedStatus
+              });
+            } else if (b.booking_type === 'class' || (b.id && b.id.startsWith('BDA-CLS-'))) {
+              serverClassEnrollments.push({
+                enrollmentId: b.id,
+                fullName: b.customer_name,
+                mobileNumber: b.customer_phone,
+                emailAddress: b.customer_email,
+                address: b.pickup_area || '',
+                pickupLocation: b.pickup_area || '',
+                preferredStartDate: b.date,
+                preferredTime: b.time || 'Morning',
+                courseFee: b.calculated_fare,
+                status: formattedStatus,
+                assignedInstructor: b.assigned_driver_name || '',
+                assignedInstructorPhone: b.assigned_driver_phone || ''
+              });
+            } else {
+              const cleanDriverName = (b.assigned_driver_name && b.assigned_driver_name !== 'Driver Assigned on Dispatch' && b.assigned_driver_name !== 'Driver Assigned' && b.assigned_driver_name !== 'Pending Admin Acceptance') ? b.assigned_driver_name : '';
+              const cleanDriverPhone = (b.assigned_driver_phone && b.assigned_driver_phone !== '+91 80 2555 0199') ? b.assigned_driver_phone : '';
+
+              serverDriverBookings.push({
+                id: b.id,
+                customerName: b.customer_name,
+                phone: b.customer_phone,
+                email: b.customer_email,
+                tripType: b.trip_type,
+                tripTitle: b.service_name,
+                pickupArea: b.pickup_area,
+                dropLocation: b.drop_location,
+                date: b.date,
+                time: b.time,
+                fare: b.calculated_fare,
+                paymentMode: b.payment_mode,
+                status: formattedStatus,
+                assignedDriver: cleanDriverName,
+                assignedDriverPhone: cleanDriverPhone
+              });
+            }
+          });
+
+          if (serverDriverBookings.length > 0) {
+            setDriverBookings(prev => {
+              const map = new Map();
+              (prev || []).forEach(b => map.set(b.id, b));
+              serverDriverBookings.forEach(b => {
+                const existing = map.get(b.id);
+
+                // Authoritative status resolution:
+                // Server status takes precedence when server is Assigned, Confirmed, or Cancelled.
+                // If local status was Assigned or Cancelled, keep it if server is still Pending.
+                let finalStatus = b.status || 'Pending';
+                if (b.status === 'Assigned' || existing?.status === 'Assigned') {
+                  finalStatus = 'Assigned';
+                } else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') {
+                  finalStatus = 'Cancelled';
+                } else if (b.status === 'Confirmed' || existing?.status === 'Confirmed') {
+                  finalStatus = 'Confirmed';
+                }
+
+                const isInvalidName = (n) => 
+                  !n || 
+                  n === 'Pending Admin Acceptance' || 
+                  n === 'Driver Assigned on Dispatch' || 
+                  n === 'Driver Assigned' || 
+                  n.includes('Assigned on Dispatch');
+
+                let validName = '';
+                if (!isInvalidName(b.assignedDriver)) {
+                  validName = b.assignedDriver;
+                } else if (!isInvalidName(existing?.assignedDriver)) {
+                  validName = existing.assignedDriver;
+                }
+
+                let validPhone = '';
+                if (b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') {
+                  validPhone = b.assignedDriverPhone;
+                } else if (existing?.assignedDriverPhone && existing.assignedDriverPhone !== '+91 80 2555 0199') {
+                  validPhone = existing.assignedDriverPhone;
+                }
+
+                if (validName || validPhone) {
+                  setDriverInputState(inp => ({
+                    ...inp,
+                    [b.id]: {
+                      name: validName || inp[b.id]?.name || '',
+                      phone: validPhone || inp[b.id]?.phone || ''
+                    }
+                  }));
+                }
+
+                map.set(b.id, { 
+                  ...(existing || {}), 
+                  ...b, 
+                  assignedDriver: validName,
+                  assignedDriverPhone: validPhone,
+                  status: finalStatus 
+                });
+              });
+              // Filter out any class enrollments that might have lingered
+              const merged = Array.from(map.values()).filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-')));
+              localStorage.setItem('bda_driver_bookings', JSON.stringify(merged));
+              return merged;
+            });
+          }
+
+          if (serverVehicleBookings.length > 0) {
+            setVehicleBookings(prev => {
+              const map = new Map();
+              (prev || []).forEach(b => map.set(b.id, b));
+              serverVehicleBookings.forEach(b => {
+                const existing = map.get(b.id);
+                let finalStatus = b.status || 'Pending';
+                if (b.status === 'Confirmed' || existing?.status === 'Confirmed') {
+                  finalStatus = 'Confirmed';
+                } else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') {
+                  finalStatus = 'Cancelled';
+                } else if (b.status === 'Assigned' || existing?.status === 'Assigned') {
+                  finalStatus = 'Assigned';
+                }
+                map.set(b.id, { ...(existing || {}), ...b, status: finalStatus });
+              });
+              const merged = Array.from(map.values());
+              localStorage.setItem('bda_vehicle_bookings', JSON.stringify(merged));
+              return merged;
+            });
+          }
+
+          if (serverClassEnrollments.length > 0) {
+            setClassEnrollments(prev => {
+              const map = new Map();
+              (prev || []).forEach(e => map.set(e.enrollmentId, e));
+              serverClassEnrollments.forEach(e => {
+                const existing = map.get(e.enrollmentId);
+                let finalStatus = e.status || 'Pending';
+                if (e.status === 'Confirmed' || existing?.status === 'Confirmed') finalStatus = 'Confirmed';
+                else if (e.status === 'Cancelled' || existing?.status === 'Cancelled') finalStatus = 'Cancelled';
+                else if (e.status === 'In Training' || existing?.status === 'In Training') finalStatus = 'In Training';
+
+                map.set(e.enrollmentId, {
+                  ...(existing || {}),
+                  ...e,
+                  status: finalStatus,
+                  assignedInstructor: e.assignedInstructor || existing?.assignedInstructor || '',
+                  assignedInstructorPhone: e.assignedInstructorPhone || existing?.assignedInstructorPhone || ''
+                });
+              });
+              const merged = Array.from(map.values());
+              localStorage.setItem('bda_class_enrollments', JSON.stringify(merged));
+              return merged;
+            });
+          }
         }
       })
       .catch(() => {});
@@ -819,26 +1092,60 @@ export default function AdminPage({ onReturnToClient }) {
   };
 
   // Accept & Assign driver booking with admin-typed driver name and phone
-  const handleAcceptAndAssignDriver = (bookingId) => {
-    const typedName = driverInputState[bookingId]?.name?.trim();
-    const typedPhone = driverInputState[bookingId]?.phone?.trim();
+  const handleAcceptAndAssignDriver = async (bookingId, overrideName = null, overridePhone = null) => {
+    const typedName = (overrideName !== null ? overrideName : driverInputState[bookingId]?.name)?.trim();
+    const typedPhone = (overridePhone !== null ? overridePhone : driverInputState[bookingId]?.phone)?.trim();
+    
+    if (!typedName || !typedPhone) {
+      console.warn('[ADMIN] Cannot accept & assign driver without valid driver name and phone.');
+      return false;
+    }
 
-    const finalName = typedName || "Driver Assigned";
-    const finalPhone = typedPhone || "+91 80 2555 0199";
+    const finalName = typedName;
+    const finalPhone = typedPhone;
 
-    let assignedBookingItem = null;
+    // Look up assigned driver UPI from registered drivers fleet
+    const matchedDriver = registeredDrivers.find(d => {
+      const dClean = (d.phone || '').replace(/[^0-9]/g, '');
+      const tClean = finalPhone.replace(/[^0-9]/g, '');
+      return (tClean && dClean && (tClean === dClean || tClean.includes(dClean) || dClean.includes(tClean))) ||
+             (d.name && d.name.toLowerCase().trim() === finalName.toLowerCase().trim());
+    });
+    const finalUpi = matchedDriver?.upiId || `${finalName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'driver'}@oksbi`;
 
+    // Update input state as well so the inputs reflect the assigned driver
+    setDriverInputState(prev => ({
+      ...prev,
+      [bookingId]: {
+        name: finalName,
+        phone: finalPhone
+      }
+    }));
+
+    // Synchronously update localStorage so immediate listeners or storage readers see the updated booking
+    try {
+      const currentList = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+      const updatedList = currentList.map(b => (b.id === bookingId ? {
+        ...b,
+        assignedDriver: finalName,
+        assignedDriverPhone: finalPhone,
+        assignedDriverUpi: finalUpi,
+        status: 'Assigned'
+      } : b));
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updatedList));
+    } catch (e) {}
+
+    // 1. Update React state immediately
     setDriverBookings(prev => {
       const updated = prev.map(b => {
         if (b.id === bookingId) {
-          const item = {
+          return {
             ...b,
             assignedDriver: finalName,
             assignedDriverPhone: finalPhone,
+            assignedDriverUpi: finalUpi,
             status: 'Assigned'
           };
-          assignedBookingItem = item;
-          return item;
         }
         return b;
       });
@@ -846,35 +1153,32 @@ export default function AdminPage({ onReturnToClient }) {
       return updated;
     });
 
-    // Notify client site in real time across the app & active tabs
-    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
-      detail: { bookingId, status: 'Assigned', assignedDriver: finalName, assignedDriverPhone: finalPhone, booking: assignedBookingItem }
-    }));
-    window.dispatchEvent(new CustomEvent('bda_driver_assigned', {
-      detail: { bookingId, status: 'Assigned', driverName: finalName, driverPhone: finalPhone, booking: assignedBookingItem }
-    }));
+    // 2. Broadcast booking update event to client listeners across all tabs and windows
+    broadcastBookingUpdate({
+      bookingId,
+      status: 'Assigned',
+      assignedDriver: finalName,
+      assignedDriverPhone: finalPhone,
+      assignedDriverUpi: finalUpi
+    });
 
+    // 3. Persist to authoritative backend database with driver details
     try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('bda_realtime_channel');
-        bc.postMessage({
-          type: 'BOOKING_ASSIGNED',
-          bookingId,
-          status: 'Assigned',
-          driverName: finalName,
-          driverPhone: finalPhone,
-          booking: assignedBookingItem
-        });
-        bc.close();
+      if (!localStorage.getItem('bda_admin_token')) {
+        await apiClient.adminSession({ phone: loggedInAdminPhone }).catch(() => {});
       }
-    } catch (e) {}
+      await apiClient.updateAdminBooking(bookingId, {
+        status: 'ASSIGNED',
+        driverName: finalName,
+        driverPhone: finalPhone,
+        assignedDriverName: finalName,
+        assignedDriverPhone: finalPhone
+      });
+    } catch (err) {
+      console.warn('[ADMIN] Backend booking status update note:', err.message);
+    }
 
-    // Persist to authoritative backend database if available
-    apiClient.updateAdminBooking(bookingId, {
-      status: 'ASSIGNED',
-      assignedDriverName: finalName,
-      assignedDriverPhone: finalPhone
-    }).catch(() => {});
+    return true;
   };
 
   // WhatsApp Sender ONLY to Client (Enabled ONLY after Accept & Assign)
@@ -947,84 +1251,65 @@ export default function AdminPage({ onReturnToClient }) {
   };
 
   // Quick Action: Update driver booking status
-  const handleUpdateDriverStatus = (bookingId, newStatus) => {
-    let updatedItem = null;
+  const handleUpdateDriverStatus = async (bookingId, newStatus) => {
+    const dbStatus = newStatus === 'Assigned' ? 'ASSIGNED' : (newStatus === 'Cancelled' ? 'CANCELLED' : (newStatus === 'Pending' ? 'PENDING' : 'CONFIRMED'));
+    
+    try {
+      const cur = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+      const upd = cur.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(upd));
+    } catch (e) {}
+
     setDriverBookings(prev => {
-      const updated = prev.map(b => {
-        if (b.id === bookingId) {
-          const item = { ...b, status: newStatus };
-          updatedItem = item;
-          return item;
-        }
-        return b;
-      });
+      const updated = prev.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
       localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
       return updated;
     });
-
-    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
-      detail: { bookingId, status: newStatus, booking: updatedItem }
-    }));
+    broadcastBookingUpdate({ bookingId, status: newStatus });
     try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('bda_realtime_channel');
-        bc.postMessage({ type: 'BOOKING_STATUS_CHANGED', bookingId, status: newStatus, booking: updatedItem });
-        bc.close();
-      }
-    } catch (e) {}
-
-    const backendStatus = newStatus === 'In Progress' ? 'IN_PROGRESS' : newStatus.toUpperCase();
-    apiClient.updateAdminBooking(bookingId, { status: backendStatus }).catch(() => {});
+      await apiClient.updateAdminBooking(bookingId, { status: dbStatus });
+    } catch (err) {
+      console.warn('[ADMIN] Driver status update note:', err.message);
+    }
   };
 
   // Quick Action: Update vehicle booking status
-  const handleUpdateVehicleStatus = (bookingId, newStatus) => {
-    let updatedItem = null;
+  const handleUpdateVehicleStatus = async (bookingId, newStatus) => {
+    const dbStatus = newStatus === 'Confirmed' ? 'CONFIRMED' : (newStatus === 'Cancelled' ? 'CANCELLED' : (newStatus === 'Pending' ? 'PENDING' : 'ASSIGNED'));
+    
+    try {
+      const cur = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
+      const upd = cur.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
+      localStorage.setItem('bda_vehicle_bookings', JSON.stringify(upd));
+    } catch (e) {}
+
     setVehicleBookings(prev => {
-      const updated = prev.map(b => {
-        if (b.id === bookingId) {
-          const item = { ...b, status: newStatus };
-          updatedItem = item;
-          return item;
-        }
-        return b;
-      });
+      const updated = prev.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
       localStorage.setItem('bda_vehicle_bookings', JSON.stringify(updated));
       return updated;
     });
-
-    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
-      detail: { bookingId, status: newStatus, booking: updatedItem }
-    }));
+    broadcastBookingUpdate({ bookingId, status: newStatus });
     try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('bda_realtime_channel');
-        bc.postMessage({ type: 'BOOKING_STATUS_CHANGED', bookingId, status: newStatus, booking: updatedItem });
-        bc.close();
-      }
-    } catch (e) {}
-
-    const backendStatus = newStatus === 'In Progress' ? 'IN_PROGRESS' : newStatus.toUpperCase();
-    apiClient.updateAdminBooking(bookingId, { status: backendStatus }).catch(() => {});
+      await apiClient.updateAdminBooking(bookingId, { status: dbStatus });
+    } catch (err) {
+      console.warn('[ADMIN] Vehicle status update note:', err.message);
+    }
   };
 
   // Quick Action: Update class enrollment status (Pending, In Training, Completed, Cancelled)
-  const handleUpdateClassStatus = (enrollmentId, newStatus) => {
+  const handleUpdateClassStatus = async (enrollmentId, newStatus) => {
     const typedName = instructorInputState[enrollmentId]?.name?.trim();
     const typedPhone = instructorInputState[enrollmentId]?.phone?.trim();
 
-    let updatedItem = null;
     setClassEnrollments(prev => {
       const updated = prev.map(e => {
         if (e.enrollmentId === enrollmentId) {
-          const item = {
+          return {
             ...e,
             status: newStatus,
             assignedInstructor: typedName !== undefined && typedName !== '' ? typedName : (e.assignedInstructor || ''),
             assignedInstructorPhone: typedPhone !== undefined && typedPhone !== '' ? typedPhone : (e.assignedInstructorPhone || '')
           };
-          updatedItem = item;
-          return item;
         }
         return e;
       });
@@ -1032,16 +1317,18 @@ export default function AdminPage({ onReturnToClient }) {
       return updated;
     });
 
-    window.dispatchEvent(new CustomEvent('bda_booking_updated', {
-      detail: { enrollmentId, status: newStatus, enrollment: updatedItem }
-    }));
+    setDriverBookings(prev => {
+      const updated = prev.map(b => (b.id === enrollmentId ? { ...b, status: newStatus } : b));
+      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      return updated;
+    });
+
+    broadcastBookingUpdate({ bookingId: enrollmentId, status: newStatus });
+
     try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('bda_realtime_channel');
-        bc.postMessage({ type: 'CLASS_STATUS_CHANGED', enrollmentId, status: newStatus, enrollment: updatedItem });
-        bc.close();
-      }
-    } catch (e) {}
+      const dbStatus = newStatus === 'Completed' ? 'COMPLETED' : (newStatus === 'Cancelled' ? 'CANCELLED' : 'CONFIRMED');
+      await apiClient.updateAdminBooking(enrollmentId, { status: dbStatus });
+    } catch (err) {}
   };
 
   // WhatsApp Sender to Candidate (Enabled for In Training, Completed, or Cancelled)
@@ -1091,11 +1378,14 @@ export default function AdminPage({ onReturnToClient }) {
     window.open(`https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // Filtered driver bookings
+  // Filtered driver bookings (Strictly personal driver duties, exclude driving class enrollments)
   const filteredDriverBookings = driverBookings.filter(b => {
-    const matchesSearch = b.customerName.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
-                          b.id.toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
-                          b.pickupArea.toLowerCase().includes(driverSearchQuery.toLowerCase());
+    if (b.tripType === 'class' || b.booking_type === 'class' || (b.id && b.id.startsWith('BDA-CLS-'))) {
+      return false;
+    }
+    const matchesSearch = (b.customerName || '').toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
+                          (b.id || '').toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
+                          (b.pickupArea || '').toLowerCase().includes(driverSearchQuery.toLowerCase());
     const matchesStatus = driverStatusFilter === 'All' || b.status === driverStatusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -1261,7 +1551,7 @@ export default function AdminPage({ onReturnToClient }) {
         navigateToTab={navigateToTab}
         loggedInAdminName={loggedInAdminName}
         loggedInAdminPhone={loggedInAdminPhone}
-        driverBookingsCount={driverBookings.length}
+        driverBookingsCount={driverBookings.filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-'))).length}
         vehicleBookingsCount={vehicleBookings.length}
         classEnrollmentsCount={classEnrollments.length}
         usersCount={registeredUsers.length + registeredDrivers.length}
@@ -1269,13 +1559,14 @@ export default function AdminPage({ onReturnToClient }) {
         setIsMobileSidebarOpen={setIsMobileSidebarOpen}
         handleLogout={handleLogout}
         onReturnToClient={onReturnToClient}
+        onOpenPurgeModal={() => setIsPurgeModalOpen(true)}
       />
 
       <main className="flex-1 min-w-0 w-full lg:h-full lg:overflow-y-auto p-3.5 sm:p-6 lg:p-8 xl:p-10 max-w-full overflow-x-hidden">
         {activeTab === 'dashboard' && (
           <AdminDashboardTab
             navigateToTab={navigateToTab}
-            driverBookings={driverBookings}
+            driverBookings={driverBookings.filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-')))}
             vehicleBookings={vehicleBookings}
             classEnrollments={classEnrollments}
             registeredUsers={registeredUsers}
@@ -1295,6 +1586,7 @@ export default function AdminPage({ onReturnToClient }) {
             handleDriverInputChange={handleDriverInputChange}
             handleUpdateDriverStatus={handleUpdateDriverStatus}
             handleAcceptAndAssignDriver={handleAcceptAndAssignDriver}
+            registeredDrivers={registeredDrivers}
             sendWhatsAppToClientForDriver={sendWhatsAppToClientForDriver}
           />
         )}
@@ -1420,6 +1712,10 @@ export default function AdminPage({ onReturnToClient }) {
         isSecurityPhraseValid={isSecurityPhraseValid}
         canExecuteDelete={canExecuteDelete}
         handleConfirmDeleteUser={handleConfirmDeleteUser}
+        isPurgeModalOpen={isPurgeModalOpen}
+        setIsPurgeModalOpen={setIsPurgeModalOpen}
+        handleConfirmPurgeData={handleConfirmPurgeData}
+        isPurgingData={isPurgingData}
       />
     </div>
   );

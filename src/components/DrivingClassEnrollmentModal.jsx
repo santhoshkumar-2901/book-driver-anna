@@ -100,12 +100,6 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
         : e);
       localStorage.setItem('bda_class_enrollments', JSON.stringify(updated));
 
-      const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updatedDriverBookings = driverBookings.map(b => b.id === submittedEnrollment.enrollmentId 
-        ? { ...b, status: 'Cancelled', cancelReason: finalReason } 
-        : b);
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updatedDriverBookings));
-
       window.dispatchEvent(new CustomEvent('bda_order_created'));
       window.dispatchEvent(new CustomEvent('bda_booking_updated'));
     } catch (e) {
@@ -268,35 +262,12 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
     };
 
     const finalizeEnrollmentSubmit = (finalData) => {
-      // Save to local storage for Admin tracking
+      // Save to local storage for Admin tracking exclusively in bda_class_enrollments
       try {
         const existing = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
         localStorage.setItem('bda_class_enrollments', JSON.stringify([finalData, ...existing]));
 
-        // Also create a pending booking entry in bda_driver_bookings so it appears in the admin order dispatcher
-        const newAdminOrder = {
-          id: finalData.enrollmentId,
-          customerName: finalData.fullName,
-          phone: finalData.mobileNumber,
-          tripType: 'class',
-          tripTitle: `Driving Class Enrollment (${finalData.gearPreference})`,
-          pickupArea: finalData.pickupLocation || finalData.address.split(',')[0] || 'Bangalore',
-          dropLocation: 'Doorstep Driving School Training',
-          classCourseName: `${finalData.gearPreference} Driving Course`,
-          classDuration: 'Comprehensive Batch',
-          classTrainingCar: `${finalData.gearPreference} Car`,
-          classTransmission: finalData.gearPreference,
-          classTimeSlot: finalData.preferredTime,
-          date: formattedStartDate,
-          time: finalData.preferredTime === 'Morning' ? '07:00 AM' : (finalData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
-          fare: 5999,
-          assignedDriver: 'Instructor Assigned on Dispatch',
-          assignedDriverPhone: '+91 80 2555 0199',
-          bookedAt: 'Just Now'
-        };
-        const existingBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-        localStorage.setItem('bda_driver_bookings', JSON.stringify([newAdminOrder, ...existingBookings]));
-
+        window.dispatchEvent(new CustomEvent('bda_order_created'));
         window.dispatchEvent(new CustomEvent('bda_booking_updated'));
       } catch (err) {
         console.error('Error storing enrollment:', err);

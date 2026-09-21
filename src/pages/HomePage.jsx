@@ -13,8 +13,6 @@ export default function HomePage({
 }) {
   return (
     <div className="space-y-12 pb-16">
-
-
       
       {/* HERO SECTION */}
       <section className="pt-6 sm:pt-12 px-4 sm:px-6 lg:px-8">
@@ -23,7 +21,7 @@ export default function HomePage({
           <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
             {/* Status Label */}
             <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-[11px] sm:text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
               <span className="truncate">On-Demand Transit Services across Bengaluru</span>
             </div>
 
@@ -347,3 +345,5 @@ export default function HomePage({
     </div>
   );
 }
+
+

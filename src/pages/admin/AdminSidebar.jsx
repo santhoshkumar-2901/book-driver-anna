@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X 
+  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2 
 } from 'lucide-react';
 import { SteeringWheel } from '../../components/Icons';
 
@@ -16,7 +16,8 @@ export default function AdminSidebar({
   isMobileSidebarOpen,
   setIsMobileSidebarOpen,
   handleLogout,
-  onReturnToClient
+  onReturnToClient,
+  onOpenPurgeModal
 }) {
   return (
     <>
@@ -168,6 +169,15 @@ export default function AdminSidebar({
 
         {/* Sidebar Footer Controls - Always Visible at bottom */}
         <div className="p-4 border-t border-slate-800 space-y-2 shrink-0 bg-slate-900/95">
+          <button
+            onClick={onOpenPurgeModal}
+            className="w-full py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-500/30 cursor-pointer"
+            title="Wipe all test bookings and demo data for production launch"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Reset Data for Production</span>
+          </button>
+
           <button
             onClick={handleLogout}
             className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-800 cursor-pointer"
@@ -475,6 +485,14 @@ export default function AdminSidebar({
 
             {/* Mobile Drawer Footer Actions */}
             <div className="p-4 border-t border-slate-800 space-y-2 shrink-0 bg-slate-900/95">
+              <button
+                onClick={() => { setIsMobileSidebarOpen(false); onOpenPurgeModal(); }}
+                className="w-full py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-500/30 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Reset Data for Production</span>
+              </button>
+
               <button
                 onClick={() => { setIsMobileSidebarOpen(false); handleLogout(); }}
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-800 cursor-pointer"

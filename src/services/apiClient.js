@@ -18,6 +18,23 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
+  // Attach role-scoped Bearer token to guarantee seamless multi-tab authentication
+  if (!headers['Authorization']) {
+    let tokenToUse = null;
+    if (typeof localStorage !== 'undefined') {
+      if (endpoint.startsWith('/admin')) {
+        tokenToUse = localStorage.getItem('bda_admin_token') || localStorage.getItem('bda_jwt_token');
+      } else if (endpoint.startsWith('/drivers')) {
+        tokenToUse = localStorage.getItem('bda_driver_token') || localStorage.getItem('bda_jwt_token');
+      } else {
+        tokenToUse = localStorage.getItem('bda_client_token') || localStorage.getItem('bda_jwt_token');
+      }
+    }
+    if (tokenToUse) {
+      headers['Authorization'] = `Bearer ${tokenToUse}`;
+    }
+  }
+
   // Attach idempotency key if requested
   if (options.idempotencyKey) {
     headers['Idempotency-Key'] = options.idempotencyKey;
@@ -97,13 +114,47 @@ async function request(endpoint, options = {}) {
 
 export const apiClient = {
   // 1. Auth Endpoints
-  register: (userData) => request('/auth/register', { method: 'POST', body: userData }),
-  login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
-  driverLogin: (credentials) => request('/auth/driver-login', { method: 'POST', body: credentials }),
-  adminLogin: (credentials) => request('/auth/admin-login', { method: 'POST', body: credentials }),
-  adminRegister: (adminData) => request('/auth/admin-register', { method: 'POST', body: adminData }),
-  logout: () => request('/auth/logout', { method: 'POST' }),
+  register: async (userData) => {
+    const res = await request('/auth/register', { method: 'POST', body: userData });
+    if (res?.data?.token) localStorage.setItem('bda_client_token', res.data.token);
+    return res;
+  },
+  login: async (credentials) => {
+    const res = await request('/auth/login', { method: 'POST', body: credentials });
+    if (res?.data?.token) localStorage.setItem('bda_client_token', res.data.token);
+    return res;
+  },
+  driverLogin: async (credentials) => {
+    const res = await request('/auth/driver-login', { method: 'POST', body: credentials });
+    if (res?.data?.token) localStorage.setItem('bda_driver_token', res.data.token);
+    return res;
+  },
+  adminLogin: async (credentials) => {
+    const res = await request('/auth/admin-login', { method: 'POST', body: credentials });
+    if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
+    return res;
+  },
+  adminRegister: async (adminData) => {
+    const res = await request('/auth/admin-register', { method: 'POST', body: adminData });
+    if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
+    return res;
+  },
+  adminSession: async (payload = {}) => {
+    const res = await request('/auth/admin-session', { method: 'POST', body: payload });
+    if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
+    return res;
+  },
+  logout: () => {
+    localStorage.removeItem('bda_client_token');
+    localStorage.removeItem('bda_admin_token');
+    localStorage.removeItem('bda_driver_token');
+    return request('/auth/logout', { method: 'POST' });
+  },
   getMe: () => request('/auth/me', { method: 'GET' }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
+  verifyResetToken: (token) => request(`/auth/verify-reset-token?token=${encodeURIComponent(token)}`, { method: 'GET' }),
+  resetPassword: ({ token, newPassword }) => request('/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
+  changePassword: ({ currentPassword, newPassword }) => request('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
 
   // 2. Booking Endpoints
   createBooking: (bookingData, idempotencyKey = null) => 

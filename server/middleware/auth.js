@@ -2,14 +2,14 @@ import { verifyToken, getUserById } from '../services/authService.js';
 import { AUTH_COOKIE_NAME } from '../config/security.js';
 
 export function extractToken(req) {
-  // 1. Check HttpOnly cookie
-  if (req.cookies && req.cookies[AUTH_COOKIE_NAME]) {
-    return req.cookies[AUTH_COOKIE_NAME];
-  }
-  // 2. Check Authorization header
+  // 1. Check Authorization header (explicit token header takes precedence)
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
+  }
+  // 2. Check HttpOnly cookie (fallback for browser cookie sessions)
+  if (req.cookies && req.cookies[AUTH_COOKIE_NAME]) {
+    return req.cookies[AUTH_COOKIE_NAME];
   }
   return null;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Car, ShieldCheck, CheckCircle2, MapPin, ArrowRight, LogIn, UserPlus, 
-  Sparkles, Lock, Phone, User, Eye, EyeOff, AlertCircle, Award, Check
+  Sparkles, Lock, Phone, User, Eye, EyeOff, AlertCircle, Award, Check, QrCode
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import { BANGALORE_AREAS, DEFAULT_REGISTERED_DRIVERS } from '../data/mockData';
@@ -31,6 +31,7 @@ export default function DriverAuthPage({
   const [signupName, setSignupName] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
   const [signupDl, setSignupDl] = useState('');
+  const [signupUpi, setSignupUpi] = useState('');
   const [signupVehicleType, setSignupVehicleType] = useState('Manual & Automatic Cars');
   const [signupArea, setSignupArea] = useState('Indiranagar');
   const [signupExperience, setSignupExperience] = useState('3-5 Years');
@@ -54,6 +55,7 @@ export default function DriverAuthPage({
     setSignupName('');
     setSignupPhone('');
     setSignupDl('');
+    setSignupUpi('');
     setSignupVehicleType('Manual & Automatic Cars');
     setSignupArea('Indiranagar');
     setSignupExperience('3-5 Years');
@@ -218,6 +220,7 @@ export default function DriverAuthPage({
         name: signupName.trim(),
         phone: formattedPhone,
         dlNumber: signupDl.trim().toUpperCase(),
+        upiId: signupUpi.trim() || 'anna.driver@oksbi',
         vehicleType: signupVehicleType,
         area: signupArea,
         experienceYears: signupExperience,
@@ -546,6 +549,27 @@ export default function DriverAuthPage({
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-colors uppercase"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Driver UPI ID (For Direct Customer Ride Payment QR) */}
+                <div className="space-y-0.5">
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>Payment UPI ID (GPay / PhonePe / Paytm)</span>
+                    <span className="text-[10px] text-amber-400 font-normal">Auto QR Generator</span>
+                  </label>
+                  <div className="relative">
+                    <QrCode className="w-3.5 h-3.5 text-amber-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="driver-signup-upi"
+                      type="text"
+                      name="bda_drv_reg_upi"
+                      autoComplete="off"
+                      placeholder="e.g. yourname@oksbi or phone@paytm"
+                      value={signupUpi}
+                      onChange={(e) => setSignupUpi(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-colors font-mono"
+                    />
                   </div>
                 </div>
 

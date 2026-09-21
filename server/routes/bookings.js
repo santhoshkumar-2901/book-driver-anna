@@ -76,7 +76,14 @@ router.post('/lookup', async (req, res, next) => {
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
-    const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId.trim()]);
+    const booking = await queryOne(`
+      SELECT b.*, 
+             COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+             COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+      FROM bookings b
+      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+      WHERE b.id = ?
+    `, [bookingId.trim()]);
 
     if (!booking) {
       return res.status(404).json({

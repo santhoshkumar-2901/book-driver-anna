@@ -42,7 +42,6 @@ if (isTiDB) {
     sqliteDb.exec(schemaSql);
   }
 
-  // Safe non-destructive column migrations for driver assignment
   try {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_name TEXT;');
   } catch (e) {}

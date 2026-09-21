@@ -12,11 +12,28 @@ export const COOKIE_OPTIONS = {
   path: '/'
 };
 
+export const CLEAR_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: ENV.IS_PRODUCTION,
+  sameSite: ENV.IS_PRODUCTION ? 'strict' : 'lax',
+  path: '/'
+};
+
 export const RATE_LIMITS = {
   AUTH: {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 10, // 10 attempts
     message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many login or registration attempts. Please try again in 15 minutes.' } }
+  },
+  FORGOT_PASSWORD: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 requests per IP
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many password reset requests. Please try again in 15 minutes.' } }
+  },
+  RESET_PASSWORD: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts per IP
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many password reset attempts. Please try again in 15 minutes.' } }
   },
   BOOKINGS: {
     windowMs: 60 * 60 * 1000, // 1 hour

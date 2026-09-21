@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, Star, ShieldCheck, Phone, MapPin, Clock, Car, 
-  CreditCard, Smartphone, Banknote, Wallet, QrCode, ArrowRight, 
+  Smartphone, Banknote, QrCode, ArrowRight, ArrowLeft,
   Sparkles, X, Heart, Award, Download, Printer, Check, ChevronRight,
-  Info, AlertCircle, ThumbsUp, Send
+  Info, AlertCircle, ThumbsUp, Send, MessageSquare, ExternalLink
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { useScrollLock } from '../utils/useScrollLock';
@@ -30,11 +30,34 @@ export default function RidePaymentModal({
   const duration = rideData.duration || "Trip Duration";
   const baseCalculatedFare = Number(rideData.totalFare || rideData.fare || 549);
 
+  // Driver UPI ID resolution (drivers put their UPI ID in /driver, generating dynamic QR)
+  const resolvedDriverUpi = (() => {
+    if (rideData.driverUpi) return rideData.driverUpi;
+    if (rideData.assignedDriverUpi) return rideData.assignedDriverUpi;
+    try {
+      const savedFleet = JSON.parse(localStorage.getItem('bda_registered_drivers') || '[]');
+      const cleanPhone = (driverPhone || '').replace(/[^0-9]/g, '');
+      const matched = savedFleet.find(d => {
+        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+        return (cleanPhone && dPhone && (cleanPhone === dPhone || cleanPhone.includes(dPhone) || dPhone.includes(cleanPhone))) ||
+               (d.name && driverName && d.name.toLowerCase().trim() === driverName.toLowerCase().trim());
+      });
+      if (matched?.upiId) return matched.upiId;
+    } catch (e) {}
+    try {
+      const activeDriver = JSON.parse(localStorage.getItem('bda_driver_user') || 'null');
+      if (activeDriver?.upiId) return activeDriver.upiId;
+    } catch (e) {}
+    const sanitizedHandle = (driverName || 'driver').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${sanitizedHandle || 'driver'}@oksbi`;
+  })();
+
   // States
+  const [currentStep, setCurrentStep] = useState('settlement'); // 'settlement' | 'payment'
   const [selectedTip, setSelectedTip] = useState(0); // 0, 20, 50, 100, or custom
   const [customTip, setCustomTip] = useState('');
   const [isCustomTip, setIsCustomTip] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('upi'); // 'upi', 'card', 'cash', 'wallet'
+  const [paymentMethod, setPaymentMethod] = useState('upi'); // 'upi' | 'cash' only
   const [selectedUpiApp, setSelectedUpiApp] = useState('gpay'); // 'gpay', 'phonepe', 'paytm', 'qr'
   const [starRating, setStarRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -43,12 +66,16 @@ export default function RidePaymentModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [transactionId, setTransactionId] = useState('');
-  const [showQrCode, setShowQrCode] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(true);
+  const [upiRedirectNotice, setUpiRedirectNotice] = useState(false);
 
-  // Card inputs
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep('settlement');
+      setIsProcessing(false);
+      setUpiRedirectNotice(false);
+    }
+  }, [isOpen, rideData?.id, rideData?.bookingId]);
 
   // Fare calculations
   const effectiveTip = isCustomTip ? (Number(customTip) || 0) : selectedTip;
@@ -56,6 +83,74 @@ export default function RidePaymentModal({
   const gstTax = Math.round(baseCalculatedFare * 0.05);
   const promoDiscount = baseCalculatedFare > 400 ? 50 : 0;
   const totalAmountToPay = Math.max(0, baseCalculatedFare + tollCharges + gstTax - promoDiscount + effectiveTip);
+
+  // Available UPI Applications
+  const UPI_APPS = [
+    { id: 'gpay', name: 'Google Pay', icon: '🔵' },
+    { id: 'phonepe', name: 'PhonePe', icon: '🟣' },
+    { id: 'paytm', name: 'Paytm UPI', icon: '🔷' },
+    { id: 'generic', name: 'Any UPI App', icon: '⚡' }
+  ];
+
+  // Dynamic UPI payment URL and scannable QR Code image URL generated from driver UPI
+  const upiPayUri = `upi://pay?pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`;
+  const upiParams = `pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`;
+  const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiPayUri)}`;
+
+  const getUpiDeepLink = (appId = selectedUpiApp) => {
+    switch (appId) {
+      case 'gpay':
+        return `tez://upi/pay?${upiParams}`;
+      case 'phonepe':
+        return `phonepe://pay?${upiParams}`;
+      case 'paytm':
+        return `paytmmp://pay?${upiParams}`;
+      case 'generic':
+      default:
+        return `upi://pay?${upiParams}`;
+    }
+  };
+
+  const getUpiAppName = (appId = selectedUpiApp) => {
+    switch (appId) {
+      case 'gpay': return 'Google Pay';
+      case 'phonepe': return 'PhonePe';
+      case 'paytm': return 'Paytm';
+      case 'generic': return 'UPI App';
+      default: return 'UPI Payment App';
+    }
+  };
+
+  const launchUpiPaymentApp = (appId = selectedUpiApp) => {
+    const specificAppUri = getUpiDeepLink(appId);
+    const standardUpiUri = `upi://pay?${upiParams}`;
+
+    setUpiRedirectNotice(true);
+
+    try {
+      // 1. Attempt to launch native app scheme
+      const a = document.createElement('a');
+      a.href = specificAppUri;
+      a.target = '_self';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // 2. Also trigger universal upi:// standard fallback
+      if (appId !== 'generic' && specificAppUri !== standardUpiUri) {
+        setTimeout(() => {
+          try {
+            window.location.href = standardUpiUri;
+          } catch (e) {}
+        }, 600);
+      }
+    } catch (err) {
+      try {
+        window.location.href = standardUpiUri;
+      } catch (e) {}
+    }
+  };
 
   // Compliments bank
   const COMPLIMENT_OPTIONS = [
@@ -82,11 +177,18 @@ export default function RidePaymentModal({
 
   const handleProcessPayment = (e) => {
     if (e) e.preventDefault();
+
+    if (paymentMethod === 'upi') {
+      // Launch user's chosen payment app (GPay / PhonePe / Paytm / any UPI)
+      launchUpiPaymentApp(selectedUpiApp);
+    }
+
     setIsProcessing(true);
 
     setTimeout(() => {
       setIsProcessing(false);
       setIsPaid(true);
+      setUpiRedirectNotice(false);
       const generatedTxn = 'TXN-PAY-' + Math.floor(100000 + Math.random() * 900000);
       setTransactionId(generatedTxn);
 
@@ -96,12 +198,14 @@ export default function RidePaymentModal({
           transactionId: generatedTxn,
           amountPaid: totalAmountToPay,
           paymentMethod,
+          driverUpi: resolvedDriverUpi,
           tip: effectiveTip,
           rating: starRating,
-          compliments: selectedCompliments
+          compliments: selectedCompliments,
+          review: feedbackNotes.trim()
         });
       }
-    }, 1200);
+    }, 1800);
   };
 
   return (
@@ -134,7 +238,7 @@ export default function RidePaymentModal({
                 </span>
               </div>
               <h2 className="text-sm sm:text-lg font-black text-white font-['Outfit'] mt-0.5 truncate">
-                {isPaid ? "Payment Receipt" : "Trip Fare Settlement"}
+                {isPaid ? "Payment Receipt" : currentStep === 'payment' ? "Payment & Rating" : "Trip Fare Settlement"}
               </h2>
             </div>
           </div>
@@ -169,7 +273,7 @@ export default function RidePaymentModal({
                   ₹{totalAmountToPay}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Paid to <strong className="text-white">{driverName}</strong> via {paymentMethod.toUpperCase()}
+                  Paid to <strong className="text-white">{driverName}</strong> via {paymentMethod === 'upi' ? `UPI (${resolvedDriverUpi})` : 'Cash to Driver'}
                 </p>
                 <div className="mt-2 inline-block font-mono text-[11px] bg-slate-950 text-amber-400 border border-slate-800 px-2.5 py-1 rounded-lg">
                   Ref ID: {transactionId}
@@ -218,6 +322,18 @@ export default function RidePaymentModal({
                 </div>
               </div>
 
+              {/* Optional Review Display */}
+              {feedbackNotes.trim() && (
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 text-left space-y-1.5 animate-in fade-in duration-200">
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="w-3 h-3 text-amber-400" /> Your Driver Review
+                  </div>
+                  <p className="text-xs text-slate-300 italic leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
+                    "{feedbackNotes.trim()}"
+                  </p>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
@@ -239,9 +355,9 @@ export default function RidePaymentModal({
               </div>
 
             </div>
-          ) : (
+          ) : currentStep === 'settlement' ? (
 
-            /* ==================== VIEW 2: FARE & PAYMENT SETTLEMENT ==================== */
+            /* ==================== VIEW 2A: TRIP FARE SETTLEMENT & ITEMIZED RECEIPT ==================== */
             <>
               {/* 1. Driver Profile & Vehicle Card */}
               <div className="bg-slate-950 rounded-2xl p-3.5 border border-slate-800 flex items-center justify-between gap-3">
@@ -256,9 +372,15 @@ export default function RidePaymentModal({
                         <Star className="w-3 h-3 fill-amber-400" /> {driverRating}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                      <Car className="w-3 h-3 text-slate-400 inline" />
-                      <span>{carModel}</span>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Car className="w-3 h-3 text-slate-400 inline" />
+                        <span>{carModel}</span>
+                      </span>
+                      <span className="text-slate-600">•</span>
+                      <span className="text-emerald-400 font-mono text-[10px] bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-800/60 font-semibold truncate max-w-[170px]" title={`Driver UPI: ${resolvedDriverUpi}`}>
+                        UPI: {resolvedDriverUpi}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -362,6 +484,44 @@ export default function RidePaymentModal({
                 </div>
               </div>
 
+              {/* Step 1 Action Button: Proceed to Pay & Rate Driver */}
+              <div className="pt-2 space-y-2">
+                <button
+                  type="button"
+                  id="proceed-to-payment-btn"
+                  onClick={() => setCurrentStep('payment')}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Proceed to Pay ₹{totalAmountToPay} & Rate Driver</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <div className="text-center text-[10px] text-slate-500 flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Direct Anna Settlement • Official Fare Billing Guarantee</span>
+                </div>
+              </div>
+            </>
+          ) : (
+
+            /* ==================== VIEW 2B: PAYMENT METHOD & REVIEW ==================== */
+            <>
+              {/* Back Navigation Bar */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  type="button"
+                  id="back-to-settlement-btn"
+                  onClick={() => setCurrentStep('settlement')}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Fare Receipt</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Total:</span>
+                  <span className="text-sm font-mono font-black text-amber-400">₹{totalAmountToPay}</span>
+                </div>
+              </div>
+
               {/* 4. Add a Tip for Anna */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -431,72 +591,46 @@ export default function RidePaymentModal({
                 )}
               </div>
 
-              {/* 5. Payment Method Selector */}
+              {/* 5. Payment Method Selector (UPI and Cash Only) */}
               <div className="space-y-2.5">
                 <label className="text-xs font-bold text-slate-200 block uppercase tracking-wider">
                   Select Payment Method
                 </label>
 
-                {/* 4 Tabs: UPI, Cards, Cash, Wallet */}
-                <div className="grid grid-cols-4 gap-2">
+                {/* 2 Tabs: UPI / QR and Cash */}
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('upi')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       paymentMethod === 'upi'
                         ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
                         : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
                     }`}
                   >
-                    <Smartphone className="w-4 h-4" />
-                    <span className="text-[11px]">UPI / QR</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                      paymentMethod === 'card'
-                        ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
-                        : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span className="text-[11px]">Card</span>
+                    <Smartphone className="w-5 h-5" />
+                    <span className="text-xs font-semibold">UPI / QR</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('cash')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       paymentMethod === 'cash'
                         ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
                         : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
                     }`}
                   >
-                    <Banknote className="w-4 h-4" />
-                    <span className="text-[11px]">Cash</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('wallet')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                      paymentMethod === 'wallet'
-                        ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
-                        : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
-                    }`}
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span className="text-[11px]">FastPay</span>
+                    <Banknote className="w-5 h-5" />
+                    <span className="text-xs font-semibold">Cash to Driver</span>
                   </button>
                 </div>
 
                 {/* Sub-view for UPI */}
                 {paymentMethod === 'upi' && (
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-3 animate-in fade-in duration-200">
+                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3 animate-in fade-in duration-200">
                     <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                      <span>Choose UPI app or scan Anna's QR code:</span>
+                      <span>Choose UPI app or scan Driver's QR code:</span>
                       <button 
                         type="button" 
                         onClick={() => setShowQrCode(!showQrCode)} 
@@ -508,108 +642,126 @@ export default function RidePaymentModal({
                     </div>
 
                     {showQrCode ? (
-                      <div className="p-3 bg-white rounded-xl text-slate-950 text-center space-y-1.5">
-                        <div className="w-32 h-32 mx-auto bg-slate-100 border-2 border-slate-300 rounded-lg flex items-center justify-center p-2">
-                          <QrCode className="w-24 h-24 text-slate-900" />
+                      <div className="p-3.5 bg-white rounded-xl text-slate-950 text-center space-y-2 shadow-inner">
+                        <div className="w-36 h-36 mx-auto bg-white border-2 border-slate-300 rounded-xl flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+                          <img 
+                            src={dynamicQrCodeUrl} 
+                            alt={`Scannable UPI QR for ${resolvedDriverUpi}`} 
+                            className="w-full h-full object-contain"
+                            loading="eager"
+                          />
                         </div>
-                        <p className="text-[11px] font-bold">UPI ID: manjunath.anna@oksbi</p>
-                        <p className="text-[10px] text-slate-500">Scan using any UPI app to pay ₹{totalAmountToPay}</p>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-bold text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
+                            <span>Driver UPI:</span>
+                            <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-xs font-black select-all">
+                              {resolvedDriverUpi}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            Scan using Google Pay, PhonePe, Paytm or any UPI app to pay ₹{totalAmountToPay} directly to {driverName}
+                          </p>
+                        </div>
+
+                        {/* Direct App Launch Button */}
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => launchUpiPaymentApp(selectedUpiApp)}
+                            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>Pay ₹{totalAmountToPay} in {getUpiAppName(selectedUpiApp)}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Quick app switcher pills */}
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                          {UPI_APPS.map(app => (
+                            <button
+                              key={app.id}
+                              type="button"
+                              onClick={() => setSelectedUpiApp(app.id)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                                selectedUpiApp === app.id
+                                  ? 'bg-slate-900 text-amber-300 border-slate-900 shadow-sm font-black'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                              }`}
+                            >
+                              <span>{app.icon}</span>
+                              <span>{app.name}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        {[
-                          { id: 'gpay', name: 'Google Pay', icon: '🔵' },
-                          { id: 'phonepe', name: 'PhonePe', icon: '🟣' },
-                          { id: 'paytm', name: 'Paytm UPI', icon: '🔷' }
-                        ].map(app => (
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          {UPI_APPS.map(app => (
+                            <button
+                              key={app.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedUpiApp(app.id);
+                                launchUpiPaymentApp(app.id);
+                              }}
+                              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                                selectedUpiApp === app.id
+                                  ? 'bg-amber-400/15 border-amber-400 text-amber-300 font-bold shadow-sm ring-1 ring-amber-400/40'
+                                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/60'
+                              }`}
+                            >
+                              <span className="text-base block">{app.icon}</span>
+                              <span className="text-[11px] mt-1 block font-semibold">{app.name}</span>
+                              <span className="text-[9px] text-amber-400/80 block mt-0.5">Tap to Open</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => launchUpiPaymentApp(selectedUpiApp)}
+                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                        >
+                          <Smartphone className="w-4 h-4" />
+                          <span>Open & Pay ₹{totalAmountToPay} in {getUpiAppName(selectedUpiApp)}</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+
+                        <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 truncate mr-2">
+                            <span className="text-slate-400 text-[11px] shrink-0">Pay to UPI:</span>
+                            <span className="font-mono text-amber-300 font-bold text-[11px] truncate select-all">{resolvedDriverUpi}</span>
+                          </div>
                           <button
-                            key={app.id}
                             type="button"
-                            onClick={() => setSelectedUpiApp(app.id)}
-                            className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                              selectedUpiApp === app.id
-                                ? 'bg-amber-400/10 border-amber-400 text-amber-300 font-bold'
-                                : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                            }`}
+                            onClick={() => setShowQrCode(true)}
+                            className="text-amber-400 hover:underline text-[11px] font-bold flex items-center gap-1 shrink-0 cursor-pointer"
                           >
-                            <span className="text-sm block">{app.icon}</span>
-                            <span className="text-[11px] mt-0.5 block">{app.name}</span>
+                            <QrCode className="w-3 h-3" /> View QR
                           </button>
-                        ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Sub-view for Card */}
-                {paymentMethod === 'card' && (
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2.5 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-slate-400">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder="Enter 16-digit Card Number"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase text-slate-400">Expiry (MM/YY)</label>
-                        <input
-                          type="text"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          placeholder="MM/YY"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase text-slate-400">CVV</label>
-                        <input
-                          type="password"
-                          maxLength={3}
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          placeholder="•••"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Sub-view for Cash */}
                 {paymentMethod === 'cash' && (
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300 animate-in fade-in duration-200">
+                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300 animate-in fade-in duration-200">
                     <div className="font-bold text-amber-400 flex items-center gap-1.5">
                       <Banknote className="w-4 h-4" /> Pay Direct Cash to Driver
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Please hand over exact cash of <strong className="text-white">₹{totalAmountToPay}</strong> directly to Anna. Anna will confirm receipt in his driver portal.
-                    </p>
-                  </div>
-                )}
-
-                {/* Sub-view for Wallet */}
-                {paymentMethod === 'wallet' && (
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white flex items-center gap-1.5">
-                        <Wallet className="w-4 h-4 text-amber-400" /> Anna FastPay Wallet
-                      </span>
-                      <span className="font-mono text-emerald-400 font-extrabold text-xs">Balance: ₹1,500</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">
-                      ₹{totalAmountToPay} will be debited instantly from your wallet with 1-click checkout.
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Please hand over exact cash of <strong className="text-white font-bold">₹{totalAmountToPay}</strong> directly to Anna upon reaching your destination.
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* 6. Rate Driver Anna (5 Stars & Compliments) */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              {/* 6. Rate Driver Anna & Optional Manual Review */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3.5">
                 <div className="text-center space-y-1">
                   <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
                     Rate Your Ride with {driverName.split(' ')[0]}
@@ -627,6 +779,7 @@ export default function RidePaymentModal({
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
                       className="p-1 transition-transform hover:scale-125 cursor-pointer"
+                      title={`${star} Star${star > 1 ? 's' : ''}`}
                     >
                       <Star 
                         className={`w-7 h-7 ${
@@ -662,12 +815,37 @@ export default function RidePaymentModal({
                     ))}
                   </div>
                 </div>
+
+                {/* Manual Review (Optional) */}
+                <div className="space-y-1.5 pt-2.5 border-t border-slate-850">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Write a Review</span>
+                      <span className="text-[10px] font-semibold text-amber-400/90 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full">
+                        Optional
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {feedbackNotes.length}/300
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    maxLength={300}
+                    value={feedbackNotes}
+                    onChange={(e) => setFeedbackNotes(e.target.value)}
+                    placeholder="Share feedback or write a review about your ride experience (optional)..."
+                    className="w-full bg-slate-900/90 border border-slate-800 focus:border-amber-400/80 rounded-xl p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400/40 resize-none transition-all leading-relaxed"
+                  />
+                </div>
               </div>
 
               {/* 7. Action Button: Pay & Settle */}
               <div className="pt-2 space-y-2">
                 <button
                   type="button"
+                  id="ride-payment-submit-btn"
                   onClick={handleProcessPayment}
                   disabled={isProcessing}
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
@@ -675,19 +853,47 @@ export default function RidePaymentModal({
                   {isProcessing ? (
                     <>
                       <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                      <span>Contacting Bank Gateway & Authorizing...</span>
+                      <span>
+                        {paymentMethod === 'upi'
+                          ? `Opening ${getUpiAppName(selectedUpiApp)}...`
+                          : 'Processing Settlement...'}
+                      </span>
                     </>
                   ) : (
                     <>
-                      <span>Pay ₹{totalAmountToPay} & Complete Trip</span>
+                      <span>
+                        {paymentMethod === 'cash'
+                          ? `Confirm Cash ₹${totalAmountToPay} & Complete`
+                          : `Pay ₹${totalAmountToPay} via ${getUpiAppName(selectedUpiApp)} & Complete`}
+                      </span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
 
+                {upiRedirectNotice && (
+                  <div className="p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs text-center space-y-1 animate-in fade-in duration-200">
+                    <div className="font-bold flex items-center justify-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 animate-bounce text-amber-400" />
+                      <span>Opening {getUpiAppName(selectedUpiApp)} on your device...</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      If your UPI app did not launch automatically,{' '}
+                      <button 
+                        type="button" 
+                        onClick={() => launchUpiPaymentApp(selectedUpiApp)} 
+                        className="underline font-bold text-amber-400 hover:text-white cursor-pointer"
+                      >
+                        tap here to open {getUpiAppName(selectedUpiApp)}
+                      </button>
+                      {' '}or scan the QR code above.
+                    </p>
+                  </div>
+                )}
+
                 <div className="text-center text-[10px] text-slate-500 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>256-Bit Encrypted Settlement • Bank-Grade Security</span>
+                  <span>Direct & Secure Driver Settlement • Verified Ride</span>
                 </div>
               </div>
             </>

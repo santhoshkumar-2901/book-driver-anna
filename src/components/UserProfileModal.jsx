@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, User, Phone, Mail, MapPin, Calendar, ShieldCheck, 
   Car, Clock, CheckCircle2, AlertCircle, Edit3, LogOut, 
-  Sparkles, ArrowRight, Ban, Award, Check, Save, XCircle
+  Sparkles, ArrowRight, Ban, Award, Check, Save, XCircle, CreditCard,
+  Smartphone, Banknote, Star, MessageSquare
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { useScrollLock } from '../utils/useScrollLock';
 import { toDDMMYYYY } from '../utils/dateUtils';
 import { apiClient } from '../services/apiClient';
+import { onBookingUpdate } from '../utils/broadcastSync';
+import RidePaymentModal from './RidePaymentModal';
 
 // Helper to determine if the active user is a demo account (neutralized in production)
 export const isDemoUser = (user) => {
@@ -26,52 +29,115 @@ const DEMO_BOOKING_IDS = new Set([
   'BDA-977047',
   'BDA-VEH-9DE337',
   'BDA-DRV-9802',
-  'BDA-DRV-9803',
-  'BDA-DRV-9804',
-  'BDA-DRV-9805',
-  'BDA-DRV-9806',
-  'BDA-VEH-4101',
-  'BDA-VEH-4102',
-  'BDA-VEH-4103',
-  'BDA-VEH-4104'
+  'BDA-601936',
+  'BDA-CLS-4820'
 ]);
 
 export default function UserProfileModal({ 
   isOpen, 
   onClose, 
   clientUser, 
-  onUpdateProfile, 
-  onLogout,
-  openBookingModal,
-  onViewTripTicket
+  onLogout, 
+  onProfileUpdate, 
+  bookings = [], 
+  onCancelBooking 
 }) {
   useScrollLock(isOpen);
 
-  const [activeTab, setActiveTab] = useState('bookings'); // 'details' | 'bookings' | 'perks'
-  const [isEditing, setIsEditing] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState('');
-  const [userBookings, setUserBookings] = useState([]);
+  // Tabs: 'profile', 'bookings', 'security'
+  const [activeTab, setActiveTab] = useState('bookings');
   
-  // Profile edit state
-  const [formName, setFormName] = useState(clientUser?.name || '');
-  const [formEmail, setFormEmail] = useState(clientUser?.email || '');
-  const [formPhone, setFormPhone] = useState(clientUser?.phone || '');
-  const [formArea, setFormArea] = useState(clientUser?.homeArea || clientUser?.area || 'Indiranagar');
-  const [formHomeArea, setFormHomeArea] = useState(clientUser?.homeArea || 'Indiranagar');
-  const [formPrefCar, setFormPrefCar] = useState(clientUser?.preferredCarType || 'Sedan (Manual & Automatic)');
-  const [isSaved, setIsSaved] = useState(false);
+  // Profile form state
+  const [isEditing, setIsEditing] = useState(false);
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formArea, setFormArea] = useState('Indiranagar');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Cancellation state
+  const [selectedBookingToCancel, setSelectedBookingToCancel] = useState(null);
+
+  // Bookings list state
+  const [userBookings, setUserBookings] = useState([]);
+  const [paymentRideData, setPaymentRideData] = useState(null);
+  const [paidBookingIds, setPaidBookingIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
+    } catch (e) {
+      return new Set();
+    }
+  });
+  const [bookingReviews, setBookingReviews] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bda_booking_reviews') || '{}');
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const handleOpenPayment = (b) => {
+    const numericFare = Number(String(b.amount || '0').replace(/[^0-9]/g, '')) || 366;
+    setPaymentRideData({
+      ...b,
+      id: b.id,
+      bookingId: b.id,
+      driverName: b.assignedDriver || "Assigned Driver",
+      driverPhone: b.assignedPhone || "+91 80 2555 0199",
+      driverUpi: b.assignedDriverUpi || b.driverUpi,
+      assignedDriverUpi: b.assignedDriverUpi || b.driverUpi,
+      totalFare: numericFare,
+      fare: numericFare,
+      pickupArea: b.pickup || "Pickup Location",
+      pickup: b.pickup || "Pickup Location",
+      dropLocation: b.drop || "Destination",
+      destination: b.drop || "Destination",
+      carModel: b.serviceType === 'vehicle' ? b.title : "Customer Vehicle"
+    });
+  };
+
+  const handlePaymentSuccess = (details) => {
+    const bId = details?.rideId || paymentRideData?.id;
+    if (bId) {
+      setPaidBookingIds(prev => {
+        const updated = new Set(prev);
+        updated.add(bId);
+        localStorage.setItem('bda_paid_bookings', JSON.stringify(Array.from(updated)));
+        return updated;
+      });
+
+      if (details?.review || details?.rating) {
+        try {
+          const reviews = JSON.parse(localStorage.getItem('bda_booking_reviews') || '{}');
+          reviews[bId] = {
+            rating: details.rating,
+            review: details.review,
+            compliments: details.compliments,
+            paymentMethod: details.paymentMethod,
+            amountPaid: details.amountPaid,
+            createdAt: new Date().toISOString()
+          };
+          localStorage.setItem('bda_booking_reviews', JSON.stringify(reviews));
+          setBookingReviews(reviews);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    // Notice: We don't nullify paymentRideData here so the receipt view in RidePaymentModal remains visible!
+    // When user clicks "Done & Return Home" or "X", onClose fires and nullifies paymentRideData.
+  };
 
   useEffect(() => {
     if (clientUser) {
       setFormName(clientUser.name || '');
       setFormEmail(clientUser.email || '');
       setFormPhone(clientUser.phone || '');
-      setFormHomeArea(clientUser.homeArea || 'Indiranagar');
-      setFormPrefCar(clientUser.preferredCarType || 'Sedan (Manual & Automatic)');
+      setFormArea(clientUser.area || 'Indiranagar');
     }
   }, [clientUser]);
 
-  // Load bookings that belong ONLY to the active clientUser
+  // Load user bookings whenever modal opens or bookings are updated
   useEffect(() => {
     if (!isOpen || !clientUser) return;
 
@@ -82,12 +148,13 @@ export default function UserProfileModal({
     }
 
     // 2. For newly registered or real users:
+    // Start empty by default so new accounts have 0 bookings until they place an order
     let isCancelled = false;
 
     const fetchBookings = async () => {
-      const currentUserId = clientUser.id ? String(clientUser.id).trim() : null;
       const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
       const userEmailClean = (clientUser.email || '').toLowerCase().trim();
+      const currentUserId = clientUser.id ? String(clientUser.id).trim() : null;
 
       const matched = [];
       const seenIds = new Set();
@@ -101,6 +168,14 @@ export default function UserProfileModal({
             if (DEMO_BOOKING_IDS.has(b.id)) return;
             if (!seenIds.has(b.id)) {
               seenIds.add(b.id);
+              const rawStatus = (b.status || 'PENDING').toUpperCase();
+              let displayStatus = 'Pending';
+              if (rawStatus === 'ASSIGNED' || rawStatus === 'CONFIRMED') displayStatus = 'Confirmed';
+              else if (rawStatus === 'IN_PROGRESS') displayStatus = 'Ride In Progress';
+              else if (rawStatus === 'COMPLETED') displayStatus = 'Completed';
+              else if (rawStatus === 'CANCELLED') displayStatus = 'Cancelled';
+              else displayStatus = 'Pending';
+
               matched.push({
                 id: b.id,
                 serviceType: b.booking_type || 'driver',
@@ -111,23 +186,9 @@ export default function UserProfileModal({
                 pickup: b.pickup_area || 'Indiranagar',
                 drop: b.drop_location || '',
                 amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
-                status: b.status || 'Pending',
-                assignedDriver: b.assigned_driver_name || b.assigned_driver,
-                assignedDriverPhone: b.assigned_driver_phone,
-                rawBooking: {
-                  bookingId: b.id,
-                  status: b.status || 'Pending',
-                  serviceName: b.service_name || 'Personal Driver',
-                  pickupArea: b.pickup_area,
-                  dropLocation: b.drop_location,
-                  bookingDate: b.date,
-                  bookingTime: b.time,
-                  totalFare: b.calculated_fare,
-                  customerName: b.customer_name || clientUser?.name,
-                  customerPhone: b.customer_phone || clientUser?.phone,
-                  assignedAnna: b.assigned_driver_name || b.assigned_driver,
-                  driverPhone: b.assigned_driver_phone
-                }
+                status: displayStatus,
+                assignedDriver: b.assigned_driver_name || (rawStatus === 'ASSIGNED' ? 'Driver Assigned' : null),
+                assignedPhone: b.assigned_driver_phone || null
               });
             }
           });
@@ -137,6 +198,8 @@ export default function UserProfileModal({
       }
 
       // Check local storage for any bookings created during the active browser session
+      // STRICT requirement: Only match if booking explicitly has this user's userId or verified email/phone,
+      // and NEVER include demo bookings or match by name alone.
       try {
         const driverBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
         driverBookings.forEach(b => {
@@ -152,36 +215,51 @@ export default function UserProfileModal({
             (!bUserId && userEmailClean && bEmail === userEmailClean) ||
             (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
 
-          if (isOwner && !seenIds.has(b.id)) {
-            seenIds.add(b.id);
-            matched.push({
-              id: b.id,
-              serviceType: 'driver',
-              title: b.tripTitle || 'Driver Anna Duty',
-              category: 'Personal Driver',
-              date: b.date || b.bookingDate || 'Recent',
-              time: b.time || b.bookingTime || '',
-              pickup: b.pickupArea || 'Indiranagar',
-              drop: b.dropLocation || '',
-              amount: b.estimatedPrice || b.fare ? `₹${b.estimatedPrice || b.fare}` : '₹299',
-              status: b.status || 'Pending',
-              assignedDriver: b.assignedDriver || b.assignedAnna,
-              assignedDriverPhone: b.assignedDriverPhone || b.driverPhone,
-              rawBooking: {
-                bookingId: b.id,
-                status: b.status || 'Pending',
-                serviceName: b.tripTitle || 'Personal Driver',
-                pickupArea: b.pickupArea,
-                dropLocation: b.dropLocation,
-                bookingDate: b.date || b.bookingDate,
-                bookingTime: b.time || b.bookingTime,
-                totalFare: b.fare || b.estimatedPrice,
-                customerName: b.customerName || clientUser?.name,
-                customerPhone: b.phone || clientUser?.phone,
-                assignedAnna: b.assignedDriver || b.assignedAnna,
-                driverPhone: b.assignedDriverPhone || b.driverPhone
+          if (isOwner) {
+            const rawStatus = (b.status || 'Pending').toUpperCase();
+            let displayStatus = 'Pending';
+            if (rawStatus.includes('ASSIGN') || rawStatus.includes('CONFIRM')) displayStatus = 'Confirmed';
+            else if (rawStatus.includes('PROGRESS')) displayStatus = 'Ride In Progress';
+            else if (rawStatus.includes('COMPLET')) displayStatus = 'Completed';
+            else if (rawStatus.includes('CANCEL')) displayStatus = 'Cancelled';
+            else displayStatus = b.status || 'Pending';
+
+            const assignedName = b.assignedDriver || (displayStatus.includes('Confirmed') ? 'Driver Assigned' : null);
+            const assignedPhone = b.assignedDriverPhone || null;
+
+            const existing = matched.find(m => m.id === b.id);
+            if (existing) {
+              if (displayStatus !== 'Pending' || existing.status === 'Pending') {
+                existing.status = displayStatus;
               }
-            });
+              if (assignedName && (!existing.assignedDriver || existing.assignedDriver.includes('Pending'))) {
+                existing.assignedDriver = assignedName;
+              }
+              if (assignedPhone) {
+                existing.assignedPhone = assignedPhone;
+              }
+              if (b.assignedDriverUpi || b.driverUpi) {
+                existing.assignedDriverUpi = b.assignedDriverUpi || b.driverUpi;
+              }
+            } else if (!seenIds.has(b.id)) {
+              seenIds.add(b.id);
+              matched.push({
+                id: b.id,
+                serviceType: 'driver',
+                tripType: b.tripType,
+                title: b.tripTitle || 'Driver Anna Duty',
+                category: 'Personal Driver',
+                date: b.date || b.bookingDate || 'Recent',
+                time: b.time || b.bookingTime || '',
+                pickup: b.pickupArea || 'Indiranagar',
+                drop: b.dropLocation || '',
+                amount: b.estimatedPrice || b.fare || '₹299',
+                status: displayStatus,
+                assignedDriver: assignedName,
+                assignedPhone: assignedPhone,
+                assignedDriverUpi: b.assignedDriverUpi || b.driverUpi
+              });
+            }
           }
         });
       } catch (e) {}
@@ -201,40 +279,38 @@ export default function UserProfileModal({
             (!bUserId && userEmailClean && bEmail === userEmailClean) ||
             (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
 
-          if (isOwner && !seenIds.has(b.id)) {
-            seenIds.add(b.id);
-            matched.push({
-              id: b.id,
-              serviceType: 'vehicle',
-              title: b.vehicleName || 'Rental Vehicle',
-              category: 'Car Rental',
-              date: b.startDate || b.date || 'Recent',
-              time: b.pickupTime || b.time || '',
-              pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
-              drop: b.dropLocation || '',
-              amount: b.totalPrice || b.fare ? `₹${b.totalPrice || b.fare}` : '₹1,499',
-              status: b.status || 'Pending',
-              assignedDriver: b.assignedDriver || b.assignedAnna,
-              assignedDriverPhone: b.assignedDriverPhone || b.driverPhone,
-              vehicleRegNumber: b.vehicleRegNumber,
-              rawBooking: {
-                bookingId: b.id,
-                bookingType: 'vehicle',
-                status: b.status || 'Pending',
-                serviceName: b.vehicleName || 'Rental Vehicle',
-                vehicleCategory: b.category,
-                pickupArea: b.pickupLocation || b.pickupArea,
-                dropLocation: b.dropLocation,
-                bookingDate: b.startDate || b.date,
-                bookingTime: b.pickupTime || b.time,
-                totalFare: b.totalPrice || b.fare,
-                customerName: b.customerName || clientUser?.name,
-                customerPhone: b.phone || clientUser?.phone,
-                assignedAnna: b.assignedDriver || b.assignedAnna,
-                driverPhone: b.assignedDriverPhone || b.driverPhone,
-                vehicleRegNumber: b.vehicleRegNumber
+          if (isOwner) {
+            const rawStatus = (b.status || 'Pending').toUpperCase();
+            let displayStatus = 'Pending';
+            if (rawStatus.includes('ASSIGN') || rawStatus.includes('CONFIRM')) displayStatus = 'Confirmed';
+            else if (rawStatus.includes('CANCEL')) displayStatus = 'Cancelled';
+            else if (rawStatus.includes('COMPLET')) displayStatus = 'Completed';
+            else displayStatus = b.status || 'Pending';
+
+            const existing = matched.find(m => m.id === b.id);
+            if (existing) {
+              if (displayStatus !== 'Pending' || existing.status === 'Pending') {
+                existing.status = displayStatus;
               }
-            });
+              if (b.vehicleRegNumber) {
+                existing.assignedDriver = b.vehicleRegNumber;
+              }
+            } else if (!seenIds.has(b.id)) {
+              seenIds.add(b.id);
+              matched.push({
+                id: b.id,
+                serviceType: 'vehicle',
+                title: b.vehicleName || 'Rental Vehicle',
+                category: 'Car Rental',
+                date: b.startDate || 'Recent',
+                time: b.pickupTime || '',
+                pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
+                drop: b.dropLocation || '',
+                amount: b.totalPrice ? `₹${b.totalPrice}` : (b.fare ? `₹${b.fare}` : '₹1,499'),
+                status: displayStatus,
+                assignedDriver: b.vehicleRegNumber || null
+              });
+            }
           }
         });
       } catch (e) {}
@@ -248,46 +324,49 @@ export default function UserProfileModal({
 
           const bUserId = b.userId ? String(b.userId).trim() : null;
           const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-          const bPhone = (b.phone || b.mobileNumber || '').replace(/[^0-9]/g, '');
+          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
 
           const isOwner = 
             (currentUserId && bUserId && bUserId === currentUserId) ||
             (!bUserId && userEmailClean && bEmail === userEmailClean) ||
             (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
 
-          if (isOwner && !seenIds.has(bId)) {
-            seenIds.add(bId);
-            matched.push({
-              id: bId,
-              serviceType: 'class',
-              title: b.courseName || b.classCourseName || 'Driving Class Session',
-              category: 'Driving School',
-              date: b.startDate || b.date || 'Upcoming',
-              time: b.preferredSlot || b.time || '',
-              pickup: b.pickupArea || 'Doorstep',
-              drop: '',
-              amount: b.courseFee || b.fare ? `₹${b.courseFee || b.fare}` : '₹3,999',
-              status: b.status || 'Pending',
-              assignedDriver: b.assignedInstructor,
-              assignedDriverPhone: b.assignedInstructorPhone,
-              rawBooking: {
-                bookingId: bId,
-                bookingType: 'class',
-                status: b.status || 'Pending',
-                serviceName: b.courseName || 'Driving Class Session',
-                classTrainingCar: b.classTrainingCar,
-                classTransmission: b.classTransmission,
-                classTimeSlot: b.preferredSlot || b.classTimeSlot,
-                pickupArea: b.pickupArea,
-                bookingDate: b.startDate || b.date,
-                bookingTime: b.preferredSlot || b.time,
-                totalFare: b.courseFee || b.fare,
-                customerName: b.fullName || b.customerName || clientUser?.name,
-                customerPhone: b.mobileNumber || b.phone || clientUser?.phone,
-                assignedAnna: b.assignedInstructor,
-                driverPhone: b.assignedInstructorPhone
+          if (isOwner) {
+            const rawStatus = (b.status || 'Pending').toUpperCase();
+            let displayStatus = 'Pending';
+            if (rawStatus.includes('TRAIN') || rawStatus.includes('ACTIVE') || rawStatus.includes('CONFIRM')) displayStatus = 'Accepted & In Training';
+            else if (rawStatus.includes('COMPLET')) displayStatus = 'Completed';
+            else if (rawStatus.includes('CANCEL')) displayStatus = 'Cancelled';
+            else displayStatus = b.status || 'Pending';
+
+            const existing = matched.find(m => m.id === bId);
+            if (existing) {
+              if (displayStatus !== 'Pending' || existing.status === 'Pending') {
+                existing.status = displayStatus;
               }
-            });
+              if (b.assignedInstructor) {
+                existing.assignedDriver = b.assignedInstructor;
+              }
+              if (b.assignedInstructorPhone) {
+                existing.assignedPhone = b.assignedInstructorPhone;
+              }
+            } else if (!seenIds.has(bId)) {
+              seenIds.add(bId);
+              matched.push({
+                id: bId,
+                serviceType: 'class',
+                title: b.courseName || 'Driving Class Session',
+                category: 'Driving School',
+                date: b.startDate || 'Upcoming',
+                time: b.preferredSlot || '',
+                pickup: b.pickupArea || 'Doorstep',
+                drop: '',
+                amount: b.courseFee || '₹3,999',
+                status: displayStatus,
+                assignedDriver: b.assignedInstructor || null,
+                assignedPhone: b.assignedInstructorPhone || null
+              });
+            }
           }
         });
       } catch (e) {}
@@ -299,28 +378,18 @@ export default function UserProfileModal({
 
     fetchBookings();
 
-    const handleBookingsUpdated = () => {
+    // Cross-tab broadcast and storage event subscriber
+    const unsubscribeSync = onBookingUpdate(() => {
       fetchBookings();
-    };
+    });
 
-    window.addEventListener('bda_booking_updated', handleBookingsUpdated);
-    window.addEventListener('bda_driver_assigned', handleBookingsUpdated);
-    window.addEventListener('storage', handleBookingsUpdated);
-
-    let bc = null;
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        bc = new BroadcastChannel('bda_realtime_channel');
-        bc.onmessage = () => fetchBookings();
-      }
-    } catch (e) {}
+    // Periodic polling every 3 seconds while modal is open to ensure immediate reflection
+    const pollInterval = setInterval(fetchBookings, 3000);
 
     return () => {
       isCancelled = true;
-      window.removeEventListener('bda_booking_updated', handleBookingsUpdated);
-      window.removeEventListener('bda_driver_assigned', handleBookingsUpdated);
-      window.removeEventListener('storage', handleBookingsUpdated);
-      if (bc) bc.close();
+      clearInterval(pollInterval);
+      unsubscribeSync();
     };
   }, [isOpen, clientUser]);
 
@@ -644,6 +713,7 @@ export default function UserProfileModal({
                     const statusStr = (b.status || '').toLowerCase();
                     const isCancelled = statusStr.includes('cancel');
                     const isPending = statusStr.includes('pending');
+                    const isAccepted = statusStr.includes('accept') || statusStr.includes('assign') || statusStr.includes('confirm');
 
                     return (
                       <div 
@@ -651,6 +721,8 @@ export default function UserProfileModal({
                         className={`rounded-2xl p-3.5 space-y-2.5 transition-all ${
                           isCancelled
                             ? 'bg-red-950/20 border border-red-900/50 hover:border-red-500/50'
+                            : isAccepted
+                            ? 'bg-emerald-950/20 border border-emerald-500/40 hover:border-emerald-500/70 shadow-sm shadow-emerald-500/5'
                             : 'bg-slate-950/70 border border-slate-800/90 hover:border-amber-500/40'
                         }`}
                       >
@@ -659,6 +731,8 @@ export default function UserProfileModal({
                             <span className={`font-mono font-bold text-[10px] px-2 py-0.5 rounded-md border ${
                               isCancelled
                                 ? 'bg-red-950/60 text-red-300 border-red-900/60'
+                                : isAccepted
+                                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
                                 : 'bg-slate-900 text-slate-300 border border-slate-800'
                             }`}>
                               {b.id}
@@ -674,9 +748,11 @@ export default function UserProfileModal({
                               ? 'bg-red-500/15 text-red-400 border-red-500/40 shadow-sm shadow-red-500/10'
                               : isPending
                               ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold shadow-sm shadow-emerald-500/10'
                           }`}>
                             {isCancelled && <XCircle className="w-3 h-3 text-red-400 shrink-0" />}
+                            {isPending && <Clock className="w-3 h-3 text-amber-400 shrink-0" />}
+                            {!isCancelled && !isPending && <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
                             <span>{b.status}</span>
                           </span>
                         </div>
@@ -699,84 +775,74 @@ export default function UserProfileModal({
                           </div>
                         </div>
 
-                        {/* Assigned Anna Driver Card if assigned or confirmed */}
-                        {!isCancelled && (b.status === 'Assigned' || b.status === 'Confirmed') && b.assignedDriver && !b.assignedDriver.toLowerCase().includes('pending') && (
-                          <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                              <div className="min-w-0">
-                                <span className="text-[10px] text-emerald-400/80 block font-bold uppercase tracking-wider">Assigned Anna Driver</span>
-                                <span className="font-extrabold text-white truncate block">{b.assignedDriver}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {b.assignedDriverPhone && (
+                        {/* If Driver is Assigned, show driver assignment card with Call & Pay options */}
+                        {b.assignedDriver && !isCancelled && !isPending && (
+                          <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 gap-2 flex-wrap sm:flex-nowrap">
+                            <span className="flex items-center gap-1.5 font-medium min-w-0">
+                              <SteeringWheel className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Assigned: <strong className="text-white font-bold">{b.assignedDriver}</strong></span>
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {b.assignedPhone && (
                                 <a 
-                                  href={`tel:${b.assignedDriverPhone}`}
-                                  className="px-2 py-1 bg-emerald-500 text-slate-950 font-bold rounded-lg hover:bg-emerald-400 transition-colors flex items-center gap-1 text-[10px]"
+                                  href={`tel:${b.assignedPhone}`} 
+                                  className="text-[10px] font-extrabold text-emerald-400 hover:text-emerald-300 bg-emerald-900/50 hover:bg-emerald-900/80 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-emerald-500/30"
                                 >
-                                  <Phone className="w-3 h-3 fill-slate-950" /> Call
+                                  <Phone className="w-3 h-3" /> Call
                                 </a>
                               )}
-                              {onViewTripTicket && (
+                              {paidBookingIds.has(b.id) ? (
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
+                                </span>
+                              ) : (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onClose();
-                                    onViewTripTicket(b.rawBooking || {
-                                      bookingId: b.id,
-                                      status: b.status,
-                                      serviceName: b.title,
-                                      pickupArea: b.pickup,
-                                      dropLocation: b.drop,
-                                      bookingDate: b.date,
-                                      bookingTime: b.time,
-                                      totalFare: String(b.amount).replace(/[^0-9]/g, ''),
-                                      customerName: clientUser?.name || 'Customer',
-                                      customerPhone: clientUser?.phone || '',
-                                      assignedAnna: b.assignedDriver,
-                                      driverPhone: b.assignedDriverPhone
-                                    });
-                                  }}
-                                  className="px-2 py-1 bg-amber-400 text-slate-950 font-bold rounded-lg hover:bg-amber-300 transition-colors text-[10px] cursor-pointer"
+                                  onClick={() => handleOpenPayment(b)}
+                                  className="text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-sm shadow-amber-400/20 cursor-pointer font-['Outfit'] hover:scale-105 active:scale-95"
                                 >
-                                  Trip Ticket
+                                  <Smartphone className="w-3 h-3 text-slate-950" /> Pay
                                 </button>
                               )}
                             </div>
                           </div>
                         )}
 
-                        {/* If Pending, show awaiting dispatch notice */}
-                        {!isCancelled && isPending && (
-                          <div className="flex items-center justify-between text-[10px] text-amber-300 bg-amber-950/30 px-2.5 py-1.5 rounded-xl border border-amber-500/20">
-                            <span className="flex items-center gap-1.5 font-medium">
-                              <Clock className="w-3 h-3 text-amber-400 shrink-0" />
-                              <span>Request Received • Awaiting Admin Dispatch & Driver Assignment</span>
-                            </span>
-                            {onViewTripTicket && (
+                        {/* If Confirmed without a driver row (vehicle rental or classes), provide Pay option */}
+                        {!b.assignedDriver && !isCancelled && !isPending && (
+                          <div className="flex items-center justify-end text-[11px] pt-1">
+                            {paidBookingIds.has(b.id) ? (
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
+                              </span>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  onClose();
-                                  onViewTripTicket(b.rawBooking || {
-                                    bookingId: b.id,
-                                    status: b.status,
-                                    serviceName: b.title,
-                                    pickupArea: b.pickup,
-                                    dropLocation: b.drop,
-                                    bookingDate: b.date,
-                                    bookingTime: b.time,
-                                    totalFare: String(b.amount).replace(/[^0-9]/g, ''),
-                                    customerName: clientUser?.name || 'Customer',
-                                    customerPhone: clientUser?.phone || '',
-                                    assignedAnna: 'Pending Admin Assignment'
-                                  });
-                                }}
-                                className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer shrink-0 ml-2"
+                                onClick={() => handleOpenPayment(b)}
+                                className="text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 shadow-sm shadow-amber-400/20 cursor-pointer font-['Outfit'] hover:scale-105 active:scale-95"
                               >
-                                View Ticket
+                                <Smartphone className="w-3 h-3 text-slate-950" /> Pay Fare
                               </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Display User Review & Rating if reviewed */}
+                        {bookingReviews[b.id] && (
+                          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5 space-y-1 text-left mt-1.5">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="flex items-center gap-1 text-amber-400 font-bold">
+                                <Star className="w-3 h-3 fill-amber-400" />
+                                <span>{bookingReviews[b.id].rating} / 5 Rating</span>
+                              </span>
+                              <span className="text-slate-500 font-mono text-[9px] uppercase">
+                                Paid via {bookingReviews[b.id].paymentMethod || 'UPI'}
+                              </span>
+                            </div>
+                            {bookingReviews[b.id].review && (
+                              <p className="text-[11px] text-slate-300 italic">
+                                "{bookingReviews[b.id].review}"
+                              </p>
                             )}
                           </div>
                         )}
@@ -887,6 +953,15 @@ export default function UserProfileModal({
         </div>
 
       </div>
+
+      {paymentRideData && (
+        <RidePaymentModal
+          isOpen={Boolean(paymentRideData)}
+          rideData={paymentRideData}
+          onClose={() => setPaymentRideData(null)}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }
