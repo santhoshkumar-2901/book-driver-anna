@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Car, Phone, ArrowRight, CreditCard, ChevronUp, ChevronDown } from 'lucide-react';
+import SOSButton from './SOSButton';
+import { SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function ActiveRideBanner({ 
   activeRide, 
@@ -41,6 +43,9 @@ export default function ActiveRideBanner({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* SOS Safety Button */}
+            <SOSButton trip={activeRide} />
+
             <button
               type="button"
               onClick={onOpenPayment}
@@ -70,9 +75,9 @@ export default function ActiveRideBanner({
               <strong className="text-white truncate max-w-[200px] sm:max-w-xs">{destination}</strong>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               <a 
-                href={`tel:${activeRide.driverPhone || '+918025550199'}`}
+                href={`tel:${(activeRide.driverPhone || SUPPORT_HELPLINE).replace(/\s+/g, '')}`}
                 className="text-slate-400 hover:text-emerald-400 flex items-center gap-1 font-bold"
               >
                 <Phone className="w-3 h-3 text-emerald-400" /> Call Anna
@@ -85,3 +90,4 @@ export default function ActiveRideBanner({
     </div>
   );
 }
+

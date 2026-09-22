@@ -14,6 +14,7 @@ import {
   getDriverDuties 
 } from '../utils/driverDutyHelpers';
 import { SUPPORT_HELPLINE } from '../data/mockData';
+import SOSButton from '../components/SOSButton';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
@@ -649,7 +650,10 @@ export default function DriverPortalPage({
                       </div>
                       <h3 className="text-base font-black text-white font-['Outfit'] mt-1">{trip.tripType}</h3>
                     </div>
-                    <div className="text-lg font-black text-emerald-400 font-mono">{trip.payout}</div>
+                    <div className="flex items-center gap-2">
+                      <SOSButton trip={trip} />
+                      <div className="text-lg font-black text-emerald-400 font-mono">{trip.payout}</div>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
@@ -665,7 +669,7 @@ export default function DriverPortalPage({
 
                   <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                     <a 
-                      href={`tel:${trip.customerPhone || '+918025550199'}`}
+                      href={`tel:${trip.customerPhone || SUPPORT_HELPLINE}`}
                       className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
                       title="Call Customer"
                     >
