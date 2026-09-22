@@ -43,11 +43,11 @@ export const ENV = {
 
   DATABASE_URL: process.env.DATABASE_URL || '',
 
-  // Password Reset & Email Configuration
-  APP_URL: process.env.APP_URL || 'http://localhost:5173',
+  // Production Email Delivery Configuration (Resend SMTP: smtp.resend.com:465)
   SMTP_HOST: process.env.SMTP_HOST || '',
-  SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
-  SMTP_USER: process.env.SMTP_USER || '',
-  SMTP_PASS: process.env.SMTP_PASS || '',
-  SMTP_FROM: process.env.SMTP_FROM || 'Book Driver Anna <noreply@bookdriveranna.com>',
+  SMTP_PORT: parseInt(process.env.SMTP_PORT || '465', 10),
+  SMTP_USER: process.env.SMTP_USER || 'resend',
+  SMTP_PASS: process.env.SMTP_PASS || process.env.RESEND_API_KEY || '',
+  SMTP_FROM: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'Book Driver Anna <onboarding@resend.dev>',
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Book Driver Anna <onboarding@resend.dev>',
 };

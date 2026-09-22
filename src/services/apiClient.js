@@ -153,9 +153,6 @@ export const apiClient = {
     return request('/auth/logout', { method: 'POST' });
   },
   getMe: () => request('/auth/me', { method: 'GET' }),
-  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
-  verifyResetToken: (token) => request(`/auth/verify-reset-token?token=${encodeURIComponent(token)}`, { method: 'GET' }),
-  resetPassword: ({ token, newPassword }) => request('/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
   changePassword: ({ currentPassword, newPassword }) => request('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
 
   // 2. Booking Endpoints

@@ -8,7 +8,6 @@ import { SteeringWheel } from '../components/Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 import { useScrollLock } from '../utils/useScrollLock';
-import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
 // Initial registered clients directory (empty on clean boot)
 const DEFAULT_REGISTERED_CLIENTS = [];
@@ -47,7 +46,6 @@ export default function ClientAuthPage({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
   // Form input element refs for direct DOM clearing if browser injects values
   const loginIdentifierRef = React.useRef(null);
@@ -210,84 +208,12 @@ export default function ClientAuthPage({
         }, 400);
         return;
       }
+      setIsLoading(false);
+      setErrorMessage('Invalid email or password.');
     } catch (apiErr) {
-      let hasLocalProfileMatch = false;
-      try {
-        const allClients = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
-        const cleanInput = submittedIdentifier.toLowerCase();
-        const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
-        const matched = allClients.find(u =>
-          (u.email && u.email.toLowerCase() === cleanInput) ||
-          (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
-        );
-        if (matched && (!matched.password || matched.password === submittedPassword)) {
-          hasLocalProfileMatch = true;
-        }
-      } catch (e) { }
-
-      if (!hasLocalProfileMatch && apiErr.code !== 'NETWORK_ERROR' && apiErr.status !== 500) {
-        setIsLoading(false);
-        setErrorMessage(apiErr.message || 'Login failed. Please check your credentials.');
-        return;
-      }
-      console.warn('[AUTH] API response or offline state encountered. Checking registered client credentials.');
+      setIsLoading(false);
+      setErrorMessage(apiErr.message || 'Invalid email or password.');
     }
-
-    setTimeout(() => {
-      let registeredUsers = [];
-      try {
-        registeredUsers = JSON.parse(localStorage.getItem('bda_registered_clients') || '[]');
-      } catch (err) {
-        registeredUsers = [];
-      }
-
-      const cleanInput = submittedIdentifier.toLowerCase();
-      const cleanPhone = submittedIdentifier.replace(/[^0-9]/g, '');
-
-      // Check against stored registered clients
-      const matchedUser = registeredUsers.find(u =>
-        (u.email && u.email.toLowerCase() === cleanInput) ||
-        (cleanPhone.length >= 10 && u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
-      );
-
-      if (matchedUser) {
-        if (matchedUser.password && matchedUser.password !== submittedPassword) {
-          setIsLoading(false);
-          setErrorMessage('Incorrect password. Please verify and try again.');
-          return;
-        }
-
-        const sessionData = {
-          id: matchedUser.id,
-          name: matchedUser.name,
-          email: matchedUser.email,
-          phone: matchedUser.phone,
-          area: matchedUser.area || 'Indiranagar',
-          token: 'bda_tok_' + Date.now(),
-          loggedInAt: new Date().toISOString()
-        };
-
-        if (rememberMe) {
-          localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
-        } else {
-          sessionStorage.setItem('bda_client_user', JSON.stringify(sessionData));
-        }
-
-        syncUserToRegisteredClients(matchedUser);
-
-        // Wipe input boxes immediately so returning to signin page starts completely empty
-        resetForm();
-
-        setSuccessMessage(`Welcome, ${matchedUser.name}! Opening Namma Bangalore services...`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onLoginSuccess(sessionData);
-        }, 500);
-      } else {
-        setIsLoading(false);
-        setErrorMessage('Invalid email/phone or password. Please verify your credentials or register.');
-      }
-    }, 500);
   };
 
   // Handle Client Sign Up / Registration
@@ -343,86 +269,22 @@ export default function ClientAuthPage({
         syncUserToRegisteredClients(res.data.user);
         resetForm();
         setSuccessMessage(`Registration successful! Welcome to Book Driver Anna, ${res.data.user.name}!`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onLoginSuccess(sessionData);
-        }, 500);
-        return;
-      }
-    } catch (apiErr) {
-      // 1. If backend explicitly returns duplicate account error
-      if (apiErr.status === 409 || apiErr.code === 'USER_ALREADY_EXISTS') {
         setIsLoading(false);
-        setErrorMessage(apiErr.message || 'An account with this mobile number or email already exists. Please log in.');
-        return;
-      }
-
-      // 2. If client input failed validation (e.g. invalid format)
-      if (apiErr.status === 400 && apiErr.code === 'INVALID_INPUT') {
-        setIsLoading(false);
-        setErrorMessage(apiErr.message || 'Please check the details entered.');
-        return;
-      }
-
-      // 3. For any server outage, 500, CORS, or offline state: gracefully fall back to local profile
-      console.warn('[AUTH SIGNUP] Backend service note, proceeding with local profile registration:', apiErr.message);
-    }
-
-    setTimeout(() => {
-      setIsLoading(false);
-
-      let registeredClients = [];
-      try {
-        const saved = localStorage.getItem('bda_registered_clients');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) registeredClients = parsed;
-        }
-      } catch (err) {
-        registeredClients = [];
-      }
-
-      // Check if email or phone already registered
-      const cleanPhone = signupPhone.replace(/[^0-9]/g, '');
-      const isDuplicate = registeredClients.some(u =>
-        (u.email && u.email.toLowerCase() === signupEmail.trim().toLowerCase()) ||
-        (u.phone && u.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-10)))
-      );
-
-      if (isDuplicate) {
-        setErrorMessage('An account with this mobile number or email already exists. Please log in.');
-        return;
-      }
-
-      const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12
-        ? `+${cleanPhone.slice(0, 2)} ${cleanPhone.slice(2)}`
-        : `+91 ${cleanPhone.slice(-10)}`;
-
-      const newClient = {
-        id: 'CLI-' + Math.floor(1000 + Math.random() * 9000),
-        name: signupName.trim(),
-        phone: formattedPhone,
-        email: signupEmail.trim(),
-        area: signupArea,
-        status: 'Active',
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-
-      const sessionData = {
-        ...newClient,
-        token: 'local-session-' + Date.now(),
-        loggedInAt: new Date().toISOString()
-      };
-
-      localStorage.setItem('bda_client_user', JSON.stringify(sessionData));
-      syncUserToRegisteredClients(newClient);
-      resetForm();
-
-      setSuccessMessage(`Account created successfully! Welcome, ${newClient.name}.`);
-      if (onLoginSuccess) {
         onLoginSuccess(sessionData);
+        return;
       }
-    }, 700);
+      setIsLoading(false);
+      setErrorMessage('Registration failed. Please try again.');
+    } catch (apiErr) {
+      setIsLoading(false);
+      if (apiErr.status === 409 || apiErr.code === 'USER_ALREADY_EXISTS') {
+        setErrorMessage(apiErr.message || 'An account with this mobile number or email already exists. Please log in.');
+      } else if (apiErr.status === 400 && apiErr.code === 'INVALID_INPUT') {
+        setErrorMessage(apiErr.message || 'Please check the details entered.');
+      } else {
+        setErrorMessage(apiErr.message || 'Registration failed. Please try again.');
+      }
+    }
   };
 
   const cardElement = (
@@ -597,14 +459,6 @@ export default function ClientAuthPage({
                     />
                     <span>Remember me</span>
                   </label>
-
-                  <button 
-                    type="button" 
-                    className="text-amber-400/90 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[11px]" 
-                    onClick={() => setShowForgotPasswordModal(true)}
-                  >
-                    Forgot Password?
-                  </button>
                 </div>
 
                 {/* Submit Button */}
@@ -831,14 +685,6 @@ export default function ClientAuthPage({
         <div className="relative z-10 w-full max-w-md my-auto animate-in zoom-in-95 duration-150">
           {cardElement}
         </div>
-        <ForgotPasswordModal
-          isOpen={showForgotPasswordModal}
-          onClose={() => setShowForgotPasswordModal(false)}
-          onBackToLogin={() => {
-            setShowForgotPasswordModal(false);
-            switchMode('login');
-          }}
-        />
       </div>
     );
   }
@@ -883,14 +729,6 @@ export default function ClientAuthPage({
       {/* Central Auth Container */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-1.5 sm:py-2 overflow-y-auto custom-scrollbar">
         {cardElement}
-        <ForgotPasswordModal
-          isOpen={showForgotPasswordModal}
-          onClose={() => setShowForgotPasswordModal(false)}
-          onBackToLogin={() => {
-            setShowForgotPasswordModal(false);
-            switchMode('login');
-          }}
-        />
       </main>
 
       {/* Footer copyright */}

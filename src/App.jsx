@@ -11,7 +11,6 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ClientAuthPage = lazy(() => import('./pages/ClientAuthPage'));
 const DriverAuthPage = lazy(() => import('./pages/DriverAuthPage'));
 const DriverPortalPage = lazy(() => import('./pages/DriverPortalPage'));
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RouteLoadingFallback() {
@@ -80,9 +79,6 @@ export function resolveRoute(pathname = '') {
   }
   if (clean === '/contact') {
     return { role: 'client', page: 'contact', authRole: 'user', resetAuth: false };
-  }
-  if (clean === '/reset-password') {
-    return { role: 'client', page: 'reset-password', authRole: 'user', resetAuth: false };
   }
   if (clean === '/') {
     return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
@@ -276,8 +272,6 @@ export default function App() {
       window.history.pushState({}, '', '/about');
     } else if (newPage === 'contact') {
       window.history.pushState({}, '', '/contact');
-    } else if (newPage === 'reset-password') {
-      window.history.pushState({}, '', '/reset-password' + window.location.search);
     } else {
       if (window.location.pathname !== '/') {
         window.history.pushState({}, '', '/');
@@ -764,19 +758,7 @@ export default function App() {
     );
   }
 
-  // 4. Password Reset Page (/reset-password?token=...)
-  if (activePage === 'reset-password') {
-    return (
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <ResetPasswordPage
-          onNavigateLogin={() => changePage('login')}
-          onNavigateHome={() => changePage('home')}
-        />
-      </Suspense>
-    );
-  }
-
-  // 5. Client Auth Pages (/login, /signup, /client-auth)
+  // 4. Client Auth Pages (/login, /signup, /client-auth)
   if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth') {
     return (
       <Suspense fallback={<RouteLoadingFallback />}>

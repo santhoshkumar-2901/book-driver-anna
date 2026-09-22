@@ -22,7 +22,8 @@ describe('Production 404 Not Found Page & Routing Suite', () => {
       '/does-not-exist',
       '/anything',
       '/nested/unknown/route',
-      '/some/bogus/path/here'
+      '/some/bogus/path/here',
+      '/reset-password'
     ];
 
     for (const route of invalidRoutes) {
@@ -49,8 +50,7 @@ describe('Production 404 Not Found Page & Routing Suite', () => {
       { path: '/driver/signup', expectedPage: 'driver-signup' },
       { path: '/driver/portal', expectedPage: 'driver-portal' },
       { path: '/login', expectedPage: 'login' },
-      { path: '/signup', expectedPage: 'signup' },
-      { path: '/reset-password', expectedPage: 'reset-password' }
+      { path: '/signup', expectedPage: 'signup' }
     ];
 
     for (const { path: routePath, expectedPage } of validRoutes) {

@@ -6,23 +6,8 @@ export const authRateLimiter = rateLimit({
   max: RATE_LIMITS.AUTH.max,
   standardHeaders: true,
   legacyHeaders: false,
-  message: RATE_LIMITS.AUTH.message
-});
-
-export const forgotPasswordRateLimiter = rateLimit({
-  windowMs: RATE_LIMITS.FORGOT_PASSWORD.windowMs,
-  max: RATE_LIMITS.FORGOT_PASSWORD.max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: RATE_LIMITS.FORGOT_PASSWORD.message
-});
-
-export const resetPasswordRateLimiter = rateLimit({
-  windowMs: RATE_LIMITS.RESET_PASSWORD.windowMs,
-  max: RATE_LIMITS.RESET_PASSWORD.max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: RATE_LIMITS.RESET_PASSWORD.message
+  message: RATE_LIMITS.AUTH.message,
+  skip: () => process.env.NODE_ENV === 'test'
 });
 
 export const bookingRateLimiter = rateLimit({
@@ -30,7 +15,8 @@ export const bookingRateLimiter = rateLimit({
   max: RATE_LIMITS.BOOKINGS.max,
   standardHeaders: true,
   legacyHeaders: false,
-  message: RATE_LIMITS.BOOKINGS.message
+  message: RATE_LIMITS.BOOKINGS.message,
+  skip: () => process.env.NODE_ENV === 'test'
 });
 
 export const generalRateLimiter = rateLimit({
@@ -38,5 +24,7 @@ export const generalRateLimiter = rateLimit({
   max: RATE_LIMITS.GENERAL.max,
   standardHeaders: true,
   legacyHeaders: false,
-  message: RATE_LIMITS.GENERAL.message
+  message: RATE_LIMITS.GENERAL.message,
+  skip: () => process.env.NODE_ENV === 'test'
 });
+

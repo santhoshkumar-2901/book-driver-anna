@@ -903,53 +903,33 @@ export default function AdminPage({ onReturnToClient }) {
     try {
       if (authMode === 'register') {
         const nameToSave = submittedFullName;
-      const phoneToSave = submittedPhone;
-      const emailLower = submittedEmail.toLowerCase();
+        const phoneToSave = submittedPhone;
+        const emailLower = submittedEmail.toLowerCase();
 
-      // Clear input fields immediately after successful form validation and submission
-      resetAuthForm();
-
-      // Attempt backend admin registration in database (TiDB / SQLite)
-      try {
-        await apiClient.adminRegister({
+        const res = await apiClient.adminRegister({
           name: nameToSave,
           email: emailLower,
           phone: phoneToSave,
           password: submittedPassword,
           secretKey: submittedSecretKey
         });
-      } catch (err) {
-        console.warn('[ADMIN AUTH] Remote admin registration error/fallback:', err.message);
+
+        if (res && res.data && res.data.user) {
+          resetAuthForm();
+          setLoggedInAdminName(res.data.user.name || nameToSave);
+          setLoggedInAdminPhone(res.data.user.phone || phoneToSave);
+          setIsAdminLoggedIn(true);
+          localStorage.setItem('bda_admin_logged_in', 'true');
+          localStorage.setItem('bda_admin_name', res.data.user.name || nameToSave);
+          localStorage.setItem('bda_admin_phone', res.data.user.phone || phoneToSave);
+          const requestedTab = parseTabFromPath(window.location.pathname);
+          navigateToTab(requestedTab, true);
+          return;
+        }
+        setAuthError('Administrator registration failed.');
+        return;
       }
 
-      // Save newly registered admin locally so they can always log in via offline fallback mode
-      try {
-        let registeredAdmins = [];
-        const saved = localStorage.getItem('bda_registered_admins');
-        if (saved) registeredAdmins = JSON.parse(saved);
-        registeredAdmins = registeredAdmins.filter(a => a.email !== emailLower);
-        registeredAdmins.push({
-          name: nameToSave,
-          phone: phoneToSave,
-          email: emailLower,
-          password: submittedPassword
-        });
-        localStorage.setItem('bda_registered_admins', JSON.stringify(registeredAdmins));
-      } catch (e) {}
-
-      setLoggedInAdminName(nameToSave);
-      setLoggedInAdminPhone(phoneToSave);
-      setIsAdminLoggedIn(true);
-      localStorage.setItem('bda_admin_logged_in', 'true');
-      localStorage.setItem('bda_admin_name', nameToSave);
-      localStorage.setItem('bda_admin_phone', phoneToSave);
-
-      const requestedTab = parseTabFromPath(window.location.pathname);
-      navigateToTab(requestedTab, true);
-      return;
-    }
-
-    try {
       const res = await apiClient.adminLogin({
         identifier: submittedEmail,
         password: submittedPassword
@@ -969,127 +949,15 @@ export default function AdminPage({ onReturnToClient }) {
         navigateToTab(requestedTab, true);
         return;
       }
+      setAuthError('Invalid administrator credentials.');
     } catch (apiErr) {
-      // 1. Invalid credentials from backend (401)
-      if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
-        // Fail-safe check: grant immediate access if standard production admin credentials match
-        const isStandardAdmin = 
-          (emailLower === 'bookdriveranna@gmail.com' && (submittedPassword === 'adminpassword@bda' || submittedPassword === 'Admin@Anna2026!')) ||
-          (emailLower === 'admin@bookdriveranna.com' && (submittedPassword === 'Admin@Anna2026!' || submittedPassword === 'adminpassword@bda'));
-
-        if (isStandardAdmin) {
-          resetAuthForm();
-          setLoggedInAdminName('Book Driver Anna Administrator');
-          setLoggedInAdminPhone('+91 78991 20704');
-          setIsAdminLoggedIn(true);
-          localStorage.setItem('bda_admin_logged_in', 'true');
-          localStorage.setItem('bda_admin_name', 'Book Driver Anna Administrator');
-          localStorage.setItem('bda_admin_phone', '+91 78991 20704');
-          const requestedTab = parseTabFromPath(window.location.pathname);
-          navigateToTab(requestedTab, true);
-          return;
-        }
-
-        // If local registration exists for this user, attempt auto-syncing to backend
-        try {
-          const saved = localStorage.getItem('bda_registered_admins');
-          if (saved) {
-            const registeredAdmins = JSON.parse(saved);
-            const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
-            if (found) {
-              try {
-                const regRes = await apiClient.adminRegister({
-                  name: found.name,
-                  email: found.email,
-                  phone: found.phone,
-                  password: found.password,
-                  secretKey: 'ANNA2026'
-                });
-                if (regRes?.data?.user) {
-                  resetAuthForm();
-                  setLoggedInAdminName(regRes.data.user.name);
-                  setLoggedInAdminPhone(regRes.data.user.phone);
-                  setIsAdminLoggedIn(true);
-                  localStorage.setItem('bda_admin_logged_in', 'true');
-                  localStorage.setItem('bda_admin_name', regRes.data.user.name);
-                  localStorage.setItem('bda_admin_phone', regRes.data.user.phone);
-                  const requestedTab = parseTabFromPath(window.location.pathname);
-                  navigateToTab(requestedTab, true);
-                  return;
-                }
-              } catch (syncErr) {
-                // If remote registration fails, continue to fallback check below
-              }
-            }
-          }
-        } catch (e) {}
-
-        setAuthError(apiErr.message || 'Invalid admin email or password.');
-        return;
-      } else if (apiErr.status === 403 || apiErr.code === 'INSUFFICIENT_PRIVILEGES') {
+      if (apiErr.status === 403 || apiErr.code === 'INSUFFICIENT_PRIVILEGES') {
         setAuthError('Access denied: You do not have administrator privileges.');
-        return;
       } else if (apiErr.status === 429) {
         setAuthError(apiErr.message || 'Too many login attempts. Please wait a few minutes.');
-        return;
-      } else if (apiErr.code !== 'NETWORK_ERROR' && apiErr.status !== 500) {
-        setAuthError(apiErr.message || 'Admin authentication failed.');
-        return;
+      } else {
+        setAuthError(apiErr.message || 'Invalid administrator credentials.');
       }
-
-      // If network error or 500, check local offline storage
-      console.info('[ADMIN AUTH] Checking local fallback credentials...');
-    }
-
-    // In offline fallback mode, verify credentials against locally registered admin
-    const emailLower = submittedEmail.toLowerCase();
-    let isMatch = false;
-    let nameToSave = 'Administrator';
-    let phoneToSave = '+91 80 2555 0199';
-
-    // Verify against standard production admin credentials
-    if (
-      (emailLower === 'bookdriveranna@gmail.com' && (submittedPassword === 'adminpassword@bda' || submittedPassword === 'Admin@Anna2026!')) ||
-      (emailLower === 'admin@bookdriveranna.com' && (submittedPassword === 'Admin@Anna2026!' || submittedPassword === 'adminpassword@bda'))
-    ) {
-      isMatch = true;
-      nameToSave = 'Book Driver Anna Administrator';
-      phoneToSave = '+91 78991 20704';
-    }
-
-    try {
-      const saved = localStorage.getItem('bda_registered_admins');
-      if (saved) {
-        const registeredAdmins = JSON.parse(saved);
-        const found = registeredAdmins.find(a => a.email === emailLower && a.password === submittedPassword);
-        if (found) {
-          isMatch = true;
-          nameToSave = found.name;
-          phoneToSave = found.phone;
-        }
-      }
-    } catch (e) {}
-
-    if (!isMatch) {
-      setAuthError('Invalid administrator credentials.');
-      return;
-    }
-
-    // Clear input fields immediately after fallback match
-    resetAuthForm();
-
-    setLoggedInAdminName(nameToSave);
-    setLoggedInAdminPhone(phoneToSave);
-    setIsAdminLoggedIn(true);
-
-    // Save session to localStorage
-    localStorage.setItem('bda_admin_logged_in', 'true');
-    localStorage.setItem('bda_admin_name', nameToSave);
-    localStorage.setItem('bda_admin_phone', phoneToSave);
-
-    // Navigate to the requested tab from URL
-    const requestedTab = parseTabFromPath(window.location.pathname);
-    navigateToTab(requestedTab, true);
     } finally {
       setIsAuthSubmitting(false);
     }

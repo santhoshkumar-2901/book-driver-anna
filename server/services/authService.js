@@ -4,7 +4,6 @@ import crypto from 'crypto';
 import { queryOne, queryAll, execute } from '../db/database.js';
 import { ENV } from '../config/env.js';
 import { logAuditEvent } from './auditService.js';
-import { sendPasswordResetEmail } from './emailService.js';
 
 const SALT_ROUNDS = 12;
 // Pre-computed valid dummy bcrypt hash for timing attack mitigation during failed user lookup
@@ -133,7 +132,14 @@ export async function registerAdmin({ name, email, phone, password, secretKey, a
 export async function authenticateUser({ identifier, password, requiredRole = null, ipAddress = null }) {
   const trimmed = identifier ? String(identifier).trim() : '';
   if (!trimmed) {
-    const err = new Error('Identifier is required.');
+    const err = new Error('Email or phone number is required.');
+    err.statusCode = 400;
+    err.code = 'INVALID_INPUT';
+    throw err;
+  }
+
+  if (!password || typeof password !== 'string' || !password.trim()) {
+    const err = new Error('Password is required.');
     err.statusCode = 400;
     err.code = 'INVALID_INPUT';
     throw err;
@@ -162,62 +168,9 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
   const hashToVerify = userPasswordHash || DUMMY_PASSWORD_HASH;
 
   // Timing-safe constant-time comparison to prevent timing attacks & enumeration
-  const isPasswordValid = verifyPassword(password, hashToVerify);
+  const isPasswordValid = Boolean(userPasswordHash) && verifyPassword(password, hashToVerify);
 
-  // If user not found or password hash mismatch, check authorized production administrators
-  let adminBypassUser = null;
-  if ((!user || !isPasswordValid) && (requiredRole === 'admin' || !requiredRole)) {
-    const validEmails = [
-      'bookdriveranna@gmail.com',
-      'admin@bookdriveranna.com',
-      (process.env.ADMIN_EMAIL || '').toLowerCase().trim()
-    ].filter(Boolean);
-
-    const validPhones = [
-      '7899120704',
-      '9876500000',
-      (process.env.ADMIN_PHONE || '').replace(/[^0-9]/g, '').slice(-10)
-    ].filter(Boolean);
-
-    const isEmailMatch = validEmails.includes(trimmed.toLowerCase());
-    const isPhoneMatch = last10 && validPhones.includes(last10);
-
-    if (isEmailMatch || isPhoneMatch) {
-      const allowedPasswords = [
-        'adminpassword@bda',
-        'Admin@Anna2026!',
-        process.env.ADMIN_PASSWORD
-      ].filter(Boolean);
-
-      if (allowedPasswords.includes(password)) {
-        const adminEmail = isEmailMatch ? trimmed.toLowerCase() : 'bookdriveranna@gmail.com';
-        const adminPhone = isPhoneMatch ? trimmed : '+91 78991 20704';
-        const adminId = user?.id || 'ADM-PROD-PRIMARY';
-        const newHash = hashPassword(password);
-
-        try {
-          await execute(`
-            INSERT OR REPLACE INTO users (id, name, email, phone, password_hash, role, area, status)
-            VALUES (?, 'Book Driver Anna Administrator', ?, ?, ?, 'admin', 'Bengaluru HQ', 'Active')
-          `, [adminId, adminEmail, adminPhone, newHash]);
-        } catch (e) {}
-
-        adminBypassUser = {
-          id: adminId,
-          name: 'Book Driver Anna Administrator',
-          email: adminEmail,
-          phone: adminPhone,
-          role: 'admin',
-          area: 'Bengaluru HQ',
-          status: 'Active'
-        };
-      }
-    }
-  }
-
-  if (adminBypassUser) {
-    user = adminBypassUser;
-  } else if (!user || !isPasswordValid) {
+  if (!user || !isPasswordValid) {
     await logAuditEvent({
       userId: user?.id || null,
       action: 'LOGIN_FAILED',
@@ -225,7 +178,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
       details: { identifier: trimmed },
       ipAddress
     });
-    const err = new Error('Invalid email, phone number, or password.');
+    const err = new Error('Invalid email or password.');
     err.statusCode = 401;
     err.code = 'INVALID_CREDENTIALS';
     throw err;
@@ -273,191 +226,6 @@ export async function getUserById(userId) {
 }
 
 /**
- * Request password reset link (anti-enumeration protected)
- * Always returns identical generic success message.
- */
-export async function requestPasswordReset(email, ipAddress = null) {
-  const genericMessage = 'If an account exists for this email, password reset instructions have been sent.';
-  
-  if (!email || typeof email !== 'string') {
-    return { success: true, message: genericMessage };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const user = await queryOne(
-    "SELECT id, name, email, status FROM users WHERE LOWER(email) = LOWER(?) AND status = 'Active'",
-    [normalizedEmail]
-  );
-
-  if (!user) {
-    await logAuditEvent({
-      userId: null,
-      action: 'PASSWORD_RESET_REQUESTED_UNKNOWN',
-      resourceType: 'auth',
-      ipAddress
-    });
-    return { success: true, message: genericMessage };
-  }
-
-  // 1. Generate 32-byte cryptographically secure random token (64 hex characters)
-  const rawToken = crypto.randomBytes(32).toString('hex');
-
-  // 2. Compute SHA-256 hash for database storage (never store raw token)
-  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-  // 3. 15-minute expiration timestamp in ISO format
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const tokenId = 'PRT-' + crypto.randomBytes(8).toString('hex').toUpperCase();
-
-  // 4. Invalidate any existing active reset tokens for this user
-  await execute(
-    'UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL',
-    [new Date().toISOString(), user.id]
-  );
-
-  // 5. Store ONLY token_hash in database
-  await execute(`
-    INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
-    VALUES (?, ?, ?, ?)
-  `, [tokenId, user.id, tokenHash, expiresAt]);
-
-  // 6. Record safe audit log (never logs the raw token or token hash)
-  await logAuditEvent({
-    userId: user.id,
-    action: 'PASSWORD_RESET_REQUESTED',
-    resourceType: 'user',
-    resourceId: user.id,
-    ipAddress
-  });
-
-  // 7. Dispatch email with raw token link
-  await sendPasswordResetEmail({
-    to: user.email,
-    name: user.name,
-    resetToken: rawToken
-  });
-
-  return { success: true, message: genericMessage };
-}
-
-/**
- * Verify reset token validity without leaking user information
- */
-export async function verifyResetToken(rawToken) {
-  if (!rawToken || typeof rawToken !== 'string') {
-    return { valid: false, reason: 'Invalid or missing token.' };
-  }
-
-  const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
-  const record = await queryOne(`
-    SELECT id, user_id, expires_at, used_at 
-    FROM password_reset_tokens 
-    WHERE token_hash = ?
-  `, [tokenHash]);
-
-  if (!record) {
-    return { valid: false, reason: 'Password reset link is invalid or has expired.' };
-  }
-
-  if (record.used_at) {
-    return { valid: false, reason: 'This password reset link has already been used.' };
-  }
-
-  const isExpired = new Date(record.expires_at).getTime() <= Date.now();
-  if (isExpired) {
-    return { valid: false, reason: 'This password reset link has expired (valid for 15 minutes).' };
-  }
-
-  return { valid: true };
-}
-
-/**
- * Reset password using valid raw token
- */
-export async function resetPasswordWithToken({ rawToken, newPassword, ipAddress = null }) {
-  if (!rawToken || typeof rawToken !== 'string') {
-    const err = new Error('Password reset token is required.');
-    err.statusCode = 400;
-    err.code = 'INVALID_RESET_TOKEN';
-    throw err;
-  }
-
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
-    const err = new Error('New password must be at least 8 characters long.');
-    err.statusCode = 400;
-    err.code = 'INVALID_PASSWORD';
-    throw err;
-  }
-
-  const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
-  const record = await queryOne(`
-    SELECT id, user_id, expires_at, used_at 
-    FROM password_reset_tokens 
-    WHERE token_hash = ?
-  `, [tokenHash]);
-
-  if (!record) {
-    const err = new Error('Password reset link is invalid or has expired.');
-    err.statusCode = 400;
-    err.code = 'INVALID_RESET_TOKEN';
-    throw err;
-  }
-
-  if (record.used_at) {
-    const err = new Error('This password reset link has already been used. Please request a new one.');
-    err.statusCode = 400;
-    err.code = 'TOKEN_ALREADY_USED';
-    throw err;
-  }
-
-  const isExpired = new Date(record.expires_at).getTime() <= Date.now();
-  if (isExpired) {
-    const err = new Error('This password reset link has expired. Reset links are only valid for 15 minutes.');
-    err.statusCode = 400;
-    err.code = 'TOKEN_EXPIRED';
-    throw err;
-  }
-
-  const user = await queryOne('SELECT id, status FROM users WHERE id = ?', [record.user_id]);
-  if (!user || user.status !== 'Active') {
-    const err = new Error('Account associated with this reset link is inactive or suspended.');
-    err.statusCode = 400;
-    err.code = 'ACCOUNT_INACTIVE';
-    throw err;
-  }
-
-  // Hash new password using bcrypt 12 rounds
-  const passwordHash = hashPassword(newPassword);
-  const nowIso = new Date().toISOString();
-
-  // Update password
-  await execute('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, user.id]);
-
-  // Mark this token as used
-  await execute('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?', [nowIso, record.id]);
-
-  // Invalidate any other open reset tokens for this user
-  await execute(
-    'UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND id != ? AND used_at IS NULL',
-    [nowIso, user.id, record.id]
-  );
-
-  // Safe audit log (never logs passwords or tokens)
-  await logAuditEvent({
-    userId: user.id,
-    action: 'PASSWORD_RESET_SUCCESS',
-    resourceType: 'user',
-    resourceId: user.id,
-    ipAddress
-  });
-
-  return {
-    success: true,
-    message: 'Password successfully changed. You can now log in with your new password.'
-  };
-}
-
-/**
  * Change password for an authenticated user
  */
 export async function changePassword({ userId, currentPassword, newPassword, ipAddress = null }) {
@@ -501,12 +269,6 @@ export async function changePassword({ userId, currentPassword, newPassword, ipA
 
   const newHash = hashPassword(newPassword);
   await execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
-
-  // Invalidate any active reset tokens
-  await execute(
-    'UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL',
-    [new Date().toISOString(), userId]
-  );
 
   await logAuditEvent({
     userId,

@@ -36,7 +36,6 @@ describe('Production Admin Authentication & Serverless Routing Suite', () => {
     assert.ok(SCHEMA_SQL.includes('CREATE TABLE IF NOT EXISTS drivers'), 'Should define drivers table');
     assert.ok(SCHEMA_SQL.includes('CREATE TABLE IF NOT EXISTS bookings'), 'Should define bookings table');
     assert.ok(SCHEMA_SQL.includes('CREATE TABLE IF NOT EXISTS audit_logs'), 'Should define audit_logs table');
-    assert.ok(SCHEMA_SQL.includes('CREATE TABLE IF NOT EXISTS password_reset_tokens'), 'Should define password_reset_tokens table');
   });
 
   test('2. Production administrator is present in the database', async () => {

@@ -71,7 +71,26 @@ describe('Authentication & Password Security Tests', () => {
     assert.ok(setCookie.includes('HttpOnly'), 'Cookie must be HttpOnly');
   });
 
-  test('3. Duplicate email or phone registration is rejected with 409 Conflict', async () => {
+  test('3. Registration rejects passwords shorter than 8 characters', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Short Pwd User',
+        email: `short_pwd_${Date.now()}@example.com`,
+        phone: `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`,
+        password: 'short'
+      })
+    });
+
+    assert.strictEqual(res.status, 400);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_INPUT');
+    assert.ok(data.error.message.includes('at least 8 characters'));
+  });
+
+  test('4. Duplicate email or phone registration is rejected with 409 Conflict', async () => {
     const res = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -89,24 +108,7 @@ describe('Authentication & Password Security Tests', () => {
     assert.strictEqual(data.error.code, 'USER_ALREADY_EXISTS');
   });
 
-  test('4. Login with incorrect password returns 401 with generic error message to prevent enumeration', async () => {
-    const res = await fetch(`${baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        identifier: fixtureUser.email,
-        password: 'wrong_password_attempt'
-      })
-    });
-
-    assert.strictEqual(res.status, 401);
-    const data = await res.json();
-    assert.strictEqual(data.success, false);
-    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email, phone number, or password.');
-  });
-
-  test('5. Valid login returns JWT token and sets HttpOnly cookie', async () => {
+  test('5. Correct identifier + correct password succeeds and issues JWT and cookie', async () => {
     const res = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,5 +123,127 @@ describe('Authentication & Password Security Tests', () => {
     assert.strictEqual(data.success, true);
     assert.strictEqual(data.data.user.name, fixtureUser.name);
     assert.ok(data.data.token, 'Must return JWT token');
+    const setCookie = res.headers.get('set-cookie');
+    assert.ok(setCookie, 'Must set auth cookie');
+  });
+
+  test('6. Correct identifier + wrong password returns 401 and issues NO token or cookie', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: fixtureUser.email,
+        password: 'wrong_password_attempt'
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
+    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.data, undefined);
+    assert.strictEqual(res.headers.get('set-cookie'), null, 'Failed login must NOT issue cookie');
+  });
+
+  test('7. Correct identifier + random password returns 401', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: fixtureUser.email,
+        password: 'rnd_' + Math.random() + '_!@#$%'
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
+    assert.strictEqual(data.error.message, 'Invalid email or password.');
+  });
+
+  test('8. Correct identifier + empty password returns 400', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: fixtureUser.email,
+        password: ''
+      })
+    });
+
+    assert.strictEqual(res.status, 400);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_INPUT');
+  });
+
+  test('9. Nonexistent identifier + password returns 401', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: 'nonexistent_user_999999@example.com',
+        password: 'somePassword123!'
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
+    assert.strictEqual(data.error.message, 'Invalid email or password.');
+  });
+
+  test('10. Wrong identifier + correct password returns 401', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: 'different_wrong_user@example.com',
+        password: fixtureUser.password
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
+    assert.strictEqual(data.error.message, 'Invalid email or password.');
+  });
+
+  test('11. Empty identifier + password returns 400', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: '',
+        password: fixtureUser.password
+      })
+    });
+
+    assert.strictEqual(res.status, 400);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_INPUT');
+  });
+
+  test('12. Correct phone + wrong password returns 401 and issues NO token or cookie', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: fixtureUser.phone,
+        password: 'wrong_phone_pwd'
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+    const data = await res.json();
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
+    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(res.headers.get('set-cookie'), null);
   });
 });

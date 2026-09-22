@@ -137,46 +137,12 @@ export default function DriverAuthPage({
         }, 400);
         return;
       }
-    } catch (apiErr) {
-      if (apiErr.code !== 'NETWORK_ERROR') {
-        setIsLoading(false);
-        setErrorMessage(apiErr.message || 'Driver authentication failed. Please check credentials.');
-        return;
-      }
-    }
-
-    setTimeout(() => {
       setIsLoading(false);
-      
-      // Look up drivers in localStorage
-      let drivers = DEFAULT_DRIVERS;
-      try {
-        const saved = localStorage.getItem('bda_registered_drivers');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) drivers = parsed;
-        }
-      } catch (err) {}
-
-      const cleanInput = submittedIdentifier.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      const matched = drivers.find(d => {
-        const cleanPhone = (d.phone || '').replace(/[^0-9]/g, '');
-        const cleanDl = (d.dlNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        return cleanPhone.includes(cleanInput) || cleanDl.includes(cleanInput);
-      });
-
-      if (matched) {
-        resetForm();
-        setSuccessMessage(`Welcome back, Anna ${matched.name}!`);
-        if (onLoginSuccess) {
-          onLoginSuccess(matched);
-        }
-      } else {
-        setIsLoading(false);
-        setErrorMessage('Driver account not found. Please register or verify your credentials.');
-        return;
-      }
-    }, 600);
+      setErrorMessage('Invalid mobile/DL number or password.');
+    } catch (apiErr) {
+      setIsLoading(false);
+      setErrorMessage(apiErr.message || 'Invalid mobile/DL number or password.');
+    }
   };
 
   // Signup submission

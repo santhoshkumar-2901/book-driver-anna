@@ -4,17 +4,12 @@ import {
   registerAdmin, 
   authenticateUser, 
   generateToken,
-  requestPasswordReset,
-  verifyResetToken,
-  resetPasswordWithToken,
   changePassword
 } from '../services/authService.js';
-import { authRateLimiter, forgotPasswordRateLimiter, resetPasswordRateLimiter } from '../middleware/rateLimiter.js';
+import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { 
   validateRegisterInput, 
   validateLoginInput,
-  validateForgotPasswordInput,
-  validateResetPasswordInput,
   validateChangePasswordInput
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -169,54 +164,6 @@ router.post('/admin-session', async (req, res, next) => {
         },
         token
       }
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/auth/forgot-password (Anti-enumeration protected, dedicated rate limiting)
-router.post('/forgot-password', forgotPasswordRateLimiter, validateForgotPasswordInput, async (req, res, next) => {
-  try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const result = await requestPasswordReset(req.body.email, ipAddress);
-    res.json({
-      success: true,
-      message: result.message
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/auth/verify-reset-token?token=... (Optional verification without user exposure)
-router.get('/verify-reset-token', async (req, res, next) => {
-  try {
-    const { token } = req.query;
-    const result = await verifyResetToken(token);
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/auth/reset-password (Rate limited, single-use token)
-router.post('/reset-password', resetPasswordRateLimiter, validateResetPasswordInput, async (req, res, next) => {
-  try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const result = await resetPasswordWithToken({
-      rawToken: req.body.token,
-      newPassword: req.body.newPassword,
-      ipAddress
-    });
-    // Ensure any stale auth cookie is cleared
-    res.clearCookie(AUTH_COOKIE_NAME, CLEAR_COOKIE_OPTIONS);
-    res.json({
-      success: true,
-      message: result.message
     });
   } catch (err) {
     next(err);

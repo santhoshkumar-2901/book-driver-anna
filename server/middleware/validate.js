@@ -66,36 +66,6 @@ export function validateRegisterInput(req, res, next) {
   next();
 }
 
-export function validateForgotPasswordInput(req, res, next) {
-  const { email } = req.body;
-  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'INVALID_INPUT', message: 'Please provide a valid email address.' }
-    });
-  }
-  req.body.email = email.trim().toLowerCase();
-  next();
-}
-
-export function validateResetPasswordInput(req, res, next) {
-  const { token, newPassword } = req.body;
-  if (!token || typeof token !== 'string' || !token.trim()) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'INVALID_INPUT', message: 'Password reset token is required.' }
-    });
-  }
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'INVALID_INPUT', message: 'Password must be at least 8 characters long.' }
-    });
-  }
-  req.body.token = token.trim();
-  next();
-}
-
 export function validateChangePasswordInput(req, res, next) {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || typeof currentPassword !== 'string') {

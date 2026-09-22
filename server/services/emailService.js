@@ -23,11 +23,38 @@ export function clearTestMailbox() {
  * Send an email using SMTP or simulated dev provider
  */
 export async function sendEmail({ to, subject, html, text }) {
-  const from = ENV.SMTP_FROM || 'Book Driver Anna <noreply@bookdriveranna.com>';
+  const from = ENV.EMAIL_FROM || ENV.SMTP_FROM || 'Book Driver Anna <onboarding@resend.dev>';
   const maskedTo = to ? to.replace(/^(.)(.*)(@.*)$/, (_, a, b, c) => `${a}${'*'.repeat(Math.min(b.length, 5))}${c}`) : 'recipient';
 
-  // 1. If SMTP server is configured, attempt real SMTP delivery
-  if (ENV.SMTP_HOST && ENV.SMTP_USER && ENV.SMTP_PASS) {
+  // In automated test runs (NODE_ENV === 'test'), record into test mailbox for test assertion stability
+  const isTestEnvironment = process.env.NODE_ENV === 'test';
+  if (isTestEnvironment) {
+    lastTestEmail = {
+      to,
+      from,
+      subject,
+      html,
+      text,
+      sentAt: new Date().toISOString()
+    };
+    return { success: true, delivered: true, provider: 'simulated' };
+  }
+
+  const hasSmtpConfig = Boolean(ENV.SMTP_HOST && ENV.SMTP_USER && ENV.SMTP_PASS);
+
+  // 1. If SMTP server is configured, attempt real SMTP delivery via Resend SMTP
+  if (hasSmtpConfig) {
+    if (!ENV.IS_PRODUCTION) {
+      console.log('[EMAIL DEBUG] Initiating email delivery:');
+      console.log(`  SMTP_HOST: ${ENV.SMTP_HOST ? 'configured (' + ENV.SMTP_HOST + ')' : 'missing'}`);
+      console.log(`  SMTP_PORT: ${ENV.SMTP_PORT}`);
+      console.log(`  SMTP_USER: ${ENV.SMTP_USER ? 'configured' : 'missing'}`);
+      console.log(`  SMTP_PASS: ${ENV.SMTP_PASS ? 'configured (present)' : 'missing'}`);
+      console.log(`  EMAIL_FROM: configured (${from})`);
+      console.log(`  RECIPIENT: ${maskedTo}`);
+      console.log(`  NODE_ENV: ${ENV.NODE_ENV}`);
+    }
+
     try {
       await sendSmtpEmail({
         host: ENV.SMTP_HOST,
@@ -40,16 +67,28 @@ export async function sendEmail({ to, subject, html, text }) {
         html,
         text
       });
+      console.log(`[EMAIL SERVICE] Email successfully delivered to ${maskedTo} via Resend SMTP (${ENV.SMTP_HOST}:${ENV.SMTP_PORT})`);
       return { success: true, delivered: true, provider: 'smtp' };
     } catch (smtpErr) {
       console.error(`[EMAIL SERVICE] Failed to deliver email to ${maskedTo} via SMTP:`, smtpErr.message);
-      if (ENV.IS_PRODUCTION) {
-        throw new Error('Email delivery failed. Please try again later.');
+      
+      // In development, preserve the exact SMTP rejection reason (such as Resend 550 onboarding restriction)
+      // to avoid confusing the developer with generic settings error messages
+      const isDomainRestriction = smtpErr.message.includes('550') || smtpErr.message.includes('onboarding');
+      if (!ENV.IS_PRODUCTION || isDomainRestriction) {
+        throw new Error(smtpErr.message);
       }
+      throw new Error('Email delivery failed. Please check SMTP settings or try again later.');
     }
   }
 
-  // 2. Development / Test simulation mode
+  // 2. If SMTP configuration is missing in production, fail loudly and log configuration warning
+  if (ENV.IS_PRODUCTION) {
+    console.error('[EMAIL SERVICE CONFIG ERROR] Real email delivery is required in production, but SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) are missing.');
+    throw new Error('Email delivery failed. Server email service is not configured.');
+  }
+
+  // 3. Local Development simulation fallback (only when SMTP credentials are not yet configured in local .env)
   lastTestEmail = {
     to,
     from,
@@ -59,16 +98,13 @@ export async function sendEmail({ to, subject, html, text }) {
     sentAt: new Date().toISOString()
   };
 
-  if (!ENV.IS_PRODUCTION) {
-    // Safe logging: Never log the raw token or full reset URL in production logs
-    console.log(`[EMAIL SERVICE] Simulated password reset email dispatched to ${maskedTo}`);
-  }
-
+  console.warn(`[EMAIL SERVICE DEV] SMTP credentials not set. Simulated email recorded for ${maskedTo}.`);
   return { success: true, delivered: true, provider: 'simulated' };
 }
 
 /**
  * Lightweight native Node.js SMTP sender (TLS / STARTTLS capable, zero extra npm dependencies)
+ * Optimized for Resend SMTP (smtp.resend.com:465)
  */
 function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }) {
   return new Promise((resolve, reject) => {
@@ -84,8 +120,8 @@ function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }
 
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error('SMTP connection timed out after 10 seconds.'));
-    }, 10000);
+      reject(new Error('SMTP connection timed out after 15 seconds.'));
+    }, 15000);
 
     const onConnect = () => {
       let step = 0;
@@ -95,12 +131,18 @@ function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }
         socket.write(cmd + '\r\n');
       };
 
+      // Extract raw email for SMTP envelope commands (e.g. "onboarding@resend.dev")
+      const senderEmail = from.includes('<') && from.includes('>')
+        ? from.replace(/.*<([^>]+)>.*/, '$1').trim()
+        : from.trim();
+
       socket.on('data', (chunk) => {
         buffer += chunk.toString();
         const lines = buffer.split('\r\n');
         buffer = lines.pop(); // keep remainder
 
         for (const line of lines) {
+          if (!line.trim()) continue;
           const code = parseInt(line.substring(0, 3), 10);
           if (isNaN(code) || line.charAt(3) === '-') continue; // multiline reply
 
@@ -118,7 +160,7 @@ function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }
             send(Buffer.from(pass).toString('base64'));
           } else if (step === 4 && code === 235) {
             step = 5;
-            send(`MAIL FROM:<${from.replace(/.*<([^>]+)>.*/, '$1')}>`);
+            send(`MAIL FROM:<${senderEmail}>`);
           } else if (step === 5 && code === 250) {
             step = 6;
             send(`RCPT TO:<${to}>`);
@@ -132,6 +174,8 @@ function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }
               `From: ${from}`,
               `To: ${to}`,
               `Subject: ${subject}`,
+              `Date: ${new Date().toUTCString()}`,
+              `Message-ID: <${Date.now()}.${Math.random().toString(36).substring(2)}@bookdriveranna.com>`,
               `MIME-Version: 1.0`,
               `Content-Type: multipart/alternative; boundary="${boundary}"`,
               ``,
@@ -187,97 +231,3 @@ function sendSmtpEmail({ host, port, user, pass, from, to, subject, html, text }
   });
 }
 
-/**
- * Generate and dispatch password reset email
- */
-export async function sendPasswordResetEmail({ to, name, resetToken }) {
-  const appUrl = (ENV.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
-  const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
-  const userName = name || 'Valued Customer';
-
-  const subject = 'Password Reset Request — Book Driver Anna';
-
-  const text = `Hello ${userName},
-
-We received a request to reset the password for your Book Driver Anna account.
-
-To set a new password, click the link below (valid for 15 minutes):
-${resetUrl}
-
-SECURITY NOTICE:
-- This password reset link will expire in 15 minutes.
-- If you did not request this password reset, please ignore this email. Your password will remain completely secure and unchanged.
-- For your protection, never share this link or your account details with anyone.
-
-Best regards,
-The Book Driver Anna Security Team
-Bengaluru, India • https://bookdriveranna.com`;
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Password Reset Request</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; margin: 0; padding: 24px; }
-    .container { max-width: 540px; margin: 0 auto; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    .header { background-color: #0f172a; padding: 24px; text-align: center; border-bottom: 1px solid #1f2937; }
-    .logo { color: #f59e0b; font-size: 20px; font-weight: 900; letter-spacing: 0.5px; }
-    .content { padding: 32px 28px; line-height: 1.6; color: #cbd5e1; font-size: 14px; }
-    .title { font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 16px; }
-    .btn-container { text-align: center; margin: 28px 0; }
-    .btn { display: inline-block; background-color: #f59e0b; color: #020617; text-decoration: none; font-weight: 800; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); }
-    .notice-box { background-color: #1e293b; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 8px; margin-top: 24px; font-size: 12px; color: #94a3b8; }
-    .footer { padding: 20px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #1f2937; background-color: #090d16; }
-    .link-alt { word-break: break-all; color: #f59e0b; font-size: 11px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">BOOK DRIVER ANNA</div>
-    </div>
-    <div class="content">
-      <h1 class="title">Password Reset Request</h1>
-      <p>Hello <strong>${escapeHtml(userName)}</strong>,</p>
-      <p>We received a request to reset the password associated with your Book Driver Anna account. Click the button below to choose a new, secure password:</p>
-      
-      <div class="btn-container">
-        <a href="${escapeHtml(resetUrl)}" class="btn" target="_blank">Reset My Password</a>
-      </div>
-
-      <div class="notice-box">
-        <strong>Security Notice:</strong>
-        <ul style="margin: 6px 0 0 0; padding-left: 18px;">
-          <li>This link is strictly valid for <strong>15 minutes</strong>.</li>
-          <li>If you did not request a password reset, you can safely ignore this email. Your current password remains secure.</li>
-          <li>Never forward or share this link with anyone.</li>
-        </ul>
-      </div>
-
-      <p style="margin-top: 24px; font-size: 12px; color: #64748b;">
-        If the button above does not work, copy and paste this link into your browser:<br>
-        <a href="${escapeHtml(resetUrl)}" class="link-alt">${escapeHtml(resetUrl)}</a>
-      </p>
-    </div>
-    <div class="footer">
-      &copy; ${new Date().getFullYear()} Book Driver Anna • Professional Chauffeurs & Driving Academy<br>
-      Bengaluru, Karnataka, India
-    </div>
-  </div>
-</body>
-</html>`;
-
-  return sendEmail({ to, subject, html, text });
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
