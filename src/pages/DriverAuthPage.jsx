@@ -561,9 +561,8 @@ export default function DriverAuthPage({
 
                 {/* Driver UPI ID (For Direct Customer Ride Payment QR) */}
                 <div className="space-y-0.5">
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                    <span>Payment UPI ID (GPay / PhonePe / Paytm)</span>
-                    <span className="text-[10px] text-amber-400 font-normal">Auto QR Generator</span>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                    Payment UPI ID (GPay / PhonePe / Paytm)
                   </label>
                   <div className="relative">
                     <QrCode className="w-3.5 h-3.5 text-amber-400 absolute left-3 top-1/2 -translate-y-1/2" />

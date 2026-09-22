@@ -502,7 +502,7 @@ export default function DriverPortalPage({
           </div>
         </div>
 
-        {/* Driver Payment UPI & Auto-Generated QR Section */}
+        {/* Driver Payment UPI & Scannable QR Section */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-7 space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -510,11 +510,8 @@ export default function DriverPortalPage({
                 <QrCode className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-black text-white font-['Outfit'] flex flex-wrap items-center gap-2">
-                  <span>Your Direct Payment UPI & Scannable QR</span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
-                    Auto Generated
-                  </span>
+                <h2 className="text-base sm:text-lg font-black text-white font-['Outfit']">
+                  Your Direct Payment UPI & Scannable QR
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Enter your personal UPI ID (GPay / PhonePe / Paytm). Customers on your rides will scan this QR to pay you directly.
