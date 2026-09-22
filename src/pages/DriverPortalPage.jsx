@@ -13,6 +13,7 @@ import {
   formatDuty, 
   getDriverDuties 
 } from '../utils/driverDutyHelpers';
+import { SUPPORT_HELPLINE } from '../data/mockData';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
@@ -325,7 +326,7 @@ export default function DriverPortalPage({
         detail: {
           id: settlementTrip.id,
           driverName: driverUser?.name || "Driver Assigned",
-          driverPhone: driverUser?.phone || "+91 80 2555 0199",
+          driverPhone: driverUser?.phone || SUPPORT_HELPLINE,
           driverRating: driverUser?.rating || 5.0,
           carModel: settlementTrip.carModel,
           pickupArea: settlementTrip.pickup,
@@ -364,7 +365,7 @@ export default function DriverPortalPage({
         detail: {
           id: trip.id,
           driverName: driverUser?.name || "Driver Assigned",
-          driverPhone: driverUser?.phone || "+91 80 2555 0199",
+          driverPhone: driverUser?.phone || SUPPORT_HELPLINE,
           driverRating: driverUser?.rating || 5.0,
           driverUpi: activeUpi,
           carModel: trip.carModel,

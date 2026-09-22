@@ -1,4 +1,5 @@
 // Gemini AI Service for Book Driver Anna Assistant
+import { SUPPORT_HELPLINE } from '../data/mockData';
 
 const SYSTEM_PROMPT = `
 You are "Anna AI", the official friendly, polite, and helpful customer support assistant for "Book Driver Anna" (Namma Bengaluru's #1 Driver & Vehicle Rental Service).
@@ -61,7 +62,7 @@ KEY INFORMATION ABOUT BOOK DRIVER ANNA SERVICES:
 8. COVERAGE AREAS & CONTACT:
    - Areas: Indiranagar, Koramangala, Whitefield, Electronic City, HSR Layout, MG Road, Hebbal, Yelahanka, Rajajinagar, Banashankari, Bellandur, Marathahalli, BTM Layout, BLR Airport.
    - Doorstep Arrival: Fast on-demand pickup across Bangalore.
-   - Hotline: +91 98765 43210 (24x7 support).
+   - Hotline: ${SUPPORT_HELPLINE} (24x7 support).
    - Booking: Customer can easily click the "Book a Driver", "Book a Vehicle", or "Driving Class" buttons on the screen.
 
 Keep responses concise, cheerful, accurate, and encourage the customer to book right away!
@@ -310,7 +311,7 @@ export function getOfflineKnowledgeResponse(query) {
 
   // Generic Catch-All
   return {
-    text: `👍 **Got it boss!**\n\nAt **Book Driver Anna**, we provide verified professional drivers for your own car (starts @ ₹199 for 2 hrs) as well as commercial rental vehicles (Sedans, SUVs, 12-seater Tempos & 24-seater Buses).\n\n• **Instant Booking**: Anna arrives promptly at your doorstep.\n• **24/7 Helpline**: +91 98765 43210.\n\nWould you like to book a driver for your car or rent a vehicle?`,
+    text: `👍 **Got it boss!**\n\nAt **Book Driver Anna**, we provide verified professional drivers for your own car (starts @ ₹199 for 2 hrs) as well as commercial rental vehicles (Sedans, SUVs, 12-seater Tempos & 24-seater Buses).\n\n• **Instant Booking**: Anna arrives promptly at your doorstep.\n• **24/7 Helpline**: ${SUPPORT_HELPLINE}.\n\nWould you like to book a driver for your car or rent a vehicle?`,
     actions: [
       { label: '🚗 Book a Driver', type: 'driver', data: { tripOption: 'round-trip' } },
       { label: '🚙 Book a Vehicle', type: 'vehicle', data: {} }

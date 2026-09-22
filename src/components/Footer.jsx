@@ -1,7 +1,7 @@
 import React from 'react';
 import { Car, MapPin, Phone, Mail, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
 import { SteeringWheel } from './Icons';
-import { BANGALORE_AREAS } from '../data/mockData';
+import { BANGALORE_AREAS, SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function Footer({ setActivePage, openBookingModal, openCancelModal, clientUser, onLogout }) {
   const navigateTo = (pageId) => {
@@ -125,7 +125,7 @@ export default function Footer({ setActivePage, openBookingModal, openCancelModa
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <a href="tel:+918025550199" className="hover:text-white font-mono">+91 80 2555 0199</a>
+                <a href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`} className="hover:text-white font-mono">{SUPPORT_HELPLINE}</a>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />

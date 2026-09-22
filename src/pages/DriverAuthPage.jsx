@@ -4,7 +4,7 @@ import {
   Sparkles, Lock, Phone, User, Eye, EyeOff, AlertCircle, Award, Check, QrCode
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
-import { BANGALORE_AREAS, DEFAULT_REGISTERED_DRIVERS } from '../data/mockData';
+import { BANGALORE_AREAS, DEFAULT_REGISTERED_DRIVERS, SUPPORT_HELPLINE } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 
 // Registered driver partners directory (empty on clean boot)
@@ -443,7 +443,7 @@ export default function DriverAuthPage({
                     <span>Remember this device</span>
                   </label>
 
-                  <span className="text-emerald-400/90 hover:underline cursor-pointer" onClick={() => alert("To reset your driver PIN, please contact Bangalore Fleet Dispatcher at +91 80 2555 0199.")}>
+                  <span className="text-emerald-400/90 hover:underline cursor-pointer" onClick={() => alert(`To reset your driver PIN, please contact Bangalore Fleet Dispatcher at ${SUPPORT_HELPLINE}.`)}>
                     Forgot PIN?
                   </span>
                 </div>

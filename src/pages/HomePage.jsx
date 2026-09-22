@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
-import { LOCAL_STATS, OUTSTATION_DESTINATIONS } from '../data/mockData';
+import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function HomePage({ 
   setActivePage, 
@@ -332,11 +332,11 @@ export default function HomePage({
               <span>Book a Driver</span>
             </button>
             <a
-              href="tel:+918025550199"
+              href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`}
               className="btn-secondary"
             >
               <Phone className="w-4 h-4 text-amber-500" />
-              <span>+91 80 2555 0199</span>
+              <span>{SUPPORT_HELPLINE}</span>
             </a>
           </div>
         </div>

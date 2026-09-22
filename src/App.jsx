@@ -34,6 +34,7 @@ import UserProfileModal from './components/UserProfileModal';
 import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
 import { apiClient } from './services/apiClient';
 import { broadcastBookingUpdate, onBookingUpdate } from './utils/broadcastSync';
+import { SUPPORT_HELPLINE } from './data/mockData';
 
 /**
  * Resolves a given URL pathname into application route details:
@@ -418,7 +419,7 @@ export default function App() {
           setPaymentRideData({
             id: current.id,
             driverName: detail.assignedDriver || current.driverName || "Driver Assigned",
-            driverPhone: detail.assignedDriverPhone || current.driverPhone || "+91 80 2555 0199",
+            driverPhone: detail.assignedDriverPhone || current.driverPhone || SUPPORT_HELPLINE,
             driverUpi: detail.assignedDriverUpi || current.assignedDriverUpi || detail.driverUpi || '',
             driverRating: 5.0,
             carModel: current.carModel || current.vehicleType || "Sedan",
@@ -634,7 +635,7 @@ export default function App() {
     setActiveRide({
       id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
       driverName: 'Pending Admin Acceptance',
-      driverPhone: '+91 80 2555 0199',
+      driverPhone: SUPPORT_HELPLINE,
       driverRating: 5.0,
       carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),
       pickupArea: bookingDetails.pickupArea || 'Pickup Location',
@@ -833,7 +834,7 @@ export default function App() {
           const rideForPayment = {
             id: booking.bookingId || booking.id,
             driverName: booking.assignedAnna || "Driver Assigned",
-            driverPhone: booking.driverPhone || "+91 80 2555 0199",
+            driverPhone: booking.driverPhone || SUPPORT_HELPLINE,
             driverRating: 5.0,
             carModel: booking.vehicleCategory || "Customer Vehicle",
             pickupArea: booking.pickupArea || "Pickup Location",

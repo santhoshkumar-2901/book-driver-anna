@@ -1,3 +1,6 @@
+// Temporary admin number pending a dedicated support line
+export const SUPPORT_HELPLINE = '+91 78991 20704';
+
 export const BANGALORE_AREAS = [
   "Indiranagar",
   "Koramangala",

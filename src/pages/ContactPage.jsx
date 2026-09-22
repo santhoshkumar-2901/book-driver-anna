@@ -3,7 +3,7 @@ import {
   Phone, Mail, MapPin, Clock, Send, MessageSquare, CheckCircle2, 
   HelpCircle, ChevronDown, ChevronUp, Building2 
 } from 'lucide-react';
-import { BANGALORE_AREAS } from '../data/mockData';
+import { BANGALORE_AREAS, SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function ContactPage({ openBookingModal }) {
   const [formData, setFormData] = useState({
@@ -28,10 +28,10 @@ export default function ContactPage({ openBookingModal }) {
   };
 
   const hubs = [
-    { name: "Indiranagar Central Operations", address: "100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038", phone: "+91 80 2555 0199" },
-    { name: "Koramangala Operations Desk", address: "80 Feet Road, 4th Block, Koramangala, Bengaluru 560034", phone: "+91 80 2555 0199" },
-    { name: "Whitefield Dispatch Center", address: "ITPL Main Road, Whitefield, Bengaluru 560066", phone: "+91 80 2555 0199" },
-    { name: "Electronic City Regional Kiosk", address: "Phase 1, Hosur Road, Electronic City, Bengaluru 560100", phone: "+91 80 2555 0199" }
+    { name: "Indiranagar Central Operations", address: "100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru 560038", phone: SUPPORT_HELPLINE },
+    { name: "Koramangala Operations Desk", address: "80 Feet Road, 4th Block, Koramangala, Bengaluru 560034", phone: SUPPORT_HELPLINE },
+    { name: "Whitefield Dispatch Center", address: "ITPL Main Road, Whitefield, Bengaluru 560066", phone: SUPPORT_HELPLINE },
+    { name: "Electronic City Regional Kiosk", address: "Phase 1, Hosur Road, Electronic City, Bengaluru 560100", phone: SUPPORT_HELPLINE }
   ];
 
   const faqs = [
@@ -199,13 +199,13 @@ export default function ContactPage({ openBookingModal }) {
             </h4>
 
             <div className="space-y-3 text-xs text-slate-300">
-              <a href="tel:+918025550199" className="flex items-start gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+              <a href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`} className="flex items-start gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
                 <div className="p-2 bg-slate-900 text-amber-500 rounded-md border border-slate-800">
                   <Phone className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase font-semibold">Central Helpline</div>
-                  <div className="text-sm font-bold text-white">+91 80 2555 0199</div>
+                  <div className="text-sm font-bold text-white">{SUPPORT_HELPLINE}</div>
                   <div className="text-[11px] text-slate-400">Phone & WhatsApp dispatch desk</div>
                 </div>
               </a>

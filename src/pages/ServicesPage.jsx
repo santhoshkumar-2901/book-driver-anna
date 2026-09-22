@@ -4,7 +4,7 @@ import {
   Sparkles, Fuel, Users, ArrowRight, DollarSign, Filter, Moon, Compass, Briefcase, Navigation, Calendar, User, Phone, Check, Bus, GraduationCap, Award
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
-import { BOOK_DRIVER_TRIP_TYPES, VEHICLE_SERVICES, BANGALORE_AREAS, DRIVING_CLASSES, DRIVING_CLASS_HIGHLIGHTS } from '../data/mockData';
+import { BOOK_DRIVER_TRIP_TYPES, VEHICLE_SERVICES, BANGALORE_AREAS, DRIVING_CLASSES, DRIVING_CLASS_HIGHLIGHTS, SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function ServicesPage({ openBookingModal }) {
   const [activeServiceTab, setActiveServiceTab] = useState('driver'); // 'driver', 'vehicle', 'class'
@@ -554,10 +554,10 @@ export default function ServicesPage({ openBookingModal }) {
           Call our Indiranagar 24x7 helpdesk. Our friendly Anna will customize the driver or car rental package for your exact needs!
         </p>
         <a 
-          href="tel:+918025550199" 
+          href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`} 
           className="inline-flex items-center gap-2 py-3 px-6 rounded-2xl bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg hover:bg-amber-300 transition-colors"
         >
-          <Phone className="w-4 h-4 fill-slate-950" /> Call Helpline: +91 80 2555 0199
+          <Phone className="w-4 h-4 fill-slate-950" /> Call Helpline: {SUPPORT_HELPLINE}
         </a>
       </div>
 

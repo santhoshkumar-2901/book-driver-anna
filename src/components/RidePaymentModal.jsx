@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { useScrollLock } from '../utils/useScrollLock';
+import { SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function RidePaymentModal({ 
   isOpen, 
@@ -20,7 +21,7 @@ export default function RidePaymentModal({
 
   // Defaults
   const driverName = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna || "Driver Assigned";
-  const driverPhone = rideData.driverPhone || "+91 80 2555 0199";
+  const driverPhone = rideData.driverPhone || SUPPORT_HELPLINE;
   const driverRating = rideData.driverRating || 5.0;
   const driverTrips = rideData.driverTrips || 0;
   const carModel = rideData.carModel || rideData.vehicleName || "Customer Vehicle";

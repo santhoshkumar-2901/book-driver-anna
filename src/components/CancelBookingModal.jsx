@@ -9,6 +9,7 @@ import { SteeringWheel, WhatsAppIcon } from './Icons';
 import { toDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
+import { SUPPORT_HELPLINE } from '../data/mockData';
 
 const CANCELLATION_REASONS = [
   'Change of travel plans',
@@ -493,7 +494,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
         {/* Footer */}
         <div className="p-4 bg-slate-950/80 border-t border-slate-800 text-center shrink-0">
           <p className="text-xs text-slate-400">
-            Need urgent assistance? Call Anna 24/7 Helpline: <a href="tel:+919876543210" className="text-amber-400 font-bold hover:underline">+91 98765 43210</a>
+            Need urgent assistance? Call Anna 24/7 Helpline: <a href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`} className="text-amber-400 font-bold hover:underline">{SUPPORT_HELPLINE}</a>
           </p>
         </div>
 
