@@ -15,6 +15,7 @@ import {
 } from '../utils/driverDutyHelpers';
 import { SUPPORT_HELPLINE } from '../data/mockData';
 import SOSButton from '../components/SOSButton';
+import { isDummyOrDemoUser } from '../utils/userValidation';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
@@ -22,6 +23,13 @@ export default function DriverPortalPage({
   driverUser, 
   onLogout 
 }) {
+  // Automatically reject and logout any dummy driver profiles
+  useEffect(() => {
+    if (!driverUser || isDummyOrDemoUser(driverUser)) {
+      if (onLogout) onLogout();
+    }
+  }, [driverUser, onLogout]);
+
   const [isOnline, setIsOnline] = useState(() => {
     if (driverUser?.isOnline !== undefined) return Boolean(driverUser.isOnline);
     try {
@@ -470,11 +478,11 @@ export default function DriverPortalPage({
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1">
-                <span>DL: <strong className="text-slate-200 font-mono">{driverUser?.dlNumber || 'KA-04-2021-0098745'}</strong></span>
+                <span>DL: <strong className="text-slate-200 font-mono">{driverUser?.dlNumber || 'Verified ID'}</strong></span>
                 <span className="hidden xs:inline">•</span>
-                <span>Hub: <strong className="text-amber-400">{driverUser?.area || 'Indiranagar & Central'}</strong></span>
+                <span>Hub: <strong className="text-amber-400">{driverUser?.area || 'Bengaluru Fleet'}</strong></span>
                 <span className="hidden xs:inline">•</span>
-                <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {driverUser?.rating || '4.98'}</strong></span>
+                <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {driverUser?.rating || '5.0'}</strong></span>
               </div>
             </div>
           </div>

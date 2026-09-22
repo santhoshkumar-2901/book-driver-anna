@@ -12,11 +12,12 @@ import { toDDMMYYYY } from '../utils/dateUtils';
 import { apiClient } from '../services/apiClient';
 import { onBookingUpdate } from '../utils/broadcastSync';
 import RidePaymentModal from './RidePaymentModal';
+import { isDummyOrDemoUser } from '../utils/userValidation';
 
-// Helper to determine if the active user is a demo account (neutralized in production)
+// Helper to determine if the active user is a demo or dummy account (neutralized in production)
 export const isDemoUser = (user) => {
   if (!user) return false;
-  return user.isDemo === true;
+  return user.isDemo === true || isDummyOrDemoUser(user);
 };
 
 // Initial default bookings (empty in production; populated dynamically from bookings)
@@ -43,6 +44,14 @@ export default function UserProfileModal({
   onCancelBooking 
 }) {
   useScrollLock(isOpen);
+
+  // Automatically log out and close if opened with a legacy dummy/demo account
+  useEffect(() => {
+    if (isOpen && clientUser && isDummyOrDemoUser(clientUser)) {
+      if (onLogout) onLogout();
+      if (onClose) onClose();
+    }
+  }, [isOpen, clientUser, onLogout, onClose]);
 
   // Tabs: 'profile', 'bookings', 'security'
   const [activeTab, setActiveTab] = useState('bookings');

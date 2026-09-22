@@ -35,6 +35,7 @@ import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal'
 import { apiClient } from './services/apiClient';
 import { broadcastBookingUpdate, onBookingUpdate } from './utils/broadcastSync';
 import { SUPPORT_HELPLINE } from './data/mockData';
+import { isDummyOrDemoUser } from './utils/userValidation';
 
 /**
  * Resolves a given URL pathname into application route details:
@@ -93,6 +94,7 @@ export function resolveRoute(pathname = '') {
 
 /**
  * Reads and parses user session object from localStorage/sessionStorage.
+ * Rejects and purges any legacy dummy, demo, or placeholder accounts.
  * Returns null if missing, invalid JSON, or during SSR.
  */
 export function getInitialUser(storageKey) {
@@ -100,11 +102,25 @@ export function getInitialUser(storageKey) {
   try {
     const storedLocal = localStorage.getItem(storageKey);
     if (storedLocal) {
-      return JSON.parse(storedLocal);
+      const parsed = JSON.parse(storedLocal);
+      if (isDummyOrDemoUser(parsed)) {
+        localStorage.removeItem(storageKey);
+        sessionStorage.removeItem(storageKey);
+        localStorage.removeItem(storageKey.replace('_user', '_token'));
+        return null;
+      }
+      return parsed;
     }
     const storedSession = sessionStorage.getItem(storageKey);
     if (storedSession) {
-      return JSON.parse(storedSession);
+      const parsed = JSON.parse(storedSession);
+      if (isDummyOrDemoUser(parsed)) {
+        localStorage.removeItem(storageKey);
+        sessionStorage.removeItem(storageKey);
+        localStorage.removeItem(storageKey.replace('_user', '_token'));
+        return null;
+      }
+      return parsed;
     }
   } catch (e) {}
   return null;
@@ -151,10 +167,48 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Check active session with backend API on mount
+  // Check active session with backend API on mount and purge any stale dummy accounts
   useEffect(() => {
+    // Proactively clean up any stale legacy dummy storage keys
+    if (typeof window !== 'undefined') {
+      try {
+        const clientRaw = localStorage.getItem('bda_client_user');
+        if (clientRaw) {
+          const parsed = JSON.parse(clientRaw);
+          if (isDummyOrDemoUser(parsed)) {
+            localStorage.removeItem('bda_client_user');
+            localStorage.removeItem('bda_client_token');
+            sessionStorage.removeItem('bda_client_user');
+            setClientUser(null);
+          }
+        }
+        const driverRaw = localStorage.getItem('bda_driver_user');
+        if (driverRaw) {
+          const parsed = JSON.parse(driverRaw);
+          if (isDummyOrDemoUser(parsed)) {
+            localStorage.removeItem('bda_driver_user');
+            localStorage.removeItem('bda_driver_token');
+            sessionStorage.removeItem('bda_driver_user');
+            setDriverUser(null);
+          }
+        }
+      } catch (e) {}
+    }
+
     apiClient.getMe().then(res => {
       if (res && res.data && res.data.user) {
+        if (isDummyOrDemoUser(res.data.user)) {
+          setClientUser(null);
+          setDriverUser(null);
+          localStorage.removeItem('bda_client_user');
+          localStorage.removeItem('bda_client_token');
+          localStorage.removeItem('bda_driver_user');
+          localStorage.removeItem('bda_driver_token');
+          sessionStorage.removeItem('bda_client_user');
+          sessionStorage.removeItem('bda_driver_user');
+          return;
+        }
+
         if (res.data.user.role === 'customer') {
           setClientUser(res.data.user);
           localStorage.setItem('bda_client_user', JSON.stringify(res.data.user));
@@ -162,8 +216,28 @@ export default function App() {
           setDriverUser(res.data.user);
           localStorage.setItem('bda_driver_user', JSON.stringify(res.data.user));
         }
+      } else {
+        setClientUser(null);
+        setDriverUser(null);
+        localStorage.removeItem('bda_client_user');
+        localStorage.removeItem('bda_driver_user');
+        sessionStorage.removeItem('bda_client_user');
+        sessionStorage.removeItem('bda_driver_user');
       }
-    }).catch(() => {});
+    }).catch(err => {
+      // If server explicitly responds with unauthorized, invalid token, or account disabled:
+      // Immediately reset and purge local session so visitors never remain logged in as unauthenticated users
+      if (!err || err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED' || err.code === 'INVALID_TOKEN' || err.code === 'ACCOUNT_DISABLED') {
+        setClientUser(null);
+        setDriverUser(null);
+        localStorage.removeItem('bda_client_user');
+        localStorage.removeItem('bda_client_token');
+        localStorage.removeItem('bda_driver_user');
+        localStorage.removeItem('bda_driver_token');
+        sessionStorage.removeItem('bda_client_user');
+        sessionStorage.removeItem('bda_driver_user');
+      }
+    });
   }, []);
 
   const changePage = (newPage) => {
@@ -676,8 +750,8 @@ export default function App() {
     );
   }
 
-  // 3. Driver Auth Pages (/driver, /driver/login, /driver/signup, /driver-auth)
-  if (activePage === 'driver' || activePage === 'driver-login' || activePage === 'driver-signup' || activePage === 'driver-auth') {
+  // 3. Driver Auth Pages (/driver, /driver/login, /driver/signup, /driver-auth, /driver/portal without session)
+  if (activePage === 'driver' || activePage === 'driver-login' || activePage === 'driver-signup' || activePage === 'driver-auth' || activePage === 'driver-portal') {
     return (
       <Suspense fallback={<RouteLoadingFallback />}>
         <DriverAuthPage 
