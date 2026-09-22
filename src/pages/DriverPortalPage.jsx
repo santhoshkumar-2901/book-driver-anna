@@ -454,46 +454,46 @@ export default function DriverPortalPage({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         
         {/* Welcome Driver Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden shadow-xl">
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-xl sm:text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden shadow-xl">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-lg sm:text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
               {driverUser?.name ? driverUser.name.charAt(0).toUpperCase() : 'M'}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
-                <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0">
+                <h1 className="text-lg sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
                   Namaskara, Anna {driverUser?.name || 'Partner'}!
                 </h1>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 sm:px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
                   <span>Verified Fleet Anna</span>
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1">
                 <span>DL: <strong className="text-slate-200 font-mono">{driverUser?.dlNumber || 'KA-04-2021-0098745'}</strong></span>
-                <span>•</span>
+                <span className="hidden xs:inline">•</span>
                 <span>Hub: <strong className="text-amber-400">{driverUser?.area || 'Indiranagar & Central'}</strong></span>
-                <span>•</span>
+                <span className="hidden xs:inline">•</span>
                 <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {driverUser?.rating || '4.98'}</strong></span>
               </div>
             </div>
           </div>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
-            <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-2xl text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
+            <div className="bg-slate-950/80 border border-slate-800 p-2.5 sm:p-3 rounded-2xl text-center">
               <div className="text-[10px] uppercase font-bold text-slate-400">Today's Earnings</div>
               <div className="text-base font-extrabold text-emerald-400 font-mono mt-0.5">
                 ₹{todayEarnings}
               </div>
             </div>
-            <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-2xl text-center">
+            <div className="bg-slate-950/80 border border-slate-800 p-2.5 sm:p-3 rounded-2xl text-center">
               <div className="text-[10px] uppercase font-bold text-slate-400">Lifetime Trips</div>
               <div className="text-base font-extrabold text-white font-mono mt-0.5">
                 {lifetimeTrips}
               </div>
             </div>
-            <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-2xl text-center col-span-2 sm:col-span-1">
+            <div className="bg-slate-950/80 border border-slate-800 p-2.5 sm:p-3 rounded-2xl text-center col-span-2 sm:col-span-1">
               <div className="text-[10px] uppercase font-bold text-slate-400">Next Payout</div>
               <div className="text-xs font-bold text-amber-400 mt-1">
                 Monday (Direct Bank)
@@ -503,20 +503,20 @@ export default function DriverPortalPage({
         </div>
 
         {/* Driver Payment UPI & Auto-Generated QR Section */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 space-y-4 shadow-xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-7 space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-amber-400/15 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
                 <QrCode className="w-5 h-5" />
               </div>
-              <div>
-                <h2 className="text-base sm:text-lg font-black text-white font-['Outfit'] flex items-center gap-2">
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-black text-white font-['Outfit'] flex flex-wrap items-center gap-2">
                   <span>Your Direct Payment UPI & Scannable QR</span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                     Auto Generated
                   </span>
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-400 mt-0.5">
                   Enter your personal UPI ID (GPay / PhonePe / Paytm). Customers on your rides will scan this QR to pay you directly.
                 </p>
               </div>
@@ -591,11 +591,11 @@ export default function DriverPortalPage({
                   <QrCode className="w-16 h-16 text-slate-400" />
                 )}
               </div>
-              <div className="space-y-1 text-center sm:text-left min-w-0">
+              <div className="space-y-1 text-center sm:text-left min-w-0 flex-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md inline-block">
                   Live QR Preview
                 </span>
-                <div className="text-xs font-bold text-white font-mono truncate max-w-[170px]">
+                <div className="text-xs font-bold text-white font-mono truncate max-w-full sm:max-w-[220px]">
                   {driverUpi.trim() || 'Enter UPI ID'}
                 </div>
                 <p className="text-[10px] text-slate-400">
@@ -633,10 +633,10 @@ export default function DriverPortalPage({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {acceptedTrips.map(trip => (
-                <div key={trip.id} className="bg-emerald-950/20 border-2 border-emerald-500/40 rounded-3xl p-5 space-y-3 shadow-lg">
-                  <div className="flex items-start justify-between">
+                <div key={trip.id} className="bg-emerald-950/20 border-2 border-emerald-500/40 rounded-3xl p-4 sm:p-5 space-y-3 shadow-lg">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                           {trip.id}
                         </span>
@@ -650,27 +650,27 @@ export default function DriverPortalPage({
                       </div>
                       <h3 className="text-base font-black text-white font-['Outfit'] mt-1">{trip.tripType}</h3>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
                       <SOSButton trip={trip} />
                       <div className="text-lg font-black text-emerald-400 font-mono">{trip.payout}</div>
                     </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                    <div className="flex items-center justify-between text-[11px] text-amber-400 font-bold border-b border-slate-800/80 pb-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-amber-400 font-bold border-b border-slate-800/80 pb-1">
                       <span>Assigned Driver: {trip.assignedDriver || driverUser?.name || 'You'}</span>
                       <span className="text-slate-400 font-normal">{trip.scheduledTime}</span>
                     </div>
-                    <div><strong>Customer:</strong> {trip.customerName} {trip.customerPhone ? `(${trip.customerPhone})` : ''}</div>
-                    <div><strong>Pickup:</strong> {trip.pickup}</div>
-                    <div><strong>Destination:</strong> {trip.destination}</div>
+                    <div className="break-words"><strong>Customer:</strong> {trip.customerName} {trip.customerPhone ? `(${trip.customerPhone})` : ''}</div>
+                    <div className="break-words"><strong>Pickup:</strong> {trip.pickup}</div>
+                    <div className="break-words"><strong>Destination:</strong> {trip.destination}</div>
                     <div><strong>Vehicle:</strong> {trip.carModel}</div>
                   </div>
 
                   <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                     <a 
                       href={`tel:${trip.customerPhone || SUPPORT_HELPLINE}`}
-                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
+                      className="w-full sm:w-auto py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
                       title="Call Customer"
                     >
                       <Phone className="w-3.5 h-3.5 text-emerald-400" />
@@ -680,14 +680,14 @@ export default function DriverPortalPage({
                     {trip.status !== 'In Progress' ? (
                       <button
                         onClick={() => handleStartTrip(trip.id)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center"
+                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center"
                       >
                         Start Trip (Run Meter)
                       </button>
                     ) : (
                       <button
                         onClick={() => handleOpenSettlement(trip)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] cursor-pointer text-center flex items-center justify-center gap-1.5"
+                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] cursor-pointer text-center flex items-center justify-center gap-1.5"
                       >
                         <Check className="w-4 h-4" />
                         <span>End Ride & Settle Fare</span>
@@ -726,7 +726,7 @@ export default function DriverPortalPage({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {availableDuties.map(duty => (
                 <div 
                   key={duty.id}
@@ -755,16 +755,16 @@ export default function DriverPortalPage({
                     <div className="space-y-2 text-xs text-slate-300 bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
                       <div className="flex items-start gap-2">
                         <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <span className="text-slate-500 text-[10px] block uppercase font-bold">Pickup</span>
-                          <span className="font-semibold text-slate-200">{duty.pickup}</span>
+                          <span className="font-semibold text-slate-200 break-words">{duty.pickup}</span>
                         </div>
                       </div>
                       <div className="flex items-start gap-2 pt-1.5 border-t border-slate-800/60">
                         <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <span className="text-slate-500 text-[10px] block uppercase font-bold">Drop / Stops</span>
-                          <span className="font-semibold text-slate-200">{duty.destination}</span>
+                          <span className="font-semibold text-slate-200 break-words">{duty.destination}</span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/60 text-[11px] text-slate-400">
@@ -797,7 +797,7 @@ export default function DriverPortalPage({
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Verified Documents & Clearances</span>
             </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs">
               <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center gap-2 text-slate-300">
                 <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Driving License (Active)</span>
@@ -828,20 +828,20 @@ export default function DriverPortalPage({
                 Facing route issues, customer delay, or emergency? Contact our Bengaluru control room immediately.
               </p>
             </div>
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
               <a
-                href="https://wa.me/918025550199?text=Hi%20Dispatch%2C%20this%20is%20Driver%20Anna.%20Need%20assistance%20with%20duty."
+                href={`https://wa.me/${SUPPORT_HELPLINE.replace(/[^0-9]/g, '')}?text=${encodeURIComponent("Hi Dispatch, this is Driver Anna. Need assistance with duty.")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg"
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg"
               >
                 <WhatsAppIcon className="w-4 h-4 fill-white" />
                 <span>WhatsApp Dispatch</span>
               </a>
 
               <a 
-                href="tel:+918025550199"
-                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-700"
+                href={`tel:${SUPPORT_HELPLINE}`}
+                className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-slate-700"
               >
                 <Phone className="w-3.5 h-3.5 text-amber-400" />
                 <span>Call SOS</span>
@@ -895,9 +895,11 @@ export default function DriverPortalPage({
                     <span className="text-slate-400">Customer:</span>
                     <strong className="text-white">{settlementTrip.customerName}</strong>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Route:</span>
-                    <span className="text-slate-200 truncate max-w-[200px]">{settlementTrip.pickup} ➔ {settlementTrip.destination}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400 shrink-0">Route:</span>
+                    <span className="text-slate-200 truncate text-right flex-1 min-w-0" title={`${settlementTrip.pickup} ➔ ${settlementTrip.destination}`}>
+                      {settlementTrip.pickup} ➔ {settlementTrip.destination}
+                    </span>
                   </div>
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                     <span className="font-bold text-slate-300">Total Driver Payout:</span>

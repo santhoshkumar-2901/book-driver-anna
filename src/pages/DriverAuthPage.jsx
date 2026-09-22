@@ -275,16 +275,16 @@ export default function DriverAuthPage({
             <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
           </div>
           <div className="min-w-0">
-            <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">
+            <div className="font-extrabold text-sm sm:text-lg md:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">
               Book Driver <span className="text-emerald-400">Anna</span>
             </div>
-            <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
+            <p className="text-[9px] sm:text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
               <Award className="w-2.5 h-2.5 text-emerald-400 inline shrink-0" /> Driver Partner Portal
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl shrink-0">
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>Partner Fleet</span>
         </div>
@@ -705,10 +705,10 @@ export default function DriverAuthPage({
           </div>
 
           {/* Micro Trust Indicators */}
-          <div className="pt-2 sm:pt-2.5 flex items-center justify-center gap-4 text-[10px] sm:text-[11px] text-slate-400 font-semibold shrink-0">
-            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Weekly Payouts</span>
-            <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-amber-400" /> Zero Commission</span>
-            <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-red-400" /> 25+ Bangalore Hubs</span>
+          <div className="pt-2 sm:pt-2.5 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-[10px] sm:text-[11px] text-slate-400 font-semibold shrink-0">
+            <span className="flex items-center gap-1 shrink-0"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Weekly Payouts</span>
+            <span className="flex items-center gap-1 shrink-0"><CheckCircle2 className="w-3 h-3 text-amber-400" /> Zero Commission</span>
+            <span className="flex items-center gap-1 shrink-0"><MapPin className="w-3 h-3 text-red-400" /> 25+ Bangalore Hubs</span>
           </div>
 
         </div>
