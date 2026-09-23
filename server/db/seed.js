@@ -1,7 +1,26 @@
-import { isTiDB } from './database.js';
+import { isTiDB, db } from './database.js';
 
 export async function seedDatabase() {
   try {
+    // Ensure password_reset_tokens table exists in TiDB Cloud
+    if (isTiDB) {
+      try {
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id VARCHAR(64) NOT NULL PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            token_hash VARCHAR(64) NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          );
+        `);
+      } catch (tableErr) {
+        console.warn('[DATABASE] TiDB table init notice:', tableErr.message);
+      }
+    }
+
     const isProduction = process.env.NODE_ENV === 'production';
     const allowSeed = process.env.ALLOW_DB_SEED === 'true';
 

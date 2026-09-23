@@ -43,7 +43,11 @@ export const ENV = {
 
   DATABASE_URL: process.env.DATABASE_URL || '',
 
-  // Production Email Delivery Configuration (Resend SMTP: smtp.resend.com:465)
+  // Production Email Delivery Configuration (Gmail SMTP & Resend Fallback)
+  GMAIL_USER: process.env.GMAIL_USER || '',
+  GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD || '',
+  APP_URL: (process.env.APP_URL || (isProduction ? 'https://book-driver-anna.vercel.app' : 'http://localhost:5173')).replace(/\/+$/, ''),
+
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '465', 10),
   SMTP_USER: process.env.SMTP_USER || 'resend',

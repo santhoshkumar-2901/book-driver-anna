@@ -32,6 +32,10 @@ export default function ClientAuthPage({
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
+  // Forgot Password States
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
   // Signup Form States
   const [signupName, setSignupName] = useState(prefillData?.name || '');
   const [signupPhone, setSignupPhone] = useState(prefillData?.phone || '');
@@ -70,6 +74,8 @@ export default function ClientAuthPage({
     setShowPassword(false);
     setErrorMessage('');
     setSuccessMessage('');
+    setForgotEmail('');
+    setForgotSuccess(false);
 
     if (loginIdentifierRef.current) loginIdentifierRef.current.value = prefillData?.phone || prefillData?.email || '';
     if (loginPasswordRef.current) loginPasswordRef.current.value = '';
@@ -151,11 +157,32 @@ export default function ClientAuthPage({
     if (onSwitchMode) {
       onSwitchMode(newMode);
     } else if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', newMode === 'signup' ? '/signup' : '/login');
+      const targetUrl = newMode === 'signup' ? '/signup' : (newMode === 'forgot-password' ? '/forgot-password' : '/login');
+      window.history.pushState({}, '', targetUrl);
     }
   };
 
+  // Handle Forgot Password Submission
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+    if (!forgotEmail || !forgotEmail.includes('@')) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
 
+    setIsLoading(true);
+    try {
+      const res = await apiClient.forgotPassword(forgotEmail.trim());
+      setForgotSuccess(true);
+      setSuccessMessage(res?.message || 'If an account exists with that email, a password reset link has been sent.');
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to send reset link. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle Client Sign In
   const handleLoginSubmit = async (e) => {
@@ -319,41 +346,55 @@ export default function ClientAuthPage({
             <span>Book a Driver • Rent a Vehicle • Book a Driving Class</span>
           </div>
               <h1 className="text-xl sm:text-2xl font-black text-white font-['Outfit']">
-                {authMode === 'login' ? 'Login' : 'Signup'}
+                {authMode === 'login' ? 'Login' : (authMode === 'signup' ? 'Signup' : 'Forgot Password')}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
                 {authMode === 'login'
                   ? 'Log in to your account to book verified private drivers, rent fleet vehicles, or schedule doorstep driving classes across Bengaluru.'
-                  : 'Join Book Driver Anna to hire trusted car drivers, rent vehicles with zero hassle, or learn to drive with verified instructors.'}
+                  : (authMode === 'signup'
+                    ? 'Join Book Driver Anna to hire trusted car drivers, rent vehicles with zero hassle, or learn to drive with verified instructors.'
+                    : 'Enter your registered email address and we will send you a secure 15-minute link to reset your password.')}
               </p>
             </div>
 
             {/* Mode Switcher Tabs */}
-            <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-3.5">
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'login'
-                  ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
-                  : 'text-slate-400 hover:text-white'
-                  }`}
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Login</span>
-              </button>
+            {authMode !== 'forgot-password' ? (
+              <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-3.5">
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'login'
+                    ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Login</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => switchMode('signup')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'signup'
-                  ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
-                  : 'text-slate-400 hover:text-white'
-                  }`}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Signup</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'signup'
+                    ? 'bg-amber-400 text-slate-950 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Signup</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between mb-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  &larr; Back to Login
+                </button>
+              </div>
+            )}
 
             {/* Error & Success Banners */}
             {errorMessage && (
@@ -371,9 +412,68 @@ export default function ClientAuthPage({
             )}
 
             {/* =========================================================================
-                A. LOGIN FORM
+                A. FORGOT PASSWORD FORM
                ========================================================================= */}
-            {authMode === 'login' ? (
+            {authMode === 'forgot-password' ? (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3" autoComplete="off">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                    Registered Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      placeholder="e.g. name@email.com"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      disabled={isLoading || forgotSuccess}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {!forgotSuccess ? (
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        <span>Sending reset link...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Reset Link</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  >
+                    <span>Return to Login</span>
+                  </button>
+                )}
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Remember your password? <span className="text-amber-400 font-semibold underline">Log in</span>
+                  </button>
+                </div>
+              </form>
+            ) : authMode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="space-y-3" autoComplete="off">
                 {/* Hidden dummy fields to absorb aggressive browser autofill */}
                 <input
@@ -423,6 +523,19 @@ export default function ClientAuthPage({
                     <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
                       Password *
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMessage('');
+                        setSuccessMessage('');
+                        setForgotSuccess(false);
+                        setForgotEmail(loginIdentifier.includes('@') ? loginIdentifier : '');
+                        setAuthMode('forgot-password');
+                      }}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline cursor-pointer font-medium"
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

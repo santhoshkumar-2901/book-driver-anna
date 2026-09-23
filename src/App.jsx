@@ -11,6 +11,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ClientAuthPage = lazy(() => import('./pages/ClientAuthPage'));
 const DriverAuthPage = lazy(() => import('./pages/DriverAuthPage'));
 const DriverPortalPage = lazy(() => import('./pages/DriverPortalPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RouteLoadingFallback() {
@@ -70,6 +71,12 @@ export function resolveRoute(pathname = '') {
   }
   if (clean === '/login' || clean === '/client-auth') {
     return { role: 'client', page: 'login', authRole: 'user', resetAuth: true };
+  }
+  if (clean === '/forgot-password') {
+    return { role: 'client', page: 'forgot-password', authRole: 'user', resetAuth: true };
+  }
+  if (clean === '/reset-password') {
+    return { role: 'client', page: 'reset-password', authRole: 'user', resetAuth: true };
   }
   if (clean === '/services') {
     return { role: 'client', page: 'services', authRole: 'user', resetAuth: false };
@@ -265,6 +272,16 @@ export default function App() {
     } else if (newPage === 'login') {
       setSelectedRole('user');
       window.history.pushState({}, '', '/login');
+      setAuthSessionKey(k => k + 1);
+    } else if (newPage === 'forgot-password') {
+      setSelectedRole('user');
+      window.history.pushState({}, '', '/forgot-password');
+      setAuthSessionKey(k => k + 1);
+    } else if (newPage === 'reset-password') {
+      setSelectedRole('user');
+      if (!window.location.pathname.startsWith('/reset-password')) {
+        window.history.pushState({}, '', '/reset-password');
+      }
       setAuthSessionKey(k => k + 1);
     } else if (newPage === 'services') {
       window.history.pushState({}, '', '/services');
@@ -600,7 +617,7 @@ export default function App() {
 
   // Redirect authenticated users away from auth pages
   useEffect(() => {
-    if (clientUser && (activePage === 'login' || activePage === 'signup')) {
+    if (clientUser && (activePage === 'login' || activePage === 'signup' || activePage === 'forgot-password')) {
       changePage('home');
     }
     if (driverUser && (activePage === 'driver-login' || activePage === 'driver-signup')) {
@@ -758,15 +775,15 @@ export default function App() {
     );
   }
 
-  // 4. Client Auth Pages (/login, /signup, /client-auth)
-  if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth') {
+  // 4. Client Auth Pages (/login, /signup, /client-auth, /forgot-password)
+  if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth' || activePage === 'forgot-password') {
     return (
       <Suspense fallback={<RouteLoadingFallback />}>
         <ClientAuthPage 
           key={`${activePage}-${authSessionKey}`}
-          initialMode={activePage === 'signup' ? 'signup' : 'login'}
+          initialMode={activePage === 'signup' ? 'signup' : (activePage === 'forgot-password' ? 'forgot-password' : 'login')}
           onLoginSuccess={handleClientLoginSuccess}
-          onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : 'login')}
+          onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : (mode === 'forgot-password' ? 'forgot-password' : 'login'))}
           onBackToHome={() => changePage('home')}
           bookingBanner={
             pendingBookingSubmission?.serviceTitle || null
@@ -789,6 +806,15 @@ export default function App() {
               : {}
           }
         />
+      </Suspense>
+    );
+  }
+
+  // 5. Dedicated Reset Password Page (/reset-password?token=...)
+  if (activePage === 'reset-password') {
+    return (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <ResetPasswordPage onNavigate={(page) => changePage(page)} />
       </Suspense>
     );
   }

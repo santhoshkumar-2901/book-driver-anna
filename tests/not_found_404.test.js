@@ -22,8 +22,7 @@ describe('Production 404 Not Found Page & Routing Suite', () => {
       '/does-not-exist',
       '/anything',
       '/nested/unknown/route',
-      '/some/bogus/path/here',
-      '/reset-password'
+      '/some/bogus/path/here'
     ];
 
     for (const route of invalidRoutes) {

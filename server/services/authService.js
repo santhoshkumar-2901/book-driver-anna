@@ -1,9 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { queryOne, queryAll, execute } from '../db/database.js';
+import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
 import { ENV } from '../config/env.js';
 import { logAuditEvent } from './auditService.js';
+import { sendPasswordResetEmail } from './emailService.js';
 
 const SALT_ROUNDS = 12;
 // Pre-computed valid dummy bcrypt hash for timing attack mitigation during failed user lookup
@@ -281,6 +282,194 @@ export async function changePassword({ userId, currentPassword, newPassword, ipA
   return {
     success: true,
     message: 'Password has been changed successfully.'
+  };
+}
+
+/**
+ * Request a password reset link for an email address.
+ * Strictly adheres to email enumeration defense:
+ * Returns the exact same generic message whether the account exists or not.
+ */
+export async function requestPasswordReset({ email, ipAddress = null }) {
+  const genericResponse = {
+    message: 'If an account exists with that email, a password reset link has been sent.'
+  };
+
+  const trimmed = email ? String(email).trim().toLowerCase() : '';
+  if (!trimmed) {
+    return genericResponse;
+  }
+
+  // Lookup user by email (case-insensitive)
+  const user = await queryOne(
+    'SELECT id, name, email, status FROM users WHERE LOWER(email) = LOWER(?)',
+    [trimmed]
+  );
+
+  if (!user || user.status !== 'Active') {
+    // Timing defense: simulate SHA-256 token generation and hashing work
+    crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex');
+    return genericResponse;
+  }
+
+  // Invalidate any existing unused reset tokens for this user
+  await execute(
+    'UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL',
+    [user.id]
+  );
+
+  // Generate cryptographically secure random token (32 bytes = 64 hex characters)
+  const token = crypto.randomBytes(32).toString('hex');
+  // Store only the SHA-256 hash in database
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const tokenId = 'PRT-' + crypto.randomBytes(8).toString('hex').toUpperCase();
+
+  // Enforce 15-minute expiration
+  const expiresAtDate = new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = expiresAtDate.toISOString().replace('T', ' ').substring(0, 19);
+
+  await execute(
+    `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [tokenId, user.id, tokenHash, expiresAt]
+  );
+
+  // Deliver reset email through Gmail SMTP via Nodemailer
+  try {
+    await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      token
+    });
+  } catch (emailErr) {
+    console.error('[AUTH SERVICE] Failed to send password reset email:', emailErr.message);
+  }
+
+  await logAuditEvent({
+    userId: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    resourceType: 'user',
+    resourceId: user.id,
+    ipAddress
+  });
+
+  return genericResponse;
+}
+
+function parseTokenExpiry(val) {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  const str = String(val).trim();
+  if (str.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(str)) {
+    return new Date(str).getTime();
+  }
+  return new Date(str.replace(' ', 'T') + 'Z').getTime();
+}
+
+/**
+ * Verify whether a raw password reset token is valid, unused, and not expired
+ */
+export async function verifyResetToken(rawToken) {
+  if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length !== 64) {
+    return {
+      valid: false,
+      message: 'This password reset link is invalid or expired.'
+    };
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+  const record = await queryOne(
+    'SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?',
+    [tokenHash]
+  );
+
+  if (!record || record.used_at) {
+    return {
+      valid: false,
+      message: 'This password reset link is invalid or expired.'
+    };
+  }
+
+  const expiryTime = parseTokenExpiry(record.expires_at);
+  if (isNaN(expiryTime) || expiryTime <= Date.now()) {
+    return {
+      valid: false,
+      message: 'This password reset link is invalid or expired.'
+    };
+  }
+
+  return {
+    valid: true
+  };
+}
+
+/**
+ * Reset user password with single-use verified token and atomic transaction
+ */
+export async function resetPasswordWithToken({ rawToken, newPassword, ipAddress = null }) {
+  if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length !== 64) {
+    const err = new Error('This password reset link is invalid or expired.');
+    err.statusCode = 400;
+    err.code = 'INVALID_RESET_TOKEN';
+    throw err;
+  }
+
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    const err = new Error('Password must be at least 8 characters long.');
+    err.statusCode = 400;
+    err.code = 'INVALID_PASSWORD';
+    throw err;
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+  const record = await queryOne(
+    'SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?',
+    [tokenHash]
+  );
+
+  if (!record || record.used_at) {
+    const err = new Error('This password reset link is invalid or expired.');
+    err.statusCode = 400;
+    err.code = 'INVALID_RESET_TOKEN';
+    throw err;
+  }
+
+  const expiryTime = parseTokenExpiry(record.expires_at);
+  if (isNaN(expiryTime) || expiryTime <= Date.now()) {
+    const err = new Error('This password reset link is invalid or expired.');
+    err.statusCode = 400;
+    err.code = 'EXPIRED_RESET_TOKEN';
+    throw err;
+  }
+
+  const user = await queryOne('SELECT id, status FROM users WHERE id = ?', [record.user_id]);
+  if (!user || user.status !== 'Active') {
+    const err = new Error('Account not found or inactive.');
+    err.statusCode = 404;
+    err.code = 'USER_NOT_FOUND';
+    throw err;
+  }
+
+  // Hash the new password using the existing bcrypt setup
+  const newHash = hashPassword(newPassword);
+
+  // Atomically update user password and mark the reset token as used
+  await withTransaction(async (tx) => {
+    await tx.execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+    await tx.execute('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?', [record.id]);
+  });
+
+  await logAuditEvent({
+    userId: user.id,
+    action: 'PASSWORD_RESET_COMPLETED',
+    resourceType: 'user',
+    resourceId: user.id,
+    ipAddress
+  });
+
+  return {
+    success: true,
+    message: 'Your password has been reset successfully.'
   };
 }
 

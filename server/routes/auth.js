@@ -4,13 +4,18 @@ import {
   registerAdmin, 
   authenticateUser, 
   generateToken,
-  changePassword
+  changePassword,
+  requestPasswordReset,
+  verifyResetToken,
+  resetPasswordWithToken
 } from '../services/authService.js';
 import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { 
   validateRegisterInput, 
   validateLoginInput,
-  validateChangePasswordInput
+  validateChangePasswordInput,
+  validateForgotPasswordInput,
+  validateResetPasswordInput
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AUTH_COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from '../config/security.js';
@@ -178,6 +183,72 @@ router.post('/change-password', requireAuth, validateChangePasswordInput, async 
       userId: req.user.id,
       currentPassword: req.body.currentPassword,
       newPassword: req.body.newPassword,
+      ipAddress
+    });
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/forgot-password (Request secure password reset token via Gmail SMTP)
+router.post('/forgot-password', authRateLimiter, validateForgotPasswordInput, async (req, res, next) => {
+  try {
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+    const result = await requestPasswordReset({
+      email: req.body.email,
+      ipAddress
+    });
+    // Strict enumeration protection: generic message returned in all cases
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/auth/verify-reset-token (Verify validity and expiry of raw reset token)
+router.get('/verify-reset-token', authRateLimiter, async (req, res, next) => {
+  try {
+    const token = req.query.token;
+    if (!token || typeof token !== 'string') {
+      return res.json({
+        success: false,
+        valid: false,
+        message: 'This password reset link is invalid or expired.'
+      });
+    }
+
+    const verification = await verifyResetToken(token);
+    if (!verification.valid) {
+      return res.json({
+        success: false,
+        valid: false,
+        message: verification.message || 'This password reset link is invalid or expired.'
+      });
+    }
+
+    res.json({
+      success: true,
+      valid: true
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/reset-password (Atomically reset password and invalidate token)
+router.post('/reset-password', authRateLimiter, validateResetPasswordInput, async (req, res, next) => {
+  try {
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+    const result = await resetPasswordWithToken({
+      rawToken: req.body.token,
+      newPassword: req.body.password,
       ipAddress
     });
     res.json({
