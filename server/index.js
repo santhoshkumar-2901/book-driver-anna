@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ENV } from './config/env.js';
 import { ALLOWED_ORIGINS } from './config/security.js';
-import { isTiDB, queryOne, queryAll } from './db/database.js';
+import { isTiDB, queryOne, queryAll, ensureProductionAdmins } from './db/database.js';
 import { seedDatabase } from './db/seed.js';
 import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -98,6 +98,7 @@ app.get(['/api/health', '/health'], async (req, res) => {
   let dbError = null;
   let driverCount = 0;
   let userCount = 0;
+  let adminCount = 0;
   let hasResetTokensTable = false;
 
   try {
@@ -109,6 +110,13 @@ app.get(['/api/health', '/health'], async (req, res) => {
       driverCount = drivers[0]?.count ?? 0;
     } catch (e) {
       driverCount = `error: ${e.message}`;
+    }
+
+    try {
+      const admins = await queryAll("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+      adminCount = admins[0]?.count ?? 0;
+    } catch (e) {
+      adminCount = `error: ${e.message}`;
     }
 
     try {
@@ -140,6 +148,7 @@ app.get(['/api/health', '/health'], async (req, res) => {
       status: dbStatus,
       error: dbError,
       userCount,
+      adminCount,
       driverCount,
       hasResetTokensTable
     },
@@ -186,7 +195,9 @@ if (fs.existsSync(distDir)) {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize DB seed
+// Initialize DB seed & ensure production admin accounts in all environments
+ensureProductionAdmins().catch((err) => console.error('[ADMIN ENSURE ERROR]', err.message));
+
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_SEED !== 'true') {
   console.log('[SEED] Skipping database seed in production (set ALLOW_DB_SEED=true to override)');
 } else {

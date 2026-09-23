@@ -120,4 +120,35 @@ describe('Production Admin Authentication & Serverless Routing Suite', () => {
     assert.strictEqual(typeof handler, 'function', 'handler must be an exported function');
   });
 
+  test('8. ensureProductionAdmins ensures standard admin accounts (bookdriveranna@gmail.com) can log in', async () => {
+    const adminEmail = process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'adminpassword@bda';
+
+    const res = await fetch(`${baseUrl}/api/auth/admin-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: adminEmail,
+        password: adminPassword
+      })
+    });
+
+    assert.strictEqual(res.status, 200, 'Standard production admin should log in with HTTP 200');
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.data?.user?.email, adminEmail.toLowerCase());
+    assert.strictEqual(data.data?.user?.role, 'admin');
+    assert.ok(data.data?.token);
+  });
+
+  test('9. Healthcheck endpoint reports adminCount correctly in database metrics', async () => {
+    const res = await fetch(`${baseUrl}/api/health`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.status, 'healthy');
+    assert.ok(typeof data.database?.adminCount === 'number' || typeof data.database?.adminCount === 'string');
+    assert.ok(Number(data.database?.adminCount) >= 1, 'adminCount must be at least 1');
+  });
+
 });
+

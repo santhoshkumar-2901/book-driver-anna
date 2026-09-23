@@ -83,41 +83,6 @@ if (isTiDB) {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
   } catch (e) {}
 
-  // Auto-provision standard production administrator accounts
-  try {
-    const adminsToProvision = [
-      {
-        id: 'ADM-PROD-PRIMARY',
-        name: 'Book Driver Anna Administrator',
-        email: (process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com').trim().toLowerCase(),
-        password: process.env.ADMIN_PASSWORD || 'adminpassword@bda',
-        phone: (process.env.ADMIN_PHONE || '+91 78991 20704').trim(),
-        area: 'Bengaluru HQ'
-      },
-      {
-        id: 'ADM-PROD-ROOT',
-        name: 'System Operations Admin',
-        email: 'admin@bookdriveranna.com',
-        password: process.env.ADMIN_PASSWORD || 'Admin@Anna2026!',
-        phone: '+91 98765 00000',
-        area: 'Bengaluru HQ'
-      }
-    ];
-
-    for (const adm of adminsToProvision) {
-      const hash = bcrypt.hashSync(adm.password, 10);
-      try {
-        sqliteDb.prepare(`
-          INSERT OR IGNORE INTO users (id, name, email, phone, password_hash, role, area, status)
-          VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
-        `).run(adm.id, adm.name, adm.email, adm.phone, hash, adm.area);
-        console.log(`[DATABASE] Production administrator ensured: ${adm.email}`);
-      } catch (err) {}
-    }
-  } catch (e) {
-    console.warn('[DATABASE] Admin auto-provision note:', e.message);
-  }
-
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
 
@@ -275,3 +240,103 @@ export const db = {
     };
   }
 };
+
+let adminProvisionPromise = null;
+
+/**
+ * Universal Production Administrator Provisioning & Sync
+ * Works seamlessly across both SQLite (local / ephemeral) and TiDB Cloud (production).
+ * Auto-heals missing admin users, role mismatches, and synchronizes password hashes.
+ */
+export async function ensureProductionAdmins(force = false) {
+  if (adminProvisionPromise && !force) {
+    return adminProvisionPromise;
+  }
+
+  adminProvisionPromise = (async () => {
+    // If TiDB Cloud, ensure users and essential tables exist first
+    if (isTiDB && tidbConn) {
+      try {
+        await tidbConn.execute(`
+          CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(64) NOT NULL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            phone VARCHAR(64) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(32) NOT NULL DEFAULT 'customer',
+            area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+            status VARCHAR(32) NOT NULL DEFAULT 'Active',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+      } catch (err) {
+        console.warn('[DATABASE] TiDB users table ensure notice:', err.message);
+      }
+    }
+
+    const adminsToProvision = [
+      {
+        id: 'ADM-PROD-PRIMARY',
+        name: 'Book Driver Anna Administrator',
+        email: (process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com').trim().toLowerCase(),
+        password: process.env.ADMIN_PASSWORD || 'adminpassword@bda',
+        phone: (process.env.ADMIN_PHONE || '+91 78991 20704').trim(),
+        area: 'Bengaluru HQ'
+      },
+      {
+        id: 'ADM-PROD-ROOT',
+        name: 'System Operations Admin',
+        email: 'admin@bookdriveranna.com',
+        password: process.env.ADMIN_PASSWORD || 'Admin@Anna2026!',
+        phone: '+91 98765 00000',
+        area: 'Bengaluru HQ'
+      }
+    ];
+
+    for (const adm of adminsToProvision) {
+      try {
+        const existing = await queryOne(
+          'SELECT id, name, email, phone, password_hash, role, status FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
+          [adm.email, adm.phone]
+        );
+
+        const targetHash = bcrypt.hashSync(adm.password, 10);
+
+        if (!existing) {
+          await execute(`
+            INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+            VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
+          `, [adm.id, adm.name, adm.email, adm.phone, targetHash, adm.area]);
+          console.log(`[DATABASE] Production administrator ensured (created): ${adm.email}`);
+        } else {
+          const isPasswordValid = bcrypt.compareSync(adm.password, existing.password_hash || '');
+          const isRoleAdmin = (existing.role || '').toLowerCase() === 'admin';
+          const isActive = existing.status === 'Active';
+          const isEmailMatch = (existing.email || '').toLowerCase() === adm.email.toLowerCase();
+
+          if (!isPasswordValid || !isRoleAdmin || !isActive || !isEmailMatch) {
+            await execute(
+              'UPDATE users SET name = ?, email = ?, password_hash = ?, role = ?, status = ?, area = ? WHERE id = ?',
+              [adm.name, adm.email, targetHash, 'admin', 'Active', adm.area, existing.id]
+            );
+            console.log(`[DATABASE] Production administrator synchronized: ${adm.email}`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[DATABASE] Admin provisioning note for ${adm.email}:`, err.message);
+      }
+    }
+  })().catch((err) => {
+    adminProvisionPromise = null;
+    throw err;
+  });
+
+  return adminProvisionPromise;
+}
+
+// Trigger unified admin provisioning on startup for both SQLite and TiDB Cloud
+ensureProductionAdmins().catch((err) => {
+  console.warn('[DATABASE] Initial admin ensure notice:', err.message);
+});
+

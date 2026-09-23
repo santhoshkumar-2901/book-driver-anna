@@ -19,7 +19,7 @@ import {
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AUTH_COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from '../config/security.js';
-import { queryOne, queryAll } from '../db/database.js';
+import { ensureProductionAdmins, queryOne, queryAll } from '../db/database.js';
 
 const router = Router();
 
@@ -91,6 +91,7 @@ router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, re
 // POST /api/auth/admin-login (Dedicated Admin portal authentication)
 router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
+    await ensureProductionAdmins();
     const ipAddress = req.ip || req.connection.remoteAddress;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
@@ -136,6 +137,7 @@ router.post('/admin-register', authRateLimiter, validateRegisterInput, async (re
 // POST /api/auth/admin-session (Restore / maintain admin session token)
 router.post('/admin-session', async (req, res, next) => {
   try {
+    await ensureProductionAdmins();
     const { email, phone } = req.body || {};
     let admin = null;
     if (email) {
