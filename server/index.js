@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ENV } from './config/env.js';
 import { ALLOWED_ORIGINS } from './config/security.js';
+import { isTiDB, queryOne, queryAll } from './db/database.js';
 import { seedDatabase } from './db/seed.js';
 import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -92,12 +93,61 @@ app.use(cookieParser());
 app.use('/api', generalRateLimiter);
 
 // 5. Healthcheck Endpoint
-app.get(['/api/health', '/health'], (req, res) => {
+app.get(['/api/health', '/health'], async (req, res) => {
+  let dbStatus = 'ok';
+  let dbError = null;
+  let driverCount = 0;
+  let userCount = 0;
+  let hasResetTokensTable = false;
+
+  try {
+    const testRow = await queryOne('SELECT 1 as test');
+    dbStatus = testRow ? 'connected' : 'null_result';
+
+    try {
+      const drivers = await queryAll('SELECT COUNT(*) as count FROM drivers');
+      driverCount = drivers[0]?.count ?? 0;
+    } catch (e) {
+      driverCount = `error: ${e.message}`;
+    }
+
+    try {
+      const users = await queryAll('SELECT COUNT(*) as count FROM users');
+      userCount = users[0]?.count ?? 0;
+    } catch (e) {
+      userCount = `error: ${e.message}`;
+    }
+
+    try {
+      await queryOne('SELECT COUNT(*) as count FROM password_reset_tokens');
+      hasResetTokensTable = true;
+    } catch (e) {
+      hasResetTokensTable = false;
+      dbError = e.message;
+    }
+  } catch (err) {
+    dbStatus = 'error';
+    dbError = err.message;
+  }
+
   res.json({
-    status: 'healthy',
+    status: dbStatus === 'connected' ? 'healthy' : 'degraded',
     service: 'Book Driver Anna Production API',
     time: new Date().toISOString(),
-    environment: ENV.NODE_ENV
+    environment: ENV.NODE_ENV,
+    database: {
+      driver: isTiDB ? 'tidb' : 'sqlite',
+      status: dbStatus,
+      error: dbError,
+      userCount,
+      driverCount,
+      hasResetTokensTable
+    },
+    emailConfig: {
+      hasGmailUser: Boolean(ENV.GMAIL_USER),
+      hasGmailPassword: Boolean(ENV.GMAIL_APP_PASSWORD),
+      appUrl: ENV.APP_URL
+    }
   });
 });
 

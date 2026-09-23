@@ -19,6 +19,21 @@ if (isTiDB) {
   try {
     tidbConn = connect({ url: ENV.DATABASE_URL.trim() });
     console.log('[DATABASE] Initialized TiDB Cloud connection (Serverless HTTP Driver)');
+    // Auto-create password_reset_tokens table if not exists in TiDB
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_prt_user (user_id),
+        INDEX idx_prt_hash (token_hash)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB table auto-init note:', err.message);
+    });
   } catch (err) {
     console.error('[DATABASE] Failed to initialize TiDB Cloud connection:', err.message);
     throw err;
