@@ -332,7 +332,10 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
       details: { identifier: trimmed },
       ipAddress
     });
-    const err = new Error('Invalid email or password.');
+    const message = requiredRole === 'driver'
+      ? 'Invalid mobile number, DL number, or password.'
+      : 'Invalid email or password.';
+    const err = new Error(message);
     err.statusCode = 401;
     err.code = 'INVALID_CREDENTIALS';
     throw err;

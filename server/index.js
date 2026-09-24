@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ENV } from './config/env.js';
 import { ALLOWED_ORIGINS } from './config/security.js';
-import { isTiDB, queryOne, queryAll, ensureProductionAdmins } from './db/database.js';
+import { isTiDB, queryOne, queryAll, ensureProductionAdmins, ensureProductionDrivers } from './db/database.js';
 import { seedDatabase } from './db/seed.js';
 import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
