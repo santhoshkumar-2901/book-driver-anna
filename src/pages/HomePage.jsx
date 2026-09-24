@@ -3,7 +3,7 @@ import {
   Car, ShieldCheck, MapPin, Clock, 
   ArrowRight, Compass, Phone, GraduationCap 
 } from 'lucide-react';
-import { SteeringWheel } from '../components/Icons';
+import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
 import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE } from '../data/mockData';
 
@@ -331,6 +331,16 @@ export default function HomePage({
               <SteeringWheel className="w-4 h-4" />
               <span>Book a Driver</span>
             </button>
+            <a
+              href={`https://wa.me/${SUPPORT_HELPLINE.replace(/[^0-9]/g, '')}?text=${encodeURIComponent("Hello Book Driver Anna, I need assistance booking a driver or fleet vehicle.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Chat on WhatsApp"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm cursor-pointer"
+            >
+              <WhatsAppIcon className="w-4 h-4 fill-white" />
+              <span>WhatsApp</span>
+            </a>
             <a
               href={`tel:${SUPPORT_HELPLINE.replace(/\s+/g, '')}`}
               className="btn-secondary"
