@@ -20,7 +20,10 @@ export default function RidePaymentModal({
   if (!isOpen || !rideData) return null;
 
   // Defaults
-  const driverName = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna || "Driver Assigned";
+  const rawDriver = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna;
+  const driverName = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending'))
+    ? rawDriver
+    : "Driver Anna";
   const driverPhone = rideData.driverPhone || SUPPORT_HELPLINE;
   const driverRating = rideData.driverRating || 5.0;
   const driverTrips = rideData.driverTrips || 0;

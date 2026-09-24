@@ -14,7 +14,10 @@ export default function ActiveRideBanner({
     return null;
   }
 
-  const driverName = activeRide.driverName || activeRide.assignedDriver || activeRide.assignedAnna || "Driver Assigned";
+  const rawDriver = activeRide.driverName || activeRide.assignedDriver || activeRide.assignedAnna;
+  const driverName = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending'))
+    ? rawDriver
+    : "Driver Assigned on Dispatch";
   const carModel = activeRide.carModel || activeRide.vehicleName || "Assigned Vehicle";
   const destination = activeRide.dropLocation || activeRide.destination || "Destination";
   const fare = activeRide.totalFare || activeRide.fare || 0;

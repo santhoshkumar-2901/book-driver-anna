@@ -87,11 +87,13 @@ export default function UserProfileModal({
 
   const handleOpenPayment = (b) => {
     const numericFare = Number(String(b.amount || '0').replace(/[^0-9]/g, '')) || 366;
+    const rawDriver = b.assignedDriver || b.driverName;
+    const cleanDriver = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending')) ? rawDriver : "Assigned Driver";
     setPaymentRideData({
       ...b,
       id: b.id,
       bookingId: b.id,
-      driverName: b.assignedDriver || "Assigned Driver",
+      driverName: cleanDriver,
       driverPhone: b.assignedPhone || SUPPORT_HELPLINE,
       driverUpi: b.assignedDriverUpi || b.driverUpi,
       assignedDriverUpi: b.assignedDriverUpi || b.driverUpi,
@@ -236,7 +238,10 @@ export default function UserProfileModal({
             else if (rawStatus.includes('CANCEL')) displayStatus = 'Cancelled';
             else displayStatus = b.status || 'Pending';
 
-            const assignedName = b.assignedDriver || (displayStatus.includes('Confirmed') ? 'Driver Assigned' : null);
+            const rawAssigned = b.assignedDriver;
+            const assignedName = (rawAssigned && rawAssigned !== 'Pending Admin Acceptance' && !rawAssigned.toLowerCase().includes('pending'))
+              ? rawAssigned
+              : (displayStatus.includes('Confirmed') ? 'Driver Assigned' : null);
             const assignedPhone = b.assignedDriverPhone || null;
 
             const existing = matched.find(m => m.id === b.id);
@@ -800,7 +805,7 @@ export default function UserProfileModal({
                         </div>
 
                         {/* If Driver is Assigned, show driver assignment card with Call & Pay options */}
-                        {b.assignedDriver && !isCancelled && !isPending && (
+                        {b.assignedDriver && b.assignedDriver !== 'Pending Admin Acceptance' && !b.assignedDriver.toLowerCase().includes('pending') && !isCancelled && !isPending && (
                           <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 gap-2 flex-wrap sm:flex-nowrap">
                             <span className="flex items-center gap-1.5 font-medium min-w-0">
                               <SteeringWheel className="w-3.5 h-3.5 text-emerald-400 shrink-0" />

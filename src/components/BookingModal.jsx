@@ -236,9 +236,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       paymentMode,
       totalFare: fareInfo.total,
       rawPayload: payloadForApi,
-      assignedAnna: bookingCategory === 'class'
-        ? "Syed Nizamuddin (Certified Driving Instructor Anna)"
-        : (bookingCategory === 'vehicle' ? "Manjunath Gowda (Assigned Vehicle Captain)" : "Manjunath Gowda (Assigned Driver)")
+      assignedAnna: null
     };
 
     // If client is not logged in, do NOT create server booking yet. Intercept and prompt login/signup!

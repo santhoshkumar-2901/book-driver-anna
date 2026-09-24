@@ -744,7 +744,7 @@ export default function App() {
         time: bookingDetails.bookingTime || '09:00 AM',
         fare: bookingDetails.totalFare || 349,
         status: 'Pending',
-        assignedDriver: 'Pending Admin Acceptance',
+        assignedDriver: null,
         bookedAt: 'Just Now'
       };
 
@@ -757,7 +757,7 @@ export default function App() {
     // Set active ride for real-time tracking and post-ride fare settlement
     setActiveRide({
       id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
-      driverName: 'Pending Admin Acceptance',
+      driverName: null,
       driverPhone: SUPPORT_HELPLINE,
       driverRating: 5.0,
       carModel: bookingDetails.vehicleCategory || (bookingDetails.bookingType === 'class' ? "Anna's Dual-Control Car" : 'Customer Vehicle'),

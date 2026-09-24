@@ -135,7 +135,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
               location: b.pickupArea || b.address || 'Bengaluru',
               status: displayStatus,
               fare: b.fare || b.totalPrice || b.courseFee,
-              assignedDriver: b.assignedDriver || null,
+              assignedDriver: (b.assignedDriver && b.assignedDriver !== 'Pending Admin Acceptance' && !b.assignedDriver.toLowerCase().includes('pending')) ? b.assignedDriver : null,
               assignedPhone: b.assignedDriverPhone || null
             });
           }
@@ -477,7 +477,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                       <MapPin className="w-3.5 h-3.5 text-slate-500" />
                       <span className="truncate">{item.location}</span>
                     </div>
-                    {item.assignedDriver && (
+                    {item.assignedDriver && item.assignedDriver !== 'Pending Admin Acceptance' && !item.assignedDriver.toLowerCase().includes('pending') && (
                       <div className="col-span-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-emerald-400 font-medium">
                         <span>Assigned: <strong className="text-white font-bold">{item.assignedDriver}</strong></span>
                         {item.assignedPhone && <span className="font-mono text-emerald-300">{item.assignedPhone}</span>}
