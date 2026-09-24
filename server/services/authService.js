@@ -161,32 +161,42 @@ export async function registerDriver({
 
   if (existingUser) {
     userId = existingUser.id;
+
+    // Check if another driver profile already has this cleanDl
+    const conflictingDriver = await queryOne(
+      'SELECT id, user_id FROM drivers WHERE LOWER(license_number) = LOWER(?) AND user_id != ?',
+      [cleanDl, userId]
+    );
+    if (conflictingDriver) {
+      const err = new Error('This Driving License (DL) number is already registered to another driver partner. Please check your DL number or log in.');
+      err.statusCode = 409;
+      err.code = 'USER_ALREADY_EXISTS';
+      throw err;
+    }
+
     // Upgrade existing user account to driver and update their credentials
     await execute(`
       UPDATE users SET name = ?, password_hash = ?, role = 'driver', area = ?, status = 'Active'
       WHERE id = ?
     `, [name.trim(), passwordHash, area, userId]);
 
-    // Check if driver profile already exists for this user or DL
-    const existingDriver = await queryOne(
-      'SELECT id FROM drivers WHERE user_id = ? OR LOWER(license_number) = LOWER(?)',
-      [userId, cleanDl]
-    );
+    // Check if driver profile already exists for this user
+    const existingDriver = await queryOne('SELECT id FROM drivers WHERE user_id = ?', [userId]);
 
     if (existingDriver) {
       driverId = existingDriver.id;
       try {
         await execute(`
           UPDATE drivers 
-          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active', user_id = ?
+          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active'
           WHERE id = ?
-        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', userId, driverId]);
+        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', driverId]);
       } catch (e) {
         await execute(`
           UPDATE drivers 
-          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active', user_id = ?
+          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active'
           WHERE id = ?
-        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, userId, driverId]);
+        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, driverId]);
       }
     } else {
       driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -222,14 +232,21 @@ export async function registerDriver({
       }
     }
   } else {
-    // Brand new driver registration
+    // Brand new driver registration - check if DL already exists
     const existingDl = await queryOne(
       'SELECT id, user_id FROM drivers WHERE LOWER(license_number) = LOWER(?)',
       [cleanDl]
     );
 
+    if (existingDl) {
+      const err = new Error('This Driving License (DL) number is already registered. Please check your DL number or log in.');
+      err.statusCode = 409;
+      err.code = 'USER_ALREADY_EXISTS';
+      throw err;
+    }
+
     userId = 'USR-DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    driverId = existingDl ? existingDl.id : ('DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase());
+    driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 
     // Insert into users
     await execute(`
@@ -237,51 +254,35 @@ export async function registerDriver({
       VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
     `, [userId, name.trim(), email, formattedPhone, passwordHash, area]);
 
-    if (existingDl) {
-      try {
-        await execute(`
-          UPDATE drivers 
-          SET user_id = ?, name = ?, phone = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active'
-          WHERE id = ?
-        `, [userId, name.trim(), formattedPhone, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', driverId]);
-      } catch (e) {
-        await execute(`
-          UPDATE drivers 
-          SET user_id = ?, name = ?, phone = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active'
-          WHERE id = ?
-        `, [userId, name.trim(), formattedPhone, area, experienceYears, vehicleType, driverId]);
-      }
-    } else {
-      try {
-        await execute(`
-          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
-        `, [
-          driverId,
-          userId,
-          name.trim(),
-          formattedPhone,
-          cleanDl,
-          area,
-          experienceYears,
-          vehicleType,
-          upiId.trim() || 'anna.driver@oksbi'
-        ]);
-      } catch (e) {
-        await execute(`
-          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
-        `, [
-          driverId,
-          userId,
-          name.trim(),
-          formattedPhone,
-          cleanDl,
-          area,
-          experienceYears,
-          vehicleType
-        ]);
-      }
+    try {
+      await execute(`
+        INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
+      `, [
+        driverId,
+        userId,
+        name.trim(),
+        formattedPhone,
+        cleanDl,
+        area,
+        experienceYears,
+        vehicleType,
+        upiId.trim() || 'anna.driver@oksbi'
+      ]);
+    } catch (e) {
+      await execute(`
+        INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
+      `, [
+        driverId,
+        userId,
+        name.trim(),
+        formattedPhone,
+        cleanDl,
+        area,
+        experienceYears,
+        vehicleType
+      ]);
     }
   }
 

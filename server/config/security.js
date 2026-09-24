@@ -22,7 +22,7 @@ export const CLEAR_COOKIE_OPTIONS = {
 export const RATE_LIMITS = {
   AUTH: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 attempts
+    max: ENV.IS_PRODUCTION ? 60 : 300, // 60 in production, 300 in development
     message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many login or registration attempts. Please try again in 15 minutes.' } }
   },
   BOOKINGS: {

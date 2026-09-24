@@ -27,7 +27,7 @@ const router = Router();
 // POST /api/auth/register
 router.post('/register', authRateLimiter, validateRegisterInput, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await registerCustomer({
       name: req.body.name,
       email: req.body.email,
@@ -50,7 +50,7 @@ router.post('/register', authRateLimiter, validateRegisterInput, async (req, res
 // POST /api/auth/login (Customer login)
 router.post('/login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
@@ -71,8 +71,8 @@ router.post('/login', authRateLimiter, validateLoginInput, async (req, res, next
 // POST /api/auth/driver-login (Dedicated Driver portal authentication)
 router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
-    await ensureProductionDrivers();
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    await ensureProductionDrivers().catch(err => console.warn('[DATABASE] ensureProductionDrivers notice:', err.message));
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
@@ -93,9 +93,9 @@ router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, re
 // POST /api/auth/driver-register (Driver onboarding & verification)
 router.post('/driver-register', authRateLimiter, async (req, res, next) => {
   try {
-    await ensureProductionDrivers();
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const { name, phone, dlNumber, password, upiId, area, vehicleType, experienceYears } = req.body;
+    await ensureProductionDrivers().catch(err => console.warn('[DATABASE] ensureProductionDrivers notice:', err.message));
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
+    const { name, phone, dlNumber, password, upiId, area, vehicleType, experienceYears } = req.body || {};
 
     if (!name || !phone || !dlNumber || !password) {
       return res.status(400).json({
@@ -136,8 +136,8 @@ router.post('/driver-register', authRateLimiter, async (req, res, next) => {
 // POST /api/auth/admin-login (Dedicated Admin portal authentication)
 router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
-    await ensureProductionAdmins();
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    await ensureProductionAdmins().catch(err => console.warn('[DATABASE] ensureProductionAdmins notice:', err.message));
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
       password: req.body.password,
@@ -158,7 +158,7 @@ router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res
 // POST /api/auth/admin-register (Dedicated Admin onboarding with secret key)
 router.post('/admin-register', authRateLimiter, validateRegisterInput, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await registerAdmin({
       name: req.body.name,
       email: req.body.email,
@@ -225,7 +225,7 @@ router.post('/admin-session', async (req, res, next) => {
 // POST /api/auth/change-password (Authenticated password update)
 router.post('/change-password', requireAuth, validateChangePasswordInput, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const result = await changePassword({
       userId: req.user.id,
       currentPassword: req.body.currentPassword,

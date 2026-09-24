@@ -11,7 +11,7 @@ const router = Router();
 // POST /api/bookings (Create a booking)
 router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const idempotencyKey = req.headers['idempotency-key'] || req.body.idempotencyKey || null;
 
     const result = await createBooking({
@@ -113,7 +113,7 @@ router.post('/lookup', async (req, res, next) => {
 // POST /api/bookings/:id/cancel
 router.post('/:id/cancel', optionalAuth, async (req, res, next) => {
   try {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { phone, reason } = req.body;
 
     const result = await cancelBooking({
