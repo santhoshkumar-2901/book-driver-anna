@@ -585,7 +585,8 @@ export default function App() {
           totalFare: numericFare,
           settlementMethod: detail.settlementMethod || 'online',
           isPaid: false,
-          status: 'Fare Settlement'
+          status: 'Fare Settlement',
+          initialStep: 'payment'
         });
         setIsPaymentModalOpen(true);
 
@@ -597,6 +598,8 @@ export default function App() {
             ...current,
             driverName: detail.assignedDriver || current.driverName,
             driverPhone: detail.assignedDriverPhone || current.driverPhone,
+            driverUpi: detail.assignedDriverUpi || detail.driverUpi || current.driverUpi,
+            assignedDriverUpi: detail.assignedDriverUpi || detail.driverUpi || current.assignedDriverUpi,
             status: 'Fare Settlement'
           };
         });
@@ -610,6 +613,8 @@ export default function App() {
             ...current,
             driverName: detail.assignedDriver || current.driverName,
             driverPhone: detail.assignedDriverPhone || current.driverPhone,
+            driverUpi: detail.assignedDriverUpi || detail.driverUpi || current.driverUpi,
+            assignedDriverUpi: detail.assignedDriverUpi || detail.driverUpi || current.assignedDriverUpi,
             status: detail.status || current.status
           };
         });
@@ -1018,7 +1023,8 @@ export default function App() {
             dropLocation: booking.dropLocation || "Drop Location",
             distance: booking.distance || "City Route",
             duration: booking.duration || "Scheduled Trip",
-            totalFare: booking.totalFare || booking.fare || 499
+            totalFare: booking.totalFare || booking.fare || 499,
+            initialStep: 'payment'
           };
           setPaymentRideData(rideForPayment);
           setIsPaymentModalOpen(true);
@@ -1045,7 +1051,10 @@ export default function App() {
       <ActiveRideBanner 
         activeRide={activeRide}
         onOpenPayment={() => {
-          setPaymentRideData(activeRide);
+          setPaymentRideData({
+            ...activeRide,
+            initialStep: 'payment'
+          });
           setIsPaymentModalOpen(true);
         }}
       />

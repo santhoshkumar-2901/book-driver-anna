@@ -13,7 +13,8 @@ export default function RidePaymentModal({
   isOpen, 
   rideData, 
   onClose, 
-  onPaymentSuccess 
+  onPaymentSuccess,
+  initialStep
 }) {
   useScrollLock(isOpen);
 
@@ -64,7 +65,9 @@ export default function RidePaymentModal({
   })();
 
   // States
-  const [currentStep, setCurrentStep] = useState('settlement'); // 'settlement' | 'payment'
+  const [currentStep, setCurrentStep] = useState(
+    (rideData?.initialStep === 'payment' || initialStep === 'payment') ? 'payment' : 'settlement'
+  ); // useState('settlement')
   const [selectedTip, setSelectedTip] = useState(0); // 0, 20, 50, 100, or custom
   const [customTip, setCustomTip] = useState('');
   const [isCustomTip, setIsCustomTip] = useState(false);
@@ -106,13 +109,17 @@ export default function RidePaymentModal({
           setTransactionId(rideData?.transactionId || `TXN-BDA-${Date.now().toString(36).toUpperCase()}`);
         }
       } else {
-        setCurrentStep('settlement');
+        if (rideData?.initialStep === 'payment' || initialStep === 'payment') {
+          setCurrentStep('payment');
+        } else {
+          setCurrentStep('settlement');
+        }
         setIsPaid(false);
       }
       setIsProcessing(false);
       setUpiRedirectNotice(false);
     }
-  }, [isOpen, rideData?.id, rideData?.bookingId, rideData?.isPaid, rideData?.status, rideData?.settlementMethod]);
+  }, [isOpen, rideData?.id, rideData?.bookingId, rideData?.isPaid, rideData?.status, rideData?.settlementMethod, rideData?.initialStep, initialStep]);
 
   // Support Escape key to close modal
   useEffect(() => {
