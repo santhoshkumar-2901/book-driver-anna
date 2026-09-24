@@ -23,7 +23,6 @@ export function isDummyOrDemoUser(user) {
     'production test',
     'reset test user',
     'dummy user',
-    'sandy',
     'fake user',
     'mock user',
     'test customer',
@@ -40,8 +39,7 @@ export function isDummyOrDemoUser(user) {
     email.includes('reset_test_') ||
     email.includes('test_') ||
     email === 'demo@example.com' ||
-    email === 'prodtest@example.com' ||
-    email === 'sandy@gmail.com'
+    email === 'prodtest@example.com'
   ) {
     return true;
   }

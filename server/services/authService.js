@@ -148,70 +148,141 @@ export async function registerDriver({
     : `+91 ${cleanPhone.slice(-10)}`;
   const cleanDl = (dlNumber || '').trim().toUpperCase();
   const email = `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}.${last10}@driveranna.com`;
-
-  // Check if driver with this phone or DL already exists
-  const existingUser = await queryOne(
-    'SELECT id, email, phone FROM users WHERE phone = ? OR phone LIKE ?',
-    [phone.trim(), `%${last10}`]
-  );
-  if (existingUser) {
-    const err = new Error('This mobile number is already registered. Please log in.');
-    err.statusCode = 409;
-    err.code = 'USER_ALREADY_EXISTS';
-    throw err;
-  }
-
-  const existingDl = await queryOne(
-    'SELECT id FROM drivers WHERE LOWER(license_number) = LOWER(?)',
-    [cleanDl]
-  );
-  if (existingDl) {
-    const err = new Error('This Driving License (DL) number is already registered. Please log in.');
-    err.statusCode = 409;
-    err.code = 'USER_ALREADY_EXISTS';
-    throw err;
-  }
-
-  const userId = 'USR-DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-  const driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
   const passwordHash = hashPassword(password);
 
-  // Insert into users
-  await execute(`
-    INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
-    VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
-  `, [userId, name.trim(), email, formattedPhone, passwordHash, area]);
+  // Check if driver with this phone already exists in users
+  const existingUser = await queryOne(
+    'SELECT id, name, email, phone, role, status FROM users WHERE phone = ? OR phone LIKE ?',
+    [phone.trim(), `%${last10}`]
+  );
 
-  // Insert into drivers
-  try {
+  let userId;
+  let driverId;
+
+  if (existingUser) {
+    userId = existingUser.id;
+    // Upgrade existing user account to driver and update their credentials
     await execute(`
-      INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
-    `, [
-      driverId,
-      userId,
-      name.trim(),
-      formattedPhone,
-      cleanDl,
-      area,
-      experienceYears,
-      vehicleType,
-      upiId.trim() || 'anna.driver@oksbi'
-    ]);
-  } catch (driverInsertErr) {
+      UPDATE users SET name = ?, password_hash = ?, role = 'driver', area = ?, status = 'Active'
+      WHERE id = ?
+    `, [name.trim(), passwordHash, area, userId]);
+
+    // Check if driver profile already exists for this user or DL
+    const existingDriver = await queryOne(
+      'SELECT id FROM drivers WHERE user_id = ? OR LOWER(license_number) = LOWER(?)',
+      [userId, cleanDl]
+    );
+
+    if (existingDriver) {
+      driverId = existingDriver.id;
+      try {
+        await execute(`
+          UPDATE drivers 
+          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active', user_id = ?
+          WHERE id = ?
+        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', userId, driverId]);
+      } catch (e) {
+        await execute(`
+          UPDATE drivers 
+          SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active', user_id = ?
+          WHERE id = ?
+        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, userId, driverId]);
+      }
+    } else {
+      driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      try {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
+        `, [
+          driverId,
+          userId,
+          name.trim(),
+          formattedPhone,
+          cleanDl,
+          area,
+          experienceYears,
+          vehicleType,
+          upiId.trim() || 'anna.driver@oksbi'
+        ]);
+      } catch (e) {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
+        `, [
+          driverId,
+          userId,
+          name.trim(),
+          formattedPhone,
+          cleanDl,
+          area,
+          experienceYears,
+          vehicleType
+        ]);
+      }
+    }
+  } else {
+    // Brand new driver registration
+    const existingDl = await queryOne(
+      'SELECT id, user_id FROM drivers WHERE LOWER(license_number) = LOWER(?)',
+      [cleanDl]
+    );
+
+    userId = 'USR-DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    driverId = existingDl ? existingDl.id : ('DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase());
+
+    // Insert into users
     await execute(`
-      INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
-    `, [
-      driverId,
-      userId,
-      name.trim(),
-      formattedPhone,
-      cleanDl,
-      area,
-      experienceYears,
-      vehicleType
-    ]);
+      INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+      VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
+    `, [userId, name.trim(), email, formattedPhone, passwordHash, area]);
+
+    if (existingDl) {
+      try {
+        await execute(`
+          UPDATE drivers 
+          SET user_id = ?, name = ?, phone = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active'
+          WHERE id = ?
+        `, [userId, name.trim(), formattedPhone, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', driverId]);
+      } catch (e) {
+        await execute(`
+          UPDATE drivers 
+          SET user_id = ?, name = ?, phone = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active'
+          WHERE id = ?
+        `, [userId, name.trim(), formattedPhone, area, experienceYears, vehicleType, driverId]);
+      }
+    } else {
+      try {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
+        `, [
+          driverId,
+          userId,
+          name.trim(),
+          formattedPhone,
+          cleanDl,
+          area,
+          experienceYears,
+          vehicleType,
+          upiId.trim() || 'anna.driver@oksbi'
+        ]);
+      } catch (e) {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
+        `, [
+          driverId,
+          userId,
+          name.trim(),
+          formattedPhone,
+          cleanDl,
+          area,
+          experienceYears,
+          vehicleType
+        ]);
+      }
+    }
   }
 
   const safeDriver = {
@@ -342,19 +413,48 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
   }
 
   // Role validation if required (e.g. admin or driver portal login)
-  const userRole = (user.role || user.ROLE || '').toLowerCase();
+  let userRole = (user.role || user.ROLE || '').toLowerCase();
   if (requiredRole && userRole !== requiredRole.toLowerCase()) {
-    await logAuditEvent({
-      userId: user.id,
-      action: 'LOGIN_ROLE_MISMATCH',
-      resourceType: 'auth',
-      details: { required: requiredRole, actual: user.role },
-      ipAddress
-    });
-    const err = new Error('Access denied: Insufficient privileges for this portal.');
-    err.statusCode = 403;
-    err.code = 'INSUFFICIENT_PRIVILEGES';
-    throw err;
+    if (requiredRole === 'driver' && (userRole === 'customer' || userRole === 'admin')) {
+      // The user successfully authenticated with valid credentials on Driver Login!
+      // Promote account to driver and provision driver record so they can enter the driver portal
+      const driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      await execute('UPDATE users SET role = ? WHERE id = ?', ['driver', user.id]);
+      const defaultDl = `KA-01-2024-${user.id.slice(-7)}`;
+      try {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+          VALUES (?, ?, ?, ?, ?, ?, '3-5 Years', 'Manual & Automatic Cars', 5.0, 0, 'anna.driver@oksbi', 'Active')
+        `, [driverId, user.id, user.name, user.phone, defaultDl, user.area || 'Indiranagar']);
+      } catch (e) {
+        await execute(`
+          INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+          VALUES (?, ?, ?, ?, ?, ?, '3-5 Years', 'Manual & Automatic Cars', 5.0, 0, 'Active')
+        `, [driverId, user.id, user.name, user.phone, defaultDl, user.area || 'Indiranagar']);
+      }
+      userRole = 'driver';
+      user.role = 'driver';
+      user.driver_id = driverId;
+      user.license_number = defaultDl;
+      user.upi_id = 'anna.driver@oksbi';
+      user.rating = 5.0;
+      user.trips_completed = 0;
+      user.hub_area = user.area || 'Indiranagar';
+      user.specialization = 'Manual & Automatic Cars';
+      user.experience_years = '3-5 Years';
+    } else {
+      await logAuditEvent({
+        userId: user.id,
+        action: 'LOGIN_ROLE_MISMATCH',
+        resourceType: 'auth',
+        details: { required: requiredRole, actual: user.role },
+        ipAddress
+      });
+      const err = new Error('Access denied: Insufficient privileges for this portal.');
+      err.statusCode = 403;
+      err.code = 'INSUFFICIENT_PRIVILEGES';
+      throw err;
+    }
   }
 
   await logAuditEvent({
