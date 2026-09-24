@@ -426,6 +426,9 @@ export async function ensureProductionDrivers(force = false) {
       } catch (err) {
         console.warn('[DATABASE] TiDB drivers table ensure notice:', err.message);
       }
+      try {
+        await tidbConn.execute('ALTER TABLE drivers MODIFY COLUMN experience_years VARCHAR(64) DEFAULT "5 Years";').catch(() => {});
+      } catch (e) {}
     } else if (sqliteDb) {
       try {
         sqliteDb.exec("ALTER TABLE drivers ADD COLUMN upi_id TEXT DEFAULT 'anna.driver@oksbi';");

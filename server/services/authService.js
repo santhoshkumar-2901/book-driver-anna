@@ -130,6 +130,18 @@ export async function registerAdmin({ name, email, phone, password, secretKey, a
   return { user, token };
 }
 
+export function normalizeExperienceYears(val) {
+  if (typeof val === 'number' && !isNaN(val)) return Math.max(1, Math.round(val));
+  const s = String(val || '').trim();
+  if (s === '1-2 Years' || s === '1-2') return 2;
+  if (s === '3-5 Years' || s === '3-5') return 4;
+  if (s === '5-10 Years' || s === '5-10') return 7;
+  if (s === '10+ Years' || s === '10+') return 10;
+  const match = s.match(/\d+/);
+  const parsed = match ? parseInt(match[0], 10) : 5;
+  return isNaN(parsed) ? 5 : parsed;
+}
+
 export async function registerDriver({
   name,
   phone,
@@ -138,7 +150,7 @@ export async function registerDriver({
   upiId = 'anna.driver@oksbi',
   area = 'Indiranagar',
   vehicleType = 'Manual & Automatic Cars',
-  experienceYears = '3-5 Years',
+  experienceYears = 5,
   ipAddress = null
 }) {
   const cleanPhone = phone.replace(/[^0-9]/g, '');
@@ -149,6 +161,7 @@ export async function registerDriver({
   const cleanDl = (dlNumber || '').trim().toUpperCase();
   const email = `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}.${last10}@driveranna.com`;
   const passwordHash = hashPassword(password);
+  const expYearsInt = normalizeExperienceYears(experienceYears);
 
   // Check if driver with this phone already exists in users
   const existingUser = await queryOne(
@@ -190,13 +203,13 @@ export async function registerDriver({
           UPDATE drivers 
           SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, upi_id = ?, status = 'Active'
           WHERE id = ?
-        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, upiId.trim() || 'anna.driver@oksbi', driverId]);
+        `, [name.trim(), formattedPhone, cleanDl, area, expYearsInt, vehicleType, upiId.trim() || 'anna.driver@oksbi', driverId]);
       } catch (e) {
         await execute(`
           UPDATE drivers 
           SET name = ?, phone = ?, license_number = ?, hub_area = ?, experience_years = ?, specialization = ?, status = 'Active'
           WHERE id = ?
-        `, [name.trim(), formattedPhone, cleanDl, area, experienceYears, vehicleType, driverId]);
+        `, [name.trim(), formattedPhone, cleanDl, area, expYearsInt, vehicleType, driverId]);
       }
     } else {
       driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -211,7 +224,7 @@ export async function registerDriver({
           formattedPhone,
           cleanDl,
           area,
-          experienceYears,
+          expYearsInt,
           vehicleType,
           upiId.trim() || 'anna.driver@oksbi'
         ]);
@@ -226,7 +239,7 @@ export async function registerDriver({
           formattedPhone,
           cleanDl,
           area,
-          experienceYears,
+          expYearsInt,
           vehicleType
         ]);
       }
@@ -265,7 +278,7 @@ export async function registerDriver({
         formattedPhone,
         cleanDl,
         area,
-        experienceYears,
+        expYearsInt,
         vehicleType,
         upiId.trim() || 'anna.driver@oksbi'
       ]);
@@ -280,7 +293,7 @@ export async function registerDriver({
         formattedPhone,
         cleanDl,
         area,
-        experienceYears,
+        expYearsInt,
         vehicleType
       ]);
     }
@@ -425,12 +438,12 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
       try {
         await execute(`
           INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
-          VALUES (?, ?, ?, ?, ?, ?, '3-5 Years', 'Manual & Automatic Cars', 5.0, 0, 'anna.driver@oksbi', 'Active')
+          VALUES (?, ?, ?, ?, ?, ?, 5, 'Manual & Automatic Cars', 5.0, 0, 'anna.driver@oksbi', 'Active')
         `, [driverId, user.id, user.name, user.phone, defaultDl, user.area || 'Indiranagar']);
       } catch (e) {
         await execute(`
           INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
-          VALUES (?, ?, ?, ?, ?, ?, '3-5 Years', 'Manual & Automatic Cars', 5.0, 0, 'Active')
+          VALUES (?, ?, ?, ?, ?, ?, 5, 'Manual & Automatic Cars', 5.0, 0, 'Active')
         `, [driverId, user.id, user.name, user.phone, defaultDl, user.area || 'Indiranagar']);
       }
       userRole = 'driver';

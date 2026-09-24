@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { logAuditEvent } from '../services/auditService.js';
 import { updateBookingStatus } from '../services/bookingService.js';
+import { normalizeExperienceYears } from '../services/authService.js';
 
 const router = Router();
 
@@ -325,7 +326,7 @@ router.post('/drivers', async (req, res, next) => {
         phone.trim(),
         licenseNumber.trim().toUpperCase(),
         hubArea || 'Indiranagar',
-        experienceYears || 5,
+        normalizeExperienceYears(experienceYears),
         specialization || 'Manual & Automatic Cars'
       ]);
 
