@@ -85,6 +85,16 @@ export default function RidePaymentModal({
       if (alreadyPaid) {
         setIsPaid(true);
         setCurrentStep('receipt');
+        const bId = rideData?.id || rideData?.bookingId;
+        if (bId) {
+          try {
+            const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+            if (!paid.includes(bId)) {
+              paid.push(bId);
+              localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+            }
+          } catch (e) {}
+        }
         if (!transactionId) {
           setTransactionId(rideData?.transactionId || `TXN-BDA-${Date.now().toString(36).toUpperCase()}`);
         }

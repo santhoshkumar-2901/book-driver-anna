@@ -497,6 +497,16 @@ export default function App() {
   useEffect(() => {
     const handleRideCompleted = (e) => {
       if (e && e.detail) {
+        const completedId = e.detail.id || e.detail.bookingId;
+        if (completedId) {
+          try {
+            const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+            if (!paid.includes(completedId)) {
+              paid.push(completedId);
+              localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+            }
+          } catch (err) {}
+        }
         setPaymentRideData({
           ...e.detail,
           isPaid: true,
@@ -530,6 +540,16 @@ export default function App() {
         // If driver initiated fare settlement or completed ride, open customer payment modal automatically
         if (detail.status === 'Fare Settlement' || detail.status === 'Completed') {
           const isDone = detail.status === 'Completed';
+          if (isDone) {
+            try {
+              const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+              const targetId = detail.bookingId || current.id;
+              if (targetId && !paid.includes(targetId)) {
+                paid.push(targetId);
+                localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+              }
+            } catch (err) {}
+          }
           const numericFare = Number(String(detail.totalFare || current.fare || current.price || '749').replace(/[^0-9]/g, '')) || 749;
           setPaymentRideData({
             id: current.id,

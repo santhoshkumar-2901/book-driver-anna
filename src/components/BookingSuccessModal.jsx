@@ -26,6 +26,15 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
   const [copied, setCopied] = useState(false);
   const [isCancelled, setIsCancelled] = useState(Boolean(booking && booking.status === 'Cancelled'));
   const [currentStatus, setCurrentStatus] = useState(booking?.status || 'Pending');
+  const [isPaid, setIsPaid] = useState(() => {
+    try {
+      const bId = booking?.bookingId || booking?.id;
+      const paid = new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
+      return Boolean(booking?.isPaid || booking?.status === 'Completed' || (bId && paid.has(bId)));
+    } catch (e) {
+      return false;
+    }
+  });
   const [assignedDriver, setAssignedDriver] = useState(() => {
     return sanitizeDriverName(booking?.assignedAnna || booking?.assignedDriver);
   });
@@ -51,6 +60,11 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
         }
       } catch (e) {}
 
+      try {
+        const paid = new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
+        setIsPaid(Boolean(booking.isPaid || initialStatus === 'Completed' || (bId && paid.has(bId))));
+      } catch (e) {}
+
       setIsCancelled(initialStatus === 'Cancelled');
       setCurrentStatus(initialStatus);
       setAssignedDriver(initialDriver);
@@ -69,6 +83,12 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
         if (detail.status.toLowerCase().includes('cancel')) {
           setIsCancelled(true);
         }
+        if (detail.status === 'Completed' || detail.isPaid) {
+          setIsPaid(true);
+        }
+      }
+      if (detail.isPaid) {
+        setIsPaid(true);
       }
       if (detail.assignedDriver !== undefined) {
         setAssignedDriver(sanitizeDriverName(detail.assignedDriver));
@@ -158,6 +178,8 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
           <div className="bg-slate-950/40 backdrop-blur-sm inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white mb-1 border border-white/20">
             {isCancelled ? (
               <span className="text-red-300 flex items-center gap-1"><Ban className="w-3.5 h-3.5" /> Booking Cancelled</span>
+            ) : (isPaid || currentStatus.toLowerCase().includes('complete')) ? (
+              <span className="text-emerald-300 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Ride Completed • Payment Settled</span>
             ) : currentStatus.toLowerCase().includes('pending') ? (
               <span className="text-amber-300 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Booking Placed • Awaiting Driver Assignment</span>
             ) : (
@@ -168,6 +190,8 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
           <h3 className="text-2xl font-extrabold text-white font-['Outfit']">
             {isCancelled 
               ? 'Booking Cancelled' 
+              : (isPaid || currentStatus.toLowerCase().includes('complete'))
+              ? 'Trip Completed & Fare Paid!'
               : currentStatus.toLowerCase().includes('pending')
               ? 'Order Received! Anna Dispatching Soon'
               : (booking.bookingType === 'class' ? 'Class Enrollment Confirmed!' : 'Anna is on his way!')}
@@ -318,20 +342,27 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
 
           {/* Ride Completion & Payment Button */}
           {!isCancelled && (
-            <button
-              type="button"
-              onClick={() => {
-                if (onSimulateRidePayment) {
-                  onSimulateRidePayment(booking);
-                }
-                onClose();
-              }}
-              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer border border-amber-300"
-            >
-              <CreditCard className="w-4 h-4" />
-              <span>Complete Ride & Pay Fare</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            (isPaid || currentStatus.toLowerCase().includes('complete')) ? (
+              <div className="w-full py-3 px-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Fare Paid & Ride Completed</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSimulateRidePayment) {
+                    onSimulateRidePayment(booking);
+                  }
+                  onClose();
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer border border-amber-300"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Complete Ride & Pay Fare</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )
           )}
 
           {/* Action buttons */}

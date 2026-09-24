@@ -321,11 +321,26 @@ export default function DriverPortalPage({
     setTodayEarnings(prev => prev + numericFare);
     setLifetimeTrips(prev => prev + 1);
 
-    // Update persistent bda_driver_bookings
+    // Update persistent bda_driver_bookings and bda_paid_bookings
     try {
       const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updated = savedBookings.map(b => (b.id === settlementTrip.id || b.bookingId === settlementTrip.id) ? { ...b, status: 'Completed', isPaid: true } : b);
+      const updated = savedBookings.map(b => (b.id === settlementTrip.id || b.bookingId === settlementTrip.id || b.id === settlementTrip.bookingId) ? { ...b, status: 'Completed', isPaid: true, paymentStatus: 'PAID' } : b);
       localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+    } catch (e) {}
+
+    try {
+      const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+      const idsToAdd = [settlementTrip.id, settlementTrip.bookingId].filter(Boolean);
+      let changed = false;
+      idsToAdd.forEach(id => {
+        if (!paid.includes(id)) {
+          paid.push(id);
+          changed = true;
+        }
+      });
+      if (changed) {
+        localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+      }
     } catch (e) {}
 
     // Synchronize to backend database
@@ -334,35 +349,33 @@ export default function DriverPortalPage({
       apiClient.completeBooking(bookingTargetId, settlementMethod).catch(() => {});
     }
 
-    broadcastBookingUpdate({ 
-      bookingId: settlementTrip.id, 
+    const payload = { 
+      id: settlementTrip.id,
+      bookingId: settlementTrip.bookingId || settlementTrip.id, 
       status: 'Completed',
       isPaid: true,
+      paymentStatus: 'PAID',
       settlementMethod,
       totalFare: numericFare,
       assignedDriver: driverUser?.name || "Driver Assigned",
       assignedDriverPhone: driverUser?.phone || SUPPORT_HELPLINE
-    });
+    };
+
+    broadcastBookingUpdate(payload);
 
     // Notify customer app via CustomEvent
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('bda_ride_completed', {
         detail: {
-          id: settlementTrip.id,
-          driverName: driverUser?.name || "Driver Assigned",
-          driverPhone: driverUser?.phone || SUPPORT_HELPLINE,
+          ...payload,
           driverRating: driverUser?.rating || 5.0,
           carModel: settlementTrip.carModel,
           pickupArea: settlementTrip.pickup,
           dropLocation: settlementTrip.destination,
-          distance: settlementTrip.distance,
-          totalFare: numericFare,
-          settlementMethod,
-          isPaid: true,
-          status: 'Completed'
+          distance: settlementTrip.distance
         }
       }));
-      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
+      window.dispatchEvent(new CustomEvent('bda_booking_updated', { detail: payload }));
     }
 
     setAcceptedTrips(prev => prev.filter(t => t.id !== settlementTrip.id));

@@ -163,6 +163,11 @@ export default function UserProfileModal({
     let isCancelled = false;
 
     const fetchBookings = async () => {
+      try {
+        const storedPaid = new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
+        setPaidBookingIds(storedPaid);
+      } catch (e) {}
+
       const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
       const userEmailClean = (clientUser.email || '').toLowerCase().trim();
       const currentUserId = clientUser.id ? String(clientUser.id).trim() : null;
@@ -187,6 +192,13 @@ export default function UserProfileModal({
               else if (rawStatus === 'CANCELLED') displayStatus = 'Cancelled';
               else displayStatus = 'Pending';
 
+              const isPaid = (
+                rawStatus === 'COMPLETED' || 
+                b.payment_status === 'PAID' || 
+                b.paymentStatus === 'PAID' || 
+                Boolean(b.is_paid) || 
+                Boolean(b.isPaid)
+              );
               matched.push({
                 id: b.id,
                 serviceType: b.booking_type || 'driver',
@@ -198,6 +210,7 @@ export default function UserProfileModal({
                 drop: b.drop_location || '',
                 amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
                 status: displayStatus,
+                isPaid,
                 assignedDriver: b.assigned_driver_name || (rawStatus === 'ASSIGNED' ? 'Driver Assigned' : null),
                 assignedPhone: b.assigned_driver_phone || null
               });
@@ -244,10 +257,20 @@ export default function UserProfileModal({
               : (displayStatus.includes('Confirmed') ? 'Driver Assigned' : null);
             const assignedPhone = b.assignedDriverPhone || null;
 
+            const isLocalPaid = Boolean(
+              rawStatus.includes('COMPLET') || 
+              b.isPaid || 
+              b.is_paid || 
+              b.paymentStatus === 'PAID'
+            );
             const existing = matched.find(m => m.id === b.id);
             if (existing) {
               if (displayStatus !== 'Pending' || existing.status === 'Pending') {
                 existing.status = displayStatus;
+              }
+              if (isLocalPaid) {
+                existing.isPaid = true;
+                existing.status = 'Completed';
               }
               if (assignedName && (!existing.assignedDriver || existing.assignedDriver.includes('Pending'))) {
                 existing.assignedDriver = assignedName;
@@ -271,7 +294,8 @@ export default function UserProfileModal({
                 pickup: b.pickupArea || 'Indiranagar',
                 drop: b.dropLocation || '',
                 amount: b.estimatedPrice || b.fare || '₹299',
-                status: displayStatus,
+                status: isLocalPaid ? 'Completed' : displayStatus,
+                isPaid: isLocalPaid,
                 assignedDriver: assignedName,
                 assignedPhone: assignedPhone,
                 assignedDriverUpi: b.assignedDriverUpi || b.driverUpi
@@ -402,11 +426,29 @@ export default function UserProfileModal({
     fetchBookings();
 
     // Cross-tab broadcast and storage event subscriber
-    const unsubscribeSync = onBookingUpdate(() => {
+    const unsubscribeSync = onBookingUpdate((detail) => {
+      if (detail && (detail.isPaid || detail.status === 'Completed')) {
+        const bId = detail.bookingId || detail.id;
+        if (bId) {
+          setPaidBookingIds(prev => {
+            const updated = new Set(prev);
+            updated.add(bId);
+            return updated;
+          });
+        }
+      }
       fetchBookings();
     });
 
-    const handleRideCompleted = () => {
+    const handleRideCompleted = (e) => {
+      const bId = e?.detail?.id || e?.detail?.bookingId;
+      if (bId) {
+        setPaidBookingIds(prev => {
+          const updated = new Set(prev);
+          updated.add(bId);
+          return updated;
+        });
+      }
       fetchBookings();
     };
     window.addEventListener('bda_ride_completed', handleRideCompleted);
@@ -820,7 +862,7 @@ export default function UserProfileModal({
                                   <Phone className="w-3 h-3" /> Call
                                 </a>
                               )}
-                              {paidBookingIds.has(b.id) ? (
+                              {(paidBookingIds.has(b.id) || Boolean(b.isPaid) || b.status === 'Completed' || b.status === 'COMPLETED') ? (
                                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
                                 </span>
@@ -840,7 +882,7 @@ export default function UserProfileModal({
                         {/* If Confirmed without a driver row (vehicle rental or classes), provide Pay option */}
                         {!b.assignedDriver && !isCancelled && !isPending && (
                           <div className="flex items-center justify-end text-[11px] pt-1">
-                            {paidBookingIds.has(b.id) ? (
+                            {(paidBookingIds.has(b.id) || Boolean(b.isPaid) || b.status === 'Completed' || b.status === 'COMPLETED') ? (
                               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
                               </span>
