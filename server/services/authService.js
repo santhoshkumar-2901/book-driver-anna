@@ -130,10 +130,124 @@ export async function registerAdmin({ name, email, phone, password, secretKey, a
   return { user, token };
 }
 
+export async function registerDriver({
+  name,
+  phone,
+  dlNumber,
+  password,
+  upiId = 'anna.driver@oksbi',
+  area = 'Indiranagar',
+  vehicleType = 'Manual & Automatic Cars',
+  experienceYears = '3-5 Years',
+  ipAddress = null
+}) {
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+  const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12
+    ? `+${cleanPhone.slice(0, 2)} ${cleanPhone.slice(2)}`
+    : `+91 ${cleanPhone.slice(-10)}`;
+  const cleanDl = (dlNumber || '').trim().toUpperCase();
+  const email = `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}.${last10}@driveranna.com`;
+
+  // Check if driver with this phone or DL already exists
+  const existingUser = await queryOne(
+    'SELECT id, email, phone FROM users WHERE phone = ? OR phone LIKE ?',
+    [phone.trim(), `%${last10}`]
+  );
+  if (existingUser) {
+    const err = new Error('This mobile number is already registered. Please log in.');
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
+
+  const existingDl = await queryOne(
+    'SELECT id FROM drivers WHERE LOWER(license_number) = LOWER(?)',
+    [cleanDl]
+  );
+  if (existingDl) {
+    const err = new Error('This Driving License (DL) number is already registered. Please log in.');
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
+
+  const userId = 'USR-DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const driverId = 'DRV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const passwordHash = hashPassword(password);
+
+  // Insert into users
+  await execute(`
+    INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+    VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
+  `, [userId, name.trim(), email, formattedPhone, passwordHash, area]);
+
+  // Insert into drivers
+  try {
+    await execute(`
+      INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, ?, 'Active')
+    `, [
+      driverId,
+      userId,
+      name.trim(),
+      formattedPhone,
+      cleanDl,
+      area,
+      experienceYears,
+      vehicleType,
+      upiId.trim() || 'anna.driver@oksbi'
+    ]);
+  } catch (driverInsertErr) {
+    await execute(`
+      INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, 0, 'Active')
+    `, [
+      driverId,
+      userId,
+      name.trim(),
+      formattedPhone,
+      cleanDl,
+      area,
+      experienceYears,
+      vehicleType
+    ]);
+  }
+
+  const safeDriver = {
+    id: userId,
+    driverId,
+    name: name.trim(),
+    email,
+    phone: formattedPhone,
+    role: 'driver',
+    area,
+    dlNumber: cleanDl,
+    upiId: upiId.trim() || 'anna.driver@oksbi',
+    vehicleType,
+    experienceYears,
+    rating: 5.0,
+    trips: 0,
+    isOnline: true
+  };
+
+  const token = generateToken(safeDriver);
+
+  await logAuditEvent({
+    userId,
+    action: 'DRIVER_REGISTERED',
+    resourceType: 'driver',
+    resourceId: driverId,
+    ipAddress
+  });
+
+  return { user: safeDriver, token };
+}
+
 export async function authenticateUser({ identifier, password, requiredRole = null, ipAddress = null }) {
   const trimmed = identifier ? String(identifier).trim() : '';
   if (!trimmed) {
-    const err = new Error('Email or phone number is required.');
+    const err = new Error('Email, mobile number, or DL number is required.');
     err.statusCode = 400;
     err.code = 'INVALID_INPUT';
     throw err;
@@ -148,21 +262,60 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
 
   const cleanPhone = trimmed.replace(/[^0-9]/g, '');
   const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : null;
+  const cleanDl = trimmed.toUpperCase().replace(/[\s-]/g, '');
 
-  // Safe parameterized query matching email OR phone (or last 10 digits of phone)
   let user = null;
-  if (last10) {
-    user = await queryOne(`
-      SELECT id, name, email, phone, password_hash, role, area, status 
-      FROM users 
-      WHERE (LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?) AND status = 'Active'
-    `, [trimmed, trimmed, `%${last10}`]);
-  } else {
-    user = await queryOne(`
-      SELECT id, name, email, phone, password_hash, role, area, status 
-      FROM users 
-      WHERE LOWER(email) = LOWER(?) AND status = 'Active'
-    `, [trimmed]);
+
+  // 1. If looking for a driver, or if identifier could be a Driving License (DL) or phone
+  if (requiredRole === 'driver' || trimmed.length >= 5) {
+    try {
+      const driverUser = await queryOne(`
+        SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.area, u.status,
+               d.id as driver_id, d.license_number, d.upi_id, d.rating, d.trips_completed,
+               d.hub_area, d.specialization, d.experience_years
+        FROM users u
+        INNER JOIN drivers d ON d.user_id = u.id
+        WHERE (
+          LOWER(u.email) = LOWER(?)
+          OR u.phone = ?
+          ${last10 ? "OR REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), '+', '') LIKE ?" : ''}
+          OR LOWER(d.license_number) = LOWER(?)
+          OR REPLACE(REPLACE(UPPER(d.license_number), '-', ''), ' ', '') = ?
+        ) AND u.status = 'Active'
+      `, [
+        trimmed,
+        trimmed,
+        ...(last10 ? [`%${last10}`] : []),
+        trimmed,
+        cleanDl
+      ]);
+      if (driverUser) {
+        user = driverUser;
+      }
+    } catch (e) {
+      // Fallback to standard users query if drivers join fails
+    }
+  }
+
+  // 2. Standard user lookup if not found through driver table
+  if (!user) {
+    if (last10) {
+      user = await queryOne(`
+        SELECT id, name, email, phone, password_hash, role, area, status 
+        FROM users 
+        WHERE (
+          LOWER(email) = LOWER(?) 
+          OR phone = ? 
+          OR REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ?
+        ) AND status = 'Active'
+      `, [trimmed, trimmed, `%${last10}`]);
+    } else {
+      user = await queryOne(`
+        SELECT id, name, email, phone, password_hash, role, area, status 
+        FROM users 
+        WHERE LOWER(email) = LOWER(?) AND status = 'Active'
+      `, [trimmed]);
+    }
   }
 
   const userPasswordHash = user ? (user.password_hash || user.PASSWORD_HASH || user.Password_Hash) : null;
@@ -185,7 +338,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
     throw err;
   }
 
-  // Role validation if required (e.g. admin login)
+  // Role validation if required (e.g. admin or driver portal login)
   const userRole = (user.role || user.ROLE || '').toLowerCase();
   if (requiredRole && userRole !== requiredRole.toLowerCase()) {
     await logAuditEvent({
@@ -208,13 +361,37 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
     ipAddress
   });
 
+  // Enrich driver properties if role is driver
+  let driverDetails = {};
+  if (userRole === 'driver') {
+    try {
+      const driverRecord = user.driver_id ? user : await queryOne(`
+        SELECT id as driver_id, license_number, upi_id, rating, trips_completed, hub_area, specialization, experience_years
+        FROM drivers WHERE user_id = ?
+      `, [user.id]);
+      if (driverRecord) {
+        driverDetails = {
+          driverId: driverRecord.driver_id,
+          dlNumber: driverRecord.license_number || '',
+          upiId: driverRecord.upi_id || 'anna.driver@oksbi',
+          rating: Number(driverRecord.rating) || 4.95,
+          trips: Number(driverRecord.trips_completed || driverRecord.trips) || 0,
+          vehicleType: driverRecord.specialization || 'Manual & Automatic Cars',
+          experienceYears: driverRecord.experience_years || '5+ Years',
+          isOnline: true
+        };
+      }
+    } catch (e) {}
+  }
+
   const safeUser = {
     id: user.id,
     name: user.name,
     email: user.email,
     phone: user.phone,
     role: userRole || 'customer',
-    area: user.area
+    area: user.area,
+    ...driverDetails
   };
 
   const token = generateToken(safeUser);
@@ -223,7 +400,29 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
 
 export async function getUserById(userId) {
   const user = await queryOne('SELECT id, name, email, phone, role, area, status, created_at FROM users WHERE id = ?', [userId]);
-  return user || null;
+  if (!user) return null;
+  if ((user.role || '').toLowerCase() === 'driver') {
+    try {
+      const driverRecord = await queryOne(`
+        SELECT id as driver_id, license_number, upi_id, rating, trips_completed, hub_area, specialization, experience_years
+        FROM drivers WHERE user_id = ?
+      `, [userId]);
+      if (driverRecord) {
+        return {
+          ...user,
+          driverId: driverRecord.driver_id,
+          dlNumber: driverRecord.license_number || '',
+          upiId: driverRecord.upi_id || 'anna.driver@oksbi',
+          rating: Number(driverRecord.rating) || 4.95,
+          trips: Number(driverRecord.trips_completed) || 0,
+          vehicleType: driverRecord.specialization || 'Manual & Automatic Cars',
+          experienceYears: driverRecord.experience_years || '5+ Years',
+          isOnline: true
+        };
+      }
+    } catch (e) {}
+  }
+  return user;
 }
 
 /**

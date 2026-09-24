@@ -72,11 +72,39 @@ export default function RidePaymentModal({
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentStep('settlement');
+      const alreadyPaid = Boolean(
+        rideData?.isPaid || 
+        rideData?.status === 'Completed' || 
+        rideData?.status === 'COMPLETED' || 
+        rideData?.paymentCompleted ||
+        rideData?.settlementMethod
+      );
+      if (alreadyPaid) {
+        setIsPaid(true);
+        setCurrentStep('receipt');
+        if (!transactionId) {
+          setTransactionId(rideData?.transactionId || `TXN-BDA-${Date.now().toString(36).toUpperCase()}`);
+        }
+      } else {
+        setCurrentStep('settlement');
+        setIsPaid(false);
+      }
       setIsProcessing(false);
       setUpiRedirectNotice(false);
     }
-  }, [isOpen, rideData?.id, rideData?.bookingId]);
+  }, [isOpen, rideData?.id, rideData?.bookingId, rideData?.isPaid, rideData?.status, rideData?.settlementMethod]);
+
+  // Support Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Fare calculations
   const effectiveTip = isCustomTip ? (Number(customTip) || 0) : selectedTip;
@@ -213,8 +241,8 @@ export default function RidePaymentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
       {/* Dark Blur Backdrop */}
       <div 
-        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity"
-        onClick={isPaid ? onClose : undefined}
+        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity cursor-pointer"
+        onClick={onClose}
       />
 
       {/* Main Card Container */}

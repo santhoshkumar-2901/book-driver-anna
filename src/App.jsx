@@ -444,9 +444,31 @@ export default function App() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
   // Active Ride & Post-Ride Fare Settlement States
-  const [activeRide, setActiveRide] = useState(null);
+  const [activeRide, setActiveRide] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bda_active_ride');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.status !== 'Completed' && parsed.status !== 'Cancelled') {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentRideData, setPaymentRideData] = useState(null);
+
+  // Sync activeRide changes to localStorage
+  useEffect(() => {
+    try {
+      if (activeRide && activeRide.status !== 'Completed' && activeRide.status !== 'Cancelled') {
+        localStorage.setItem('bda_active_ride', JSON.stringify(activeRide));
+      } else {
+        localStorage.removeItem('bda_active_ride');
+      }
+    } catch (e) {}
+  }, [activeRide]);
 
   // Client User Profile Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -475,9 +497,16 @@ export default function App() {
   useEffect(() => {
     const handleRideCompleted = (e) => {
       if (e && e.detail) {
-        setPaymentRideData(e.detail);
+        setPaymentRideData({
+          ...e.detail,
+          isPaid: true,
+          status: 'Completed'
+        });
         setIsPaymentModalOpen(true);
         setActiveRide(null);
+        try {
+          localStorage.removeItem('bda_active_ride');
+        } catch (err) {}
       }
     };
 
@@ -500,6 +529,7 @@ export default function App() {
 
         // If driver initiated fare settlement or completed ride, open customer payment modal automatically
         if (detail.status === 'Fare Settlement' || detail.status === 'Completed') {
+          const isDone = detail.status === 'Completed';
           const numericFare = Number(String(detail.totalFare || current.fare || current.price || '749').replace(/[^0-9]/g, '')) || 749;
           setPaymentRideData({
             id: current.id,
@@ -512,9 +542,17 @@ export default function App() {
             dropLocation: current.dropoff || current.dropoffLocation || "Destination",
             distance: current.distance || "18 km",
             totalFare: numericFare,
-            settlementMethod: detail.settlementMethod || 'online'
+            settlementMethod: detail.settlementMethod || 'online',
+            isPaid: isDone,
+            status: detail.status
           });
           setIsPaymentModalOpen(true);
+          if (isDone) {
+            try {
+              localStorage.removeItem('bda_active_ride');
+            } catch (err) {}
+            return null;
+          }
         }
 
         return updated;
@@ -959,9 +997,15 @@ export default function App() {
       <RidePaymentModal 
         isOpen={isPaymentModalOpen}
         rideData={paymentRideData}
-        onClose={() => setIsPaymentModalOpen(false)}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPaymentRideData(null);
+        }}
         onPaymentSuccess={(details) => {
           setActiveRide(null);
+          try {
+            localStorage.removeItem('bda_active_ride');
+          } catch (err) {}
         }}
       />
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { 
   registerCustomer, 
+  registerDriver,
   registerAdmin, 
   authenticateUser, 
   generateToken,
@@ -19,7 +20,7 @@ import {
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AUTH_COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from '../config/security.js';
-import { ensureProductionAdmins, queryOne, queryAll } from '../db/database.js';
+import { ensureProductionAdmins, ensureProductionDrivers, queryOne, queryAll } from '../db/database.js';
 
 const router = Router();
 
@@ -70,6 +71,7 @@ router.post('/login', authRateLimiter, validateLoginInput, async (req, res, next
 // POST /api/auth/driver-login (Dedicated Driver portal authentication)
 router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
+    await ensureProductionDrivers();
     const ipAddress = req.ip || req.connection.remoteAddress;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
@@ -80,6 +82,49 @@ router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, re
 
     res.cookie(AUTH_COOKIE_NAME, token, COOKIE_OPTIONS);
     res.json({
+      success: true,
+      data: { user, token }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/driver-register (Driver onboarding & verification)
+router.post('/driver-register', authRateLimiter, async (req, res, next) => {
+  try {
+    await ensureProductionDrivers();
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const { name, phone, dlNumber, password, upiId, area, vehicleType, experienceYears } = req.body;
+
+    if (!name || !phone || !dlNumber || !password) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Name, phone, DL number, and password are required.' }
+      });
+    }
+
+    if (String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' }
+      });
+    }
+
+    const { user, token } = await registerDriver({
+      name,
+      phone,
+      dlNumber,
+      password,
+      upiId,
+      area: area || 'Indiranagar',
+      vehicleType: vehicleType || 'Manual & Automatic Cars',
+      experienceYears: experienceYears || '3-5 Years',
+      ipAddress
+    });
+
+    res.cookie(AUTH_COOKIE_NAME, token, COOKIE_OPTIONS);
+    res.status(201).json({
       success: true,
       data: { user, token }
     });

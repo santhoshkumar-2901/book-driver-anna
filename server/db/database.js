@@ -340,3 +340,184 @@ ensureProductionAdmins().catch((err) => {
   console.warn('[DATABASE] Initial admin ensure notice:', err.message);
 });
 
+let driverProvisionPromise = null;
+
+export const DEFAULT_PRODUCTION_DRIVERS = [
+  {
+    driverId: 'DRV-1001',
+    userId: 'USR-DRV-1001',
+    name: 'Manjunath Gowda',
+    phone: '+91 98860 12345',
+    email: 'manjunath.gowda@driveranna.com',
+    licenseNumber: 'KA-04-2021-0098745',
+    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
+    hubArea: 'Indiranagar',
+    experienceYears: 12,
+    specialization: 'Manual & Automatic Cars',
+    rating: 4.98,
+    tripsCompleted: 3420,
+    upiId: 'manjunath.gowda@oksbi'
+  },
+  {
+    driverId: 'DRV-1002',
+    userId: 'USR-DRV-1002',
+    name: 'Venkatesh Prasad',
+    phone: '+91 98450 67890',
+    email: 'venkatesh.prasad@driveranna.com',
+    licenseNumber: 'KA-05-2020-0081234',
+    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
+    hubArea: 'Koramangala',
+    experienceYears: 9,
+    specialization: 'Automatic Luxury & SUVs',
+    rating: 4.95,
+    tripsCompleted: 2890,
+    upiId: 'venkatesh.prasad@okaxis'
+  },
+  {
+    driverId: 'DRV-1003',
+    userId: 'USR-DRV-1003',
+    name: 'Suresh Kumar',
+    phone: '+91 99002 55667',
+    email: 'suresh.kumar@driveranna.com',
+    licenseNumber: 'KA-01-2019-0043120',
+    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
+    hubArea: 'Whitefield',
+    experienceYears: 14,
+    specialization: 'All Cars & Heavy Sedans',
+    rating: 4.96,
+    tripsCompleted: 4150,
+    upiId: 'suresh.anna@paytm'
+  }
+];
+
+/**
+ * Universal Production Driver Partner Fleet Provisioning & Sync
+ * Works seamlessly across both SQLite (local / ephemeral) and TiDB Cloud (production).
+ * Auto-creates tables, heals missing driver partner records, and synchronizes credentials.
+ */
+export async function ensureProductionDrivers(force = false) {
+  if (driverProvisionPromise && !force) {
+    return driverProvisionPromise;
+  }
+
+  driverProvisionPromise = (async () => {
+    // 1. If TiDB Cloud, ensure drivers table exists
+    if (isTiDB && tidbConn) {
+      try {
+        await tidbConn.execute(`
+          CREATE TABLE IF NOT EXISTS drivers (
+            id VARCHAR(64) NOT NULL PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL UNIQUE,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(64) NOT NULL,
+            license_number VARCHAR(64) NOT NULL UNIQUE,
+            hub_area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+            experience_years VARCHAR(64) DEFAULT '5 Years',
+            specialization VARCHAR(255) DEFAULT 'Manual & Automatic Cars',
+            rating DECIMAL(3,2) DEFAULT 4.95,
+            trips_completed INT DEFAULT 0,
+            upi_id VARCHAR(255) DEFAULT 'anna.driver@oksbi',
+            status VARCHAR(32) DEFAULT 'Active',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_drivers_phone (phone),
+            INDEX idx_drivers_license (license_number)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+      } catch (err) {
+        console.warn('[DATABASE] TiDB drivers table ensure notice:', err.message);
+      }
+    } else if (sqliteDb) {
+      try {
+        sqliteDb.exec("ALTER TABLE drivers ADD COLUMN upi_id TEXT DEFAULT 'anna.driver@oksbi';");
+      } catch (e) {}
+    }
+
+    // 2. Ensure each production driver partner exists
+    for (const drv of DEFAULT_PRODUCTION_DRIVERS) {
+      try {
+        const cleanPhone = drv.phone.replace(/[^0-9]/g, '').slice(-10);
+        let user = await queryOne(
+          'SELECT id, name, email, phone, password_hash, role, status FROM users WHERE LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?',
+          [drv.email, drv.phone, `%${cleanPhone}`]
+        );
+
+        const targetHash = bcrypt.hashSync(drv.password, 10);
+
+        if (!user) {
+          await execute(`
+            INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+            VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
+          `, [drv.userId, drv.name, drv.email, drv.phone, targetHash, drv.hubArea]);
+          user = { id: drv.userId };
+          console.log(`[DATABASE] Production driver user created: ${drv.name} (${drv.phone})`);
+        } else {
+          const isPasswordValid = bcrypt.compareSync(drv.password, user.password_hash || '');
+          const isRoleDriver = (user.role || '').toLowerCase() === 'driver';
+          if (!isPasswordValid || !isRoleDriver) {
+            await execute(
+              'UPDATE users SET password_hash = ?, role = ?, status = ? WHERE id = ?',
+              [targetHash, 'driver', 'Active', user.id]
+            );
+          }
+        }
+
+        // Check if driver profile exists
+        const driverRecord = await queryOne(
+          'SELECT id FROM drivers WHERE user_id = ? OR LOWER(license_number) = LOWER(?)',
+          [user.id, drv.licenseNumber]
+        );
+
+        if (!driverRecord) {
+          try {
+            await execute(`
+              INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+            `, [
+              drv.driverId,
+              user.id,
+              drv.name,
+              drv.phone,
+              drv.licenseNumber,
+              drv.hubArea,
+              drv.experienceYears,
+              drv.specialization,
+              drv.rating,
+              drv.tripsCompleted,
+              drv.upiId
+            ]);
+          } catch (e) {
+            await execute(`
+              INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+            `, [
+              drv.driverId,
+              user.id,
+              drv.name,
+              drv.phone,
+              drv.licenseNumber,
+              drv.hubArea,
+              drv.experienceYears,
+              drv.specialization,
+              drv.rating,
+              drv.tripsCompleted
+            ]);
+          }
+          console.log(`[DATABASE] Production driver profile created: ${drv.name} [DL: ${drv.licenseNumber}]`);
+        }
+      } catch (err) {
+        console.warn(`[DATABASE] Driver provisioning note for ${drv.name}:`, err.message);
+      }
+    }
+  })().catch((err) => {
+    driverProvisionPromise = null;
+    throw err;
+  });
+
+  return driverProvisionPromise;
+}
+
+// Trigger driver provisioning on startup for both SQLite and TiDB Cloud
+ensureProductionDrivers().catch((err) => {
+  console.warn('[DATABASE] Initial driver ensure notice:', err.message);
+});
+

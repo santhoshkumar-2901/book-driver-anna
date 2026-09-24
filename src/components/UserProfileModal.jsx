@@ -217,12 +217,15 @@ export default function UserProfileModal({
 
           const bUserId = b.userId ? String(b.userId).trim() : null;
           const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
+          const bPhone = (b.customerPhone || b.mobileNumber || b.phone || '').replace(/[^0-9]/g, '');
 
           const isOwner = 
             (currentUserId && bUserId && bUserId === currentUserId) ||
-            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
-            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+            (userEmailClean && bEmail && bEmail === userEmailClean) ||
+            (userPhoneClean && bPhone && (
+              userPhoneClean === bPhone ||
+              (userPhoneClean.length >= 10 && bPhone.length >= 10 && userPhoneClean.slice(-10) === bPhone.slice(-10))
+            ));
 
           if (isOwner) {
             const rawStatus = (b.status || 'Pending').toUpperCase();
@@ -281,12 +284,15 @@ export default function UserProfileModal({
 
           const bUserId = b.userId ? String(b.userId).trim() : null;
           const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
+          const bPhone = (b.customerPhone || b.mobileNumber || b.phone || '').replace(/[^0-9]/g, '');
 
           const isOwner = 
             (currentUserId && bUserId && bUserId === currentUserId) ||
-            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
-            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+            (userEmailClean && bEmail && bEmail === userEmailClean) ||
+            (userPhoneClean && bPhone && (
+              userPhoneClean === bPhone ||
+              (userPhoneClean.length >= 10 && bPhone.length >= 10 && userPhoneClean.slice(-10) === bPhone.slice(-10))
+            ));
 
           if (isOwner) {
             const rawStatus = (b.status || 'Pending').toUpperCase();
@@ -333,12 +339,15 @@ export default function UserProfileModal({
 
           const bUserId = b.userId ? String(b.userId).trim() : null;
           const bEmail = (b.customerEmail || b.email || '').toLowerCase().trim();
-          const bPhone = (b.phone || '').replace(/[^0-9]/g, '');
+          const bPhone = (b.customerPhone || b.mobileNumber || b.phone || '').replace(/[^0-9]/g, '');
 
           const isOwner = 
             (currentUserId && bUserId && bUserId === currentUserId) ||
-            (!bUserId && userEmailClean && bEmail === userEmailClean) ||
-            (!bUserId && userPhoneClean && userPhoneClean.length >= 10 && bPhone.endsWith(userPhoneClean.slice(-10)));
+            (userEmailClean && bEmail && bEmail === userEmailClean) ||
+            (userPhoneClean && bPhone && (
+              userPhoneClean === bPhone ||
+              (userPhoneClean.length >= 10 && bPhone.length >= 10 && userPhoneClean.slice(-10) === bPhone.slice(-10))
+            ));
 
           if (isOwner) {
             const rawStatus = (b.status || 'Pending').toUpperCase();
@@ -392,12 +401,18 @@ export default function UserProfileModal({
       fetchBookings();
     });
 
+    const handleRideCompleted = () => {
+      fetchBookings();
+    };
+    window.addEventListener('bda_ride_completed', handleRideCompleted);
+
     // Periodic polling every 3 seconds while modal is open to ensure immediate reflection
     const pollInterval = setInterval(fetchBookings, 3000);
 
     return () => {
       isCancelled = true;
       clearInterval(pollInterval);
+      window.removeEventListener('bda_ride_completed', handleRideCompleted);
       unsubscribeSync();
     };
   }, [isOpen, clientUser]);

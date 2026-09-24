@@ -16,6 +16,7 @@ import {
 import { SUPPORT_HELPLINE } from '../data/mockData';
 import SOSButton from '../components/SOSButton';
 import { isDummyOrDemoUser } from '../utils/userValidation';
+import { apiClient } from '../services/apiClient';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
@@ -323,11 +324,25 @@ export default function DriverPortalPage({
     // Update persistent bda_driver_bookings
     try {
       const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updated = savedBookings.map(b => (b.id === settlementTrip.id || b.bookingId === settlementTrip.id) ? { ...b, status: 'Completed' } : b);
+      const updated = savedBookings.map(b => (b.id === settlementTrip.id || b.bookingId === settlementTrip.id) ? { ...b, status: 'Completed', isPaid: true } : b);
       localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
     } catch (e) {}
 
-    broadcastBookingUpdate({ bookingId: settlementTrip.id, status: 'Completed' });
+    // Synchronize to backend database
+    const bookingTargetId = settlementTrip.bookingId || settlementTrip.id;
+    if (bookingTargetId) {
+      apiClient.completeBooking(bookingTargetId, settlementMethod).catch(() => {});
+    }
+
+    broadcastBookingUpdate({ 
+      bookingId: settlementTrip.id, 
+      status: 'Completed',
+      isPaid: true,
+      settlementMethod,
+      totalFare: numericFare,
+      assignedDriver: driverUser?.name || "Driver Assigned",
+      assignedDriverPhone: driverUser?.phone || SUPPORT_HELPLINE
+    });
 
     // Notify customer app via CustomEvent
     if (typeof window !== 'undefined') {
@@ -342,9 +357,12 @@ export default function DriverPortalPage({
           dropLocation: settlementTrip.destination,
           distance: settlementTrip.distance,
           totalFare: numericFare,
-          settlementMethod
+          settlementMethod,
+          isPaid: true,
+          status: 'Completed'
         }
       }));
+      window.dispatchEvent(new CustomEvent('bda_booking_updated'));
     }
 
     setAcceptedTrips(prev => prev.filter(t => t.id !== settlementTrip.id));

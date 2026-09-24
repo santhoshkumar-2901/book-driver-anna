@@ -298,8 +298,17 @@ export async function getUserBookings(userId, phone = null) {
     FROM bookings b
     LEFT JOIN drivers d ON b.assigned_driver_id = d.id
   `;
-  if (userId) {
+  if (userId && phone) {
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+    return await queryAll(
+      `${selectSql} WHERE b.user_id = ? OR b.customer_phone = ? OR b.customer_phone LIKE ? ORDER BY b.created_at DESC`,
+      [userId, String(phone).trim(), `%${last10}`]
+    );
+  } else if (userId) {
     return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC`, [userId]);
   }
-  return await queryAll(`${selectSql} WHERE b.customer_phone = ? ORDER BY b.created_at DESC`, [phone]);
+  const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+  return await queryAll(`${selectSql} WHERE b.customer_phone = ? OR b.customer_phone LIKE ? ORDER BY b.created_at DESC`, [String(phone).trim(), `%${last10}`]);
 }

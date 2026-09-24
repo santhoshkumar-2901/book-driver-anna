@@ -4,7 +4,7 @@ import { bookingRateLimiter } from '../middleware/rateLimiter.js';
 import { validateBookingInput } from '../middleware/validate.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { checkBookingOwnership } from '../middleware/rbac.js';
-import { queryOne } from '../db/database.js';
+import { queryOne, execute } from '../db/database.js';
 
 const router = Router();
 
@@ -128,6 +128,29 @@ router.post('/:id/cancel', optionalAuth, async (req, res, next) => {
       success: true,
       data: result
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/bookings/:id/complete (Mark trip completed & payment settled)
+router.post('/:id/complete', optionalAuth, async (req, res, next) => {
+  try {
+    const bookingId = req.params.id;
+    const { paymentMode } = req.body || {};
+    const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (!booking) {
+      return res.status(404).json({ success: false, error: { code: 'BOOKING_NOT_FOUND', message: 'Booking not found.' } });
+    }
+
+    await execute(`
+      UPDATE bookings 
+      SET status = 'COMPLETED', payment_mode = COALESCE(?, payment_mode), updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [paymentMode || null, bookingId]);
+
+    const updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    res.json({ success: true, data: { booking: updated } });
   } catch (err) {
     next(err);
   }

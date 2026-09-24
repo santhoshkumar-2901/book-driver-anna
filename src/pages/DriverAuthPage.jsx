@@ -173,57 +173,57 @@ export default function DriverAuthPage({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-
+    try {
       const cleanPhone = signupPhone.replace(/[^0-9]/g, '');
       const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12
         ? `+${cleanPhone.slice(0, 2)} ${cleanPhone.slice(2)}`
         : `+91 ${cleanPhone.slice(-10)}`;
 
-      const newDriver = {
-        id: 'DRV-' + Math.floor(1000 + Math.random() * 9000),
+      const res = await apiClient.driverRegister({
         name: signupName.trim(),
         phone: formattedPhone,
         dlNumber: signupDl.trim().toUpperCase(),
+        password: signupPassword,
         upiId: signupUpi.trim() || 'anna.driver@oksbi',
-        vehicleType: signupVehicleType,
         area: signupArea,
-        experienceYears: signupExperience,
-        rating: 5.0,
-        trips: 0,
-        status: 'Active',
-        earningsToday: 0,
-        isOnline: true,
-        createdAt: new Date().toISOString()
-      };
+        vehicleType: signupVehicleType,
+        experienceYears: signupExperience
+      });
 
-      // Save to localStorage
-      try {
-        let drivers = DEFAULT_DRIVERS;
-        const saved = localStorage.getItem('bda_registered_drivers');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) drivers = parsed;
-        }
-        const updated = [newDriver, ...drivers];
-        localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('bda_driver_registered'));
-      } catch (err) {}
+      if (res && res.data && res.data.user) {
+        const driverData = {
+          ...res.data.user,
+          token: res.data.token,
+          loggedInAt: new Date().toISOString()
+        };
+        localStorage.setItem('bda_driver_user', JSON.stringify(driverData));
 
-      const sessionData = {
-        ...newDriver,
-        token: 'driver-session-' + Date.now(),
-        loggedInAt: new Date().toISOString()
-      };
-      localStorage.setItem('bda_driver_user', JSON.stringify(sessionData));
+        try {
+          let drivers = DEFAULT_DRIVERS;
+          const saved = localStorage.getItem('bda_registered_drivers');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) drivers = parsed;
+          }
+          const updated = [driverData, ...drivers.filter(d => d.id !== driverData.id && d.phone !== driverData.phone)];
+          localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent('bda_driver_registered'));
+        } catch (err) {}
 
-      resetForm();
-      setSuccessMessage(`Driver partner profile registered! Welcome to the fleet, Anna ${newDriver.name}.`);
-      if (onLoginSuccess) {
-        onLoginSuccess(sessionData);
+        resetForm();
+        setSuccessMessage(`Driver partner profile registered! Welcome to the fleet, Anna ${driverData.name}.`);
+        setTimeout(() => {
+          setIsLoading(false);
+          if (onLoginSuccess) onLoginSuccess(driverData);
+        }, 400);
+        return;
       }
-    }, 700);
+      setIsLoading(false);
+      setErrorMessage('Registration failed. Please check details and try again.');
+    } catch (apiErr) {
+      setIsLoading(false);
+      setErrorMessage(apiErr.message || 'Registration failed. Please check details and try again.');
+    }
   };
 
   return (

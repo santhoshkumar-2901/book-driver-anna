@@ -131,6 +131,11 @@ export const apiClient = {
     if (res?.data?.token) localStorage.setItem('bda_driver_token', res.data.token);
     return res;
   },
+  driverRegister: async (driverData) => {
+    const res = await request('/auth/driver-register', { method: 'POST', body: driverData });
+    if (res?.data?.token) localStorage.setItem('bda_driver_token', res.data.token);
+    return res;
+  },
   adminLogin: async (credentials) => {
     const res = await request('/auth/admin-login', { method: 'POST', body: credentials });
     if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
@@ -166,6 +171,8 @@ export const apiClient = {
     request('/bookings/lookup', { method: 'POST', body: { bookingId, phone } }),
   cancelBooking: (bookingId, phone, reason) => 
     request(`/bookings/${bookingId}/cancel`, { method: 'POST', body: { phone, reason } }),
+  completeBooking: (bookingId, paymentMode = 'cash') =>
+    request(`/bookings/${bookingId}/complete`, { method: 'POST', body: { paymentMode } }),
   getBookingById: (bookingId) => request(`/bookings/${bookingId}`, { method: 'GET' }),
 
   // 3. Driver Endpoints
