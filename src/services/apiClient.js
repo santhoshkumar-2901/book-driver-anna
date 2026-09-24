@@ -105,7 +105,11 @@ async function request(endpoint, options = {}) {
     // If server is unreachable (offline / static build without proxy), log and rethrow
     if (err.name === 'TypeError' && (err.message.includes('fetch') || err.message.includes('NetworkError') || err.message.includes('Failed to fetch'))) {
       console.warn(`[API CLIENT] Backend server offline at ${url}. Falling back.`);
-      const networkErr = new Error('Cannot connect to server. Please ensure the backend service is running on port 5000.');
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const networkErr = new Error(isLocal
+        ? 'Cannot connect to server. Please ensure the backend service is running on port 5000.'
+        : 'Cannot connect to server. Please check your network connection or try again in a moment.'
+      );
       networkErr.code = 'NETWORK_ERROR';
       networkErr.status = 0;
       throw networkErr;
