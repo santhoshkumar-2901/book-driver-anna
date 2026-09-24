@@ -15,11 +15,16 @@ export default function ActiveRideBanner({
   }
 
   const rawDriver = activeRide.driverName || activeRide.assignedDriver || activeRide.assignedAnna;
-  const driverName = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending'))
-    ? rawDriver
+  const rawDriverStr = typeof rawDriver === 'string' ? rawDriver : '';
+  const driverName = (rawDriverStr && rawDriverStr !== 'Pending Admin Acceptance' && !rawDriverStr.toLowerCase().includes('pending'))
+    ? rawDriverStr
     : "Driver Assigned on Dispatch";
-  const carModel = activeRide.carModel || activeRide.vehicleName || "Assigned Vehicle";
-  const destination = activeRide.dropLocation || activeRide.destination || "Destination";
+  const carModel = typeof (activeRide.carModel || activeRide.vehicleName) === 'string' 
+    ? (activeRide.carModel || activeRide.vehicleName) 
+    : "Assigned Vehicle";
+  const destination = typeof (activeRide.dropLocation || activeRide.destination) === 'string'
+    ? (activeRide.dropLocation || activeRide.destination)
+    : "Destination";
   const fare = activeRide.totalFare || activeRide.fare || 0;
 
   return (
@@ -80,7 +85,7 @@ export default function ActiveRideBanner({
 
             <div className="flex items-center gap-3 shrink-0">
               <a 
-                href={`tel:${(activeRide.driverPhone || SUPPORT_HELPLINE).replace(/\s+/g, '')}`}
+                href={`tel:${String(activeRide.driverPhone || SUPPORT_HELPLINE).replace(/\s+/g, '')}`}
                 className="text-slate-400 hover:text-emerald-400 flex items-center gap-1 font-bold"
               >
                 <Phone className="w-3 h-3 text-emerald-400" /> Call Anna

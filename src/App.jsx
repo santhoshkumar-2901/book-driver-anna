@@ -32,6 +32,7 @@ import RidePaymentModal from './components/RidePaymentModal';
 import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
 import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
+import ErrorBoundary from './components/ErrorBoundary';
 import { apiClient } from './services/apiClient';
 import { broadcastBookingUpdate, onBookingUpdate } from './utils/broadcastSync';
 import { SUPPORT_HELPLINE } from './data/mockData';
@@ -507,12 +508,16 @@ export default function App() {
             }
           } catch (err) {}
         }
-        setPaymentRideData({
-          ...e.detail,
-          isPaid: true,
-          status: 'Completed'
+        // If user already had the payment modal open, update it to receipt
+        setPaymentRideData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            ...e.detail,
+            isPaid: true,
+            status: 'Completed'
+          };
         });
-        setIsPaymentModalOpen(true);
         setActiveRide(null);
         try {
           localStorage.removeItem('bda_active_ride');
@@ -527,56 +532,88 @@ export default function App() {
   // Synchronize real-time driver assignment and booking status updates to active ride
   useEffect(() => {
     const unsubscribe = onBookingUpdate((detail) => {
-      if (!detail || !detail.bookingId) return;
-      setActiveRide((current) => {
-        if (!current || current.id !== detail.bookingId) return current;
-        const updated = {
-          ...current,
-          driverName: detail.assignedDriver || current.driverName,
-          driverPhone: detail.assignedDriverPhone || current.driverPhone,
-          status: detail.status || current.status
-        };
+      if (!detail) return;
+      const bookingId = detail.bookingId || detail.id;
+      if (!bookingId) return;
 
-        // If driver initiated fare settlement or completed ride, open customer payment modal automatically
-        if (detail.status === 'Fare Settlement' || detail.status === 'Completed') {
-          const isDone = detail.status === 'Completed';
-          if (isDone) {
-            try {
-              const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
-              const targetId = detail.bookingId || current.id;
-              if (targetId && !paid.includes(targetId)) {
-                paid.push(targetId);
-                localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
-              }
-            } catch (err) {}
-          }
-          const numericFare = Number(String(detail.totalFare || current.fare || current.price || '749').replace(/[^0-9]/g, '')) || 749;
-          setPaymentRideData({
-            id: current.id,
-            driverName: detail.assignedDriver || current.driverName || "Driver Assigned",
-            driverPhone: detail.assignedDriverPhone || current.driverPhone || SUPPORT_HELPLINE,
-            driverUpi: detail.assignedDriverUpi || current.assignedDriverUpi || detail.driverUpi || '',
-            driverRating: 5.0,
-            carModel: current.carModel || current.vehicleType || "Sedan",
-            pickupArea: current.pickup || current.pickupLocation || "Pickup",
-            dropLocation: current.dropoff || current.dropoffLocation || "Destination",
-            distance: current.distance || "18 km",
-            totalFare: numericFare,
-            settlementMethod: detail.settlementMethod || 'online',
-            isPaid: isDone,
-            status: detail.status
-          });
-          setIsPaymentModalOpen(true);
-          if (isDone) {
-            try {
-              localStorage.removeItem('bda_active_ride');
-            } catch (err) {}
-            return null;
-          }
-        }
+      const isCompleted = detail.status === 'Completed' || detail.status === 'COMPLETED' || detail.isPaid;
+      const isFareSettlement = detail.status === 'Fare Settlement';
 
-        return updated;
-      });
+      if (isCompleted) {
+        try {
+          const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+          if (!paid.includes(bookingId)) {
+            paid.push(bookingId);
+            localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+          }
+        } catch (err) {}
+
+        // Safely clear active ride
+        setActiveRide((current) => {
+          if (!current || (current.id !== bookingId && current.bookingId !== bookingId)) {
+            return current;
+          }
+          try {
+            localStorage.removeItem('bda_active_ride');
+          } catch (err) {}
+          return null;
+        });
+
+        // If user already had the payment modal open for this ride, update receipt
+        setPaymentRideData((prev) => {
+          if (!prev || (prev.id !== bookingId && prev.bookingId !== bookingId)) return prev;
+          return {
+            ...prev,
+            ...detail,
+            isPaid: true,
+            status: 'Completed'
+          };
+        });
+      } else if (isFareSettlement) {
+        // Driver requested fare settlement via UPI QR -> open customer payment modal
+        const numericFare = Number(String(detail.totalFare || 749).replace(/[^0-9]/g, '')) || 749;
+        setPaymentRideData({
+          id: bookingId,
+          driverName: detail.assignedDriver || "Driver Assigned",
+          driverPhone: detail.assignedDriverPhone || SUPPORT_HELPLINE,
+          driverUpi: detail.assignedDriverUpi || detail.driverUpi || '',
+          driverRating: 5.0,
+          carModel: detail.carModel || "Customer Vehicle",
+          pickupArea: detail.pickupArea || detail.pickup || "Pickup Location",
+          dropLocation: detail.dropLocation || detail.destination || "Drop Location",
+          distance: detail.distance || "City Route",
+          totalFare: numericFare,
+          settlementMethod: detail.settlementMethod || 'online',
+          isPaid: false,
+          status: 'Fare Settlement'
+        });
+        setIsPaymentModalOpen(true);
+
+        setActiveRide((current) => {
+          if (!current || (current.id !== bookingId && current.bookingId !== bookingId)) {
+            return current;
+          }
+          return {
+            ...current,
+            driverName: detail.assignedDriver || current.driverName,
+            driverPhone: detail.assignedDriverPhone || current.driverPhone,
+            status: 'Fare Settlement'
+          };
+        });
+      } else {
+        // Normal driver assignment or in-transit status updates
+        setActiveRide((current) => {
+          if (!current || (current.id !== bookingId && current.bookingId !== bookingId)) {
+            return current;
+          }
+          return {
+            ...current,
+            driverName: detail.assignedDriver || current.driverName,
+            driverPhone: detail.assignedDriverPhone || current.driverPhone,
+            status: detail.status || current.status
+          };
+        });
+      }
     });
     return unsubscribe;
   }, []);
@@ -1014,20 +1051,22 @@ export default function App() {
       />
 
       {/* Post-Ride Digital Payment & Rating Modal */}
-      <RidePaymentModal 
-        isOpen={isPaymentModalOpen}
-        rideData={paymentRideData}
-        onClose={() => {
-          setIsPaymentModalOpen(false);
-          setPaymentRideData(null);
-        }}
-        onPaymentSuccess={(details) => {
-          setActiveRide(null);
-          try {
-            localStorage.removeItem('bda_active_ride');
-          } catch (err) {}
-        }}
-      />
+      <ErrorBoundary fallback={null}>
+        <RidePaymentModal 
+          isOpen={isPaymentModalOpen}
+          rideData={paymentRideData}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setPaymentRideData(null);
+          }}
+          onPaymentSuccess={(details) => {
+            setActiveRide(null);
+            try {
+              localStorage.removeItem('bda_active_ride');
+            } catch (err) {}
+          }}
+        />
+      </ErrorBoundary>
 
       {/* Client User Profile & Bookings Modal */}
       <UserProfileModal 

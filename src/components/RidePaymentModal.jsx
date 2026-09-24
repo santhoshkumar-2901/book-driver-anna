@@ -21,38 +21,45 @@ export default function RidePaymentModal({
 
   // Defaults
   const rawDriver = rideData.driverName || rideData.assignedDriver || rideData.assignedAnna;
-  const driverName = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending'))
-    ? rawDriver
+  const rawDriverStr = typeof rawDriver === 'string' ? rawDriver : '';
+  const driverName = (rawDriverStr && rawDriverStr !== 'Pending Admin Acceptance' && !rawDriverStr.toLowerCase().includes('pending'))
+    ? rawDriverStr
     : "Driver Anna";
-  const driverPhone = rideData.driverPhone || SUPPORT_HELPLINE;
-  const driverRating = rideData.driverRating || 5.0;
-  const driverTrips = rideData.driverTrips || 0;
-  const carModel = rideData.carModel || rideData.vehicleName || "Customer Vehicle";
-  const pickup = rideData.pickupArea || rideData.pickup || "Pickup Location";
-  const destination = rideData.dropLocation || rideData.destination || "Drop Location";
-  const distance = rideData.distance || "City Route";
-  const duration = rideData.duration || "Trip Duration";
-  const baseCalculatedFare = Number(rideData.totalFare || rideData.fare || 549);
+  const driverPhone = String(rideData.driverPhone || rideData.assignedDriverPhone || SUPPORT_HELPLINE);
+  const driverRating = Number(rideData.driverRating) || 5.0;
+  const driverTrips = Number(rideData.driverTrips) || 0;
+  const rawCar = rideData.carModel || rideData.vehicleName || "Customer Vehicle";
+  const carModel = typeof rawCar === 'string' ? rawCar : "Customer Vehicle";
+  const rawPickup = rideData.pickupArea || rideData.pickup || "Pickup Location";
+  const pickup = typeof rawPickup === 'string' ? rawPickup : "Pickup Location";
+  const rawDest = rideData.dropLocation || rideData.destination || "Drop Location";
+  const destination = typeof rawDest === 'string' ? rawDest : "Drop Location";
+  const distance = String(rideData.distance || "City Route");
+  const duration = String(rideData.duration || "Trip Duration");
+  const baseCalculatedFare = Number(rideData.totalFare || rideData.fare || 549) || 549;
 
   // Driver UPI ID resolution (drivers put their UPI ID in /driver, generating dynamic QR)
   const resolvedDriverUpi = (() => {
-    if (rideData.driverUpi) return rideData.driverUpi;
-    if (rideData.assignedDriverUpi) return rideData.assignedDriverUpi;
+    if (typeof rideData.driverUpi === 'string' && rideData.driverUpi.trim()) return rideData.driverUpi.trim();
+    if (typeof rideData.assignedDriverUpi === 'string' && rideData.assignedDriverUpi.trim()) return rideData.assignedDriverUpi.trim();
     try {
       const savedFleet = JSON.parse(localStorage.getItem('bda_registered_drivers') || '[]');
-      const cleanPhone = (driverPhone || '').replace(/[^0-9]/g, '');
-      const matched = savedFleet.find(d => {
-        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+      const cleanPhone = String(driverPhone || '').replace(/[^0-9]/g, '');
+      const matched = Array.isArray(savedFleet) ? savedFleet.find(d => {
+        if (!d) return false;
+        const dPhone = String(d.phone || '').replace(/[^0-9]/g, '');
+        const dName = String(d.name || '').toLowerCase().trim();
+        const curName = String(driverName || '').toLowerCase().trim();
         return (cleanPhone && dPhone && (cleanPhone === dPhone || cleanPhone.includes(dPhone) || dPhone.includes(cleanPhone))) ||
-               (d.name && driverName && d.name.toLowerCase().trim() === driverName.toLowerCase().trim());
-      });
+               (dName && curName && dName === curName);
+      }) : null;
       if (matched?.upiId) return matched.upiId;
     } catch (e) {}
     try {
       const activeDriver = JSON.parse(localStorage.getItem('bda_driver_user') || 'null');
       if (activeDriver?.upiId) return activeDriver.upiId;
     } catch (e) {}
-    const sanitizedHandle = (driverName || 'driver').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sanitizedHandle = String(driverName || 'driver').toLowerCase().replace(/[^a-z0-9]/g, '');
     return `${sanitizedHandle || 'driver'}@oksbi`;
   })();
 
@@ -360,7 +367,7 @@ export default function RidePaymentModal({
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
                   <span>Distance: {distance}</span>
                   <span>Duration: {duration}</span>
-                  <span>Car: {carModel.split('•')[0]}</span>
+                  <span>Car: {String(carModel || '').split('•')[0] || "Customer Vehicle"}</span>
                 </div>
               </div>
 
@@ -405,7 +412,7 @@ export default function RidePaymentModal({
               <div className="bg-slate-950 rounded-2xl p-3.5 border border-slate-800 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black text-lg font-['Outfit'] shadow-md shadow-amber-500/10 shrink-0">
-                    {driverName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    {String(driverName || 'Driver Anna').split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2) || 'DA'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -806,7 +813,7 @@ export default function RidePaymentModal({
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3.5">
                 <div className="text-center space-y-1">
                   <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Rate Your Ride with {driverName.split(' ')[0]}
+                    Rate Your Ride with {String(driverName || 'Driver Anna').split(' ').filter(Boolean)[0] || 'Anna'}
                   </div>
                   <p className="text-[11px] text-slate-400">Your ratings help keep Bangalore's fleet safe & courteous</p>
                 </div>
