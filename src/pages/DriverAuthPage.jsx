@@ -150,7 +150,7 @@ export default function DriverAuthPage({
   };
 
   // Signup submission
-  const handleSignupSubmit = (e) => {
+  const handleSignupSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
