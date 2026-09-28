@@ -288,4 +288,47 @@ describe('User Profile Red Dot Badge for Active Bookings Suite', () => {
     assert.match(appCode, /hasActiveBookingBadge={hasActiveBookingBadge}/, 'App.jsx must pass hasActiveBookingBadge to components');
     assert.match(appCode, /bda_payment_completed/, 'App.jsx must dispatch bda_payment_completed on payment success');
   });
+
+  test('9. Confirmed vehicle rental bookings in UserProfileModal provide Pay option and vehicle details', () => {
+    const userModalCode = fs.readFileSync(path.resolve('src/components/UserProfileModal.jsx'), 'utf8');
+
+    // Verifies vehicle rental confirmed card is rendered
+    assert.match(
+      userModalCode,
+      /isVehicle\s*&&\s*isConfirmed\s*&&\s*!isCancelled/,
+      'UserProfileModal must identify confirmed vehicle rentals'
+    );
+
+    // Verifies Pay button is rendered for confirmed vehicle rentals
+    assert.match(
+      userModalCode,
+      /onClick=\{\(\)\s*=>\s*handleOpenPayment\(b\)\}/,
+      'UserProfileModal must attach handleOpenPayment to vehicle rental payment button'
+    );
+
+    // Verifies Pay button label and Paid status badge
+    assert.match(
+      userModalCode,
+      /<Smartphone[^>]*\/>\s*Pay/,
+      'UserProfileModal must provide Pay button with Smartphone icon'
+    );
+    assert.match(
+      userModalCode,
+      /<CheckCircle2[^>]*\/>\s*Paid/,
+      'UserProfileModal must render Paid badge when vehicle booking is paid'
+    );
+
+    // Verifies vehicle details: vehicle registration if assigned, or vehicle title (Confirmed)
+    assert.match(
+      userModalCode,
+      /Vehicle Reg:/,
+      'UserProfileModal must display Vehicle Reg if vehicle is assigned'
+    );
+    assert.match(
+      userModalCode,
+      /Vehicle Reserved:/,
+      'UserProfileModal must display Vehicle Reserved when confirmed'
+    );
+  });
 });
+

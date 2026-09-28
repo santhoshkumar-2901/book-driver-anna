@@ -10,7 +10,7 @@ import { BANGALORE_AREAS, SUPPORT_HELPLINE } from '../data/mockData';
 import { useScrollLock } from '../utils/useScrollLock';
 import { toDDMMYYYY } from '../utils/dateUtils';
 import { apiClient } from '../services/apiClient';
-import { onBookingUpdate } from '../utils/broadcastSync';
+import { onBookingUpdate, broadcastBookingUpdate } from '../utils/broadcastSync';
 import RidePaymentModal from './RidePaymentModal';
 import { isDummyOrDemoUser } from '../utils/userValidation';
 import { useUserBookingBadge } from '../utils/useUserBookingBadge';
@@ -91,8 +91,12 @@ export default function UserProfileModal({
 
   const handleOpenPayment = (b) => {
     const numericFare = Number(String(b.amount || '0').replace(/[^0-9]/g, '')) || 366;
+    const isVehicleBooking = b.serviceType === 'vehicle' || b.category === 'Car Rental' || (typeof b.id === 'string' && b.id.includes('VEH'));
     const rawDriver = b.assignedDriver || b.driverName;
-    const cleanDriver = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && !rawDriver.toLowerCase().includes('pending')) ? rawDriver : "Assigned Driver";
+    const cleanDriver = (rawDriver && rawDriver !== 'Pending Admin Acceptance' && rawDriver !== 'Pending Assignment' && !rawDriver.toLowerCase().includes('pending'))
+      ? rawDriver 
+      : (isVehicleBooking ? "Car Rental Fleet Desk" : "Assigned Driver");
+
     setPaymentRideData({
       ...b,
       id: b.id,
@@ -107,7 +111,7 @@ export default function UserProfileModal({
       pickup: b.pickup || "Pickup Location",
       dropLocation: b.drop || "Destination",
       destination: b.drop || "Destination",
-      carModel: b.serviceType === 'vehicle' ? b.title : "Customer Vehicle"
+      carModel: isVehicleBooking ? (b.title || "Rental Vehicle") : (b.title || "Customer Vehicle")
     });
   };
 
@@ -120,6 +124,32 @@ export default function UserProfileModal({
         localStorage.setItem('bda_paid_bookings', JSON.stringify(Array.from(updated)));
         return updated;
       });
+
+      // Update local storage for vehicle bookings
+      try {
+        const veh = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
+        const updVeh = veh.map(v => (v.id === bId ? { ...v, isPaid: true, paymentStatus: 'PAID' } : v));
+        localStorage.setItem('bda_vehicle_bookings', JSON.stringify(updVeh));
+      } catch (e) {}
+
+      // Update local storage for driver bookings
+      try {
+        const drv = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        const updDrv = drv.map(d => (d.id === bId ? { ...d, isPaid: true, paymentStatus: 'PAID' } : d));
+        localStorage.setItem('bda_driver_bookings', JSON.stringify(updDrv));
+      } catch (e) {}
+
+      // Update local storage for class enrollments
+      try {
+        const cls = JSON.parse(localStorage.getItem('bda_class_enrollments') || '[]');
+        const updCls = cls.map(c => ((c.id === bId || c.enrollmentId === bId) ? { ...c, isPaid: true, paymentStatus: 'PAID' } : c));
+        localStorage.setItem('bda_class_enrollments', JSON.stringify(updCls));
+      } catch (e) {}
+
+      // Broadcast update so navbar badge, active rides, and profile state sync
+      try {
+        broadcastBookingUpdate({ bookingId: bId, isPaid: true, status: 'Completed' });
+      } catch (e) {}
 
       if (details?.review || details?.rating) {
         try {
@@ -335,12 +365,24 @@ export default function UserProfileModal({
             else if (rawStatus.includes('COMPLET')) displayStatus = 'Completed';
             else displayStatus = b.status || 'Pending';
 
+            const isLocalPaid = Boolean(
+              rawStatus.includes('COMPLET') || 
+              b.isPaid || 
+              b.is_paid || 
+              b.paymentStatus === 'PAID'
+            );
+
             const existing = matched.find(m => m.id === b.id);
             if (existing) {
               if (displayStatus !== 'Pending' || existing.status === 'Pending') {
                 existing.status = displayStatus;
               }
+              if (isLocalPaid) {
+                existing.isPaid = true;
+                existing.status = 'Completed';
+              }
               if (b.vehicleRegNumber) {
+                existing.vehicleRegNumber = b.vehicleRegNumber;
                 existing.assignedDriver = b.vehicleRegNumber;
               }
             } else if (!seenIds.has(b.id)) {
@@ -350,12 +392,14 @@ export default function UserProfileModal({
                 serviceType: 'vehicle',
                 title: b.vehicleName || 'Rental Vehicle',
                 category: 'Car Rental',
-                date: b.startDate || 'Recent',
-                time: b.pickupTime || '',
+                date: b.startDate || b.date || 'Recent',
+                time: b.pickupTime || b.time || '',
                 pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
                 drop: b.dropLocation || '',
                 amount: b.totalPrice ? `₹${b.totalPrice}` : (b.fare ? `₹${b.fare}` : '₹1,499'),
-                status: displayStatus,
+                status: isLocalPaid ? 'Completed' : displayStatus,
+                isPaid: isLocalPaid,
+                vehicleRegNumber: b.vehicleRegNumber || null,
                 assignedDriver: b.vehicleRegNumber || null
               });
             }
@@ -804,6 +848,40 @@ export default function UserProfileModal({
                     const isCancelled = statusStr.includes('cancel');
                     const isPending = statusStr.includes('pending');
                     const isAccepted = statusStr.includes('accept') || statusStr.includes('assign') || statusStr.includes('confirm');
+                    const isConfirmed = isAccepted || (!isCancelled && !isPending);
+                    const isPaid = (
+                      paidBookingIds.has(b.id) || 
+                      Boolean(b.isPaid) || 
+                      statusStr.includes('complet') || 
+                      statusStr.includes('paid')
+                    );
+
+                    const isVehicle = (
+                      b.serviceType === 'vehicle' || 
+                      b.category === 'Car Rental' || 
+                      (typeof b.id === 'string' && b.id.includes('VEH'))
+                    );
+
+                    const isClass = (
+                      b.serviceType === 'class' || 
+                      b.category === 'Driving School' || 
+                      (typeof b.id === 'string' && b.id.includes('CLS'))
+                    );
+
+                    const rawDriver = typeof b.assignedDriver === 'string' ? b.assignedDriver : '';
+                    const hasDriverAssigned = Boolean(
+                      rawDriver && 
+                      rawDriver !== 'Pending Admin Acceptance' && 
+                      rawDriver !== 'Pending Assignment' && 
+                      !rawDriver.toLowerCase().includes('pending')
+                    );
+
+                    const rawReg = b.vehicleRegNumber || (isVehicle && hasDriverAssigned ? rawDriver : null);
+                    const hasVehicleAssigned = Boolean(
+                      rawReg && 
+                      rawReg !== 'Pending Assignment' && 
+                      !rawReg.toLowerCase().includes('pending')
+                    );
 
                     return (
                       <div 
@@ -865,23 +943,21 @@ export default function UserProfileModal({
                           </div>
                         </div>
 
-                        {/* If Driver is Assigned, show driver assignment card with Call & Pay options */}
-                        {b.assignedDriver && b.assignedDriver !== 'Pending Admin Acceptance' && !b.assignedDriver.toLowerCase().includes('pending') && !isCancelled && !isPending && (
+                        {/* 1. Confirmed Vehicle Rental Card with Vehicle details & Pay / Paid action */}
+                        {isVehicle && isConfirmed && !isCancelled && (
                           <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 gap-2 flex-wrap sm:flex-nowrap">
                             <span className="flex items-center gap-1.5 font-medium min-w-0">
-                              <SteeringWheel className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">Assigned: <strong className="text-white font-bold">{b.assignedDriver}</strong></span>
+                              <Car className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">
+                                {hasVehicleAssigned ? (
+                                  <>Vehicle Reg: <strong className="text-white font-bold">{rawReg}</strong></>
+                                ) : (
+                                  <>Vehicle Reserved: <strong className="text-white font-bold">{b.title || 'Car Rental'}</strong> (Confirmed)</>
+                                )}
+                              </span>
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {b.assignedPhone && (
-                                <a 
-                                  href={`tel:${b.assignedPhone}`} 
-                                  className="text-[10px] font-extrabold text-emerald-400 hover:text-emerald-300 bg-emerald-900/50 hover:bg-emerald-900/80 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-emerald-500/30"
-                                >
-                                  <Phone className="w-3 h-3" /> Call
-                                </a>
-                              )}
-                              {(paidBookingIds.has(b.id) || Boolean(b.isPaid) || b.status === 'Completed' || b.status === 'COMPLETED') ? (
+                              {isPaid ? (
                                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
                                 </span>
@@ -898,22 +974,61 @@ export default function UserProfileModal({
                           </div>
                         )}
 
-                        {/* If Confirmed without a driver row (vehicle rental or classes), provide Pay option */}
-                        {!b.assignedDriver && !isCancelled && !isPending && (
-                          <div className="flex items-center justify-end text-[11px] pt-1">
-                            {(paidBookingIds.has(b.id) || Boolean(b.isPaid) || b.status === 'Completed' || b.status === 'COMPLETED') ? (
-                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPayment(b)}
-                                className="text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 shadow-sm shadow-amber-400/20 cursor-pointer font-['Outfit'] hover:scale-105 active:scale-95"
-                              >
-                                <Smartphone className="w-3 h-3 text-slate-950" /> Pay Fare
-                              </button>
-                            )}
+                        {/* 2. Driver Assigned Card with Call & Pay options */}
+                        {!isVehicle && !isClass && hasDriverAssigned && isConfirmed && !isCancelled && (
+                          <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 gap-2 flex-wrap sm:flex-nowrap">
+                            <span className="flex items-center gap-1.5 font-medium min-w-0">
+                              <SteeringWheel className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">Assigned: <strong className="text-white font-bold">{b.assignedDriver}</strong></span>
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {b.assignedPhone && (
+                                <a 
+                                  href={`tel:${b.assignedPhone}`} 
+                                  className="text-[10px] font-extrabold text-emerald-400 hover:text-emerald-300 bg-emerald-900/50 hover:bg-emerald-900/80 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-emerald-500/30"
+                                >
+                                  <Phone className="w-3 h-3" /> Call
+                                </a>
+                              )}
+                              {isPaid ? (
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayment(b)}
+                                  className="text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-sm shadow-amber-400/20 cursor-pointer font-['Outfit'] hover:scale-105 active:scale-95"
+                                >
+                                  <Smartphone className="w-3 h-3 text-slate-950" /> Pay
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Other Confirmed Services (Driving School or Driver dispatching) */}
+                        {!isVehicle && !hasDriverAssigned && isConfirmed && !isCancelled && (
+                          <div className="flex items-center justify-between text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 gap-2 flex-wrap sm:flex-nowrap">
+                            <span className="flex items-center gap-1.5 font-medium min-w-0">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="truncate">{isClass ? 'Course Enrolled & Confirmed' : 'Booking Confirmed • Driver Dispatching'}</span>
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isPaid ? (
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-900/50 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Paid
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayment(b)}
+                                  className="text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-sm shadow-amber-400/20 cursor-pointer font-['Outfit'] hover:scale-105 active:scale-95"
+                                >
+                                  <Smartphone className="w-3 h-3 text-slate-950" /> Pay
+                                </button>
+                              )}
+                            </div>
                           </div>
                         )}
 
