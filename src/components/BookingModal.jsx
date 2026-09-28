@@ -1052,7 +1052,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 }`}
               >
                 <Banknote className="w-4 h-4 text-emerald-500" />
-                <span>{bookingCategory === 'class' ? 'Pay to Instructor Anna' : 'Cash to Driver'}</span>
+                <span>{bookingCategory === 'class' ? 'Pay to Instructor Anna' : 'Cash'}</span>
               </button>
 
               <button

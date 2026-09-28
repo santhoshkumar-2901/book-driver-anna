@@ -17,6 +17,8 @@ describe('Ride Payment Options & Manual Optional Review Verification', () => {
     assert.match(content, /grid grid-cols-2 gap-2\.5/, 'Payment buttons grid should be 2 columns');
     assert.match(content, /setPaymentMethod\(['"]upi['"]\)/, 'UPI option button should exist');
     assert.match(content, /setPaymentMethod\(['"]cash['"]\)/, 'Cash option button should exist');
+    assert.match(content, /<span className="text-xs font-semibold">Cash<\/span>/, 'Cash option button label should be "Cash"');
+    assert.doesNotMatch(content, /<span className="text-xs font-semibold">Cash to Driver<\/span>/, 'Should not use "Cash to Driver" label');
     
     // Ensure Card and Wallet are NOT options in the selector
     assert.doesNotMatch(content, /setPaymentMethod\(['"]card['"]\)/, 'Card option should not be in selector');

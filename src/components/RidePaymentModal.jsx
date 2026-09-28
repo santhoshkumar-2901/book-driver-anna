@@ -329,7 +329,7 @@ export default function RidePaymentModal({
                   ₹{totalAmountToPay}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Paid to <strong className="text-white">{driverName}</strong> via {paymentMethod === 'upi' ? `UPI (${resolvedDriverUpi})` : 'Cash to Driver'}
+                  Paid to <strong className="text-white">{driverName}</strong> via {paymentMethod === 'upi' ? `UPI (${resolvedDriverUpi})` : 'Cash'}
                 </p>
                 <div className="mt-2 inline-block font-mono text-[11px] bg-slate-950 text-amber-400 border border-slate-800 px-2.5 py-1 rounded-lg">
                   Ref ID: {transactionId}
@@ -678,7 +678,7 @@ export default function RidePaymentModal({
                     }`}
                   >
                     <Banknote className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Cash to Driver</span>
+                    <span className="text-xs font-semibold">Cash</span>
                   </button>
                 </div>
 
@@ -807,7 +807,7 @@ export default function RidePaymentModal({
                 {paymentMethod === 'cash' && (
                   <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300 animate-in fade-in duration-200">
                     <div className="font-bold text-amber-400 flex items-center gap-1.5">
-                      <Banknote className="w-4 h-4" /> Pay Direct Cash to Driver
+                      <Banknote className="w-4 h-4" /> Pay Direct Cash
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
                       Please hand over exact cash of <strong className="text-white font-bold">₹{totalAmountToPay}</strong> directly to Anna upon reaching your destination.
