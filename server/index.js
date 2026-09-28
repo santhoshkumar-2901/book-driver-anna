@@ -23,6 +23,7 @@ import driversRouter from './routes/drivers.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import pricingRouter from './routes/pricing.js';
+import { ensureServicePricing } from './services/pricingService.js';
 
 export const app = express();
 
@@ -101,6 +102,7 @@ app.get(['/api/health', '/health'], async (req, res) => {
   let userCount = 0;
   let adminCount = 0;
   let hasResetTokensTable = false;
+  let hasPricingTable = false;
 
   try {
     const testRow = await queryOne('SELECT 1 as test');
@@ -134,6 +136,13 @@ app.get(['/api/health', '/health'], async (req, res) => {
       hasResetTokensTable = false;
       dbError = e.message;
     }
+
+    try {
+      await queryOne('SELECT COUNT(*) as count FROM service_pricing');
+      hasPricingTable = true;
+    } catch (e) {
+      hasPricingTable = false;
+    }
   } catch (err) {
     dbStatus = 'error';
     dbError = err.message;
@@ -151,7 +160,8 @@ app.get(['/api/health', '/health'], async (req, res) => {
       userCount,
       adminCount,
       driverCount,
-      hasResetTokensTable
+      hasResetTokensTable,
+      hasPricingTable
     },
     emailConfig: {
       hasGmailUser: Boolean(ENV.GMAIL_USER),
@@ -199,8 +209,9 @@ if (fs.existsSync(distDir)) {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize DB seed & ensure production admin accounts in all environments
+// Initialize DB seed & ensure production admin accounts and service pricing in all environments
 ensureProductionAdmins().catch((err) => console.error('[ADMIN ENSURE ERROR]', err.message));
+ensureServicePricing().catch((err) => console.error('[PRICING ENSURE ERROR]', err.message));
 
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_SEED !== 'true') {
   console.log('[SEED] Skipping database seed in production (set ALLOW_DB_SEED=true to override)');

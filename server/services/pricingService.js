@@ -1,4 +1,4 @@
-import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
+import { isTiDB, queryOne, queryAll, execute, withTransaction } from '../db/database.js';
 import { logAuditEvent } from './auditService.js';
 
 /**
@@ -259,20 +259,53 @@ export const DEFAULT_PRICING = [
 const DEFAULT_MAP = Object.fromEntries(DEFAULT_PRICING.map(item => [item.id, item]));
 
 /**
- * Ensures the service_pricing table is populated with default tariff rows
+ * Ensures the service_pricing table is created and populated with default tariff rows
  */
 export async function ensureServicePricing() {
   try {
+    if (isTiDB) {
+      await execute(`
+        CREATE TABLE IF NOT EXISTS service_pricing (
+          id VARCHAR(64) NOT NULL PRIMARY KEY,
+          category VARCHAR(32) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          price DECIMAL(10,2) NOT NULL,
+          unit VARCHAR(64) NULL,
+          description TEXT NULL,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_pricing_category (category)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+    } else {
+      await execute(`
+        CREATE TABLE IF NOT EXISTS service_pricing (
+          id TEXT PRIMARY KEY,
+          category TEXT NOT NULL,
+          name TEXT NOT NULL,
+          price REAL NOT NULL,
+          unit TEXT,
+          description TEXT,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
+  } catch (schemaErr) {
+    console.warn('[PRICING] service_pricing schema initialization note:', schemaErr.message);
+  }
+
+  try {
     const existing = await queryAll('SELECT id FROM service_pricing');
-    const existingIds = new Set(existing.map(r => r.id));
+    const existingIds = new Set((existing || []).map(r => r.id));
 
     for (const item of DEFAULT_PRICING) {
       if (!existingIds.has(item.id)) {
+        const insertSql = isTiDB
+          ? `INSERT IGNORE INTO service_pricing (id, category, name, price, unit, description) VALUES (?, ?, ?, ?, ?, ?)`
+          : `INSERT OR IGNORE INTO service_pricing (id, category, name, price, unit, description) VALUES (?, ?, ?, ?, ?, ?)`;
         await execute(
-          `INSERT INTO service_pricing (id, category, name, price, unit, description)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          insertSql,
           [item.id, item.category, item.name, item.price, item.unit, item.description]
-        );
+        ).catch(() => {});
       }
     }
   } catch (err) {
@@ -344,6 +377,8 @@ export async function updateServicePricing(updates, userId = null, ipAddress = n
       throw Object.assign(new Error(`Invalid price for item '${item.id}'. Price must be a non-negative number.`), { statusCode: 400 });
     }
   }
+
+  await ensureServicePricing();
 
   await withTransaction(async (tx) => {
     for (const item of itemsToUpdate) {

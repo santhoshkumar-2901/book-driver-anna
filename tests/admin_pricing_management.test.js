@@ -184,4 +184,37 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(classFare.gst, 0, 'Driving classes must have 0 GST');
     assert.strictEqual(classFare.totalFare, 5999);
   });
+
+  test('10. Health check endpoint reports hasPricingTable is true and database is healthy', async () => {
+    const res = await fetch(`${baseUrl}/api/health`);
+    assert.strictEqual(res.status, 200, 'Health check should return HTTP 200');
+    const health = await res.json();
+    assert.strictEqual(health.status, 'healthy');
+    assert.strictEqual(health.database.hasPricingTable, true, 'Health check must report hasPricingTable: true');
+  });
+
+  test('11. Database schema and initialization code auto-create service_pricing table for TiDB and SQLite', () => {
+    const schemaSql = fs.readFileSync(path.resolve('server/db/schema.sql'), 'utf8');
+    assert.ok(
+      schemaSql.includes('CREATE TABLE IF NOT EXISTS service_pricing'),
+      'server/db/schema.sql must define service_pricing table'
+    );
+    assert.ok(
+      schemaSql.includes('idx_pricing_category'),
+      'server/db/schema.sql must define index on service_pricing(category)'
+    );
+
+    const dbCode = fs.readFileSync(path.resolve('server/db/database.js'), 'utf8');
+    assert.ok(
+      dbCode.includes('CREATE TABLE IF NOT EXISTS service_pricing'),
+      'server/db/database.js must auto-create service_pricing in TiDB connection initialization'
+    );
+
+    const pricingServiceCode = fs.readFileSync(path.resolve('server/services/pricingService.js'), 'utf8');
+    assert.ok(
+      pricingServiceCode.includes('CREATE TABLE IF NOT EXISTS service_pricing'),
+      'server/services/pricingService.js must proactively create service_pricing table before querying'
+    );
+  });
 });
+

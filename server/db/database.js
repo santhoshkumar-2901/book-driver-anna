@@ -19,7 +19,7 @@ if (isTiDB) {
   try {
     tidbConn = connect({ url: ENV.DATABASE_URL.trim() });
     console.log('[DATABASE] Initialized TiDB Cloud connection (Serverless HTTP Driver)');
-    // Auto-create password_reset_tokens table if not exists in TiDB
+    // Auto-create essential tables if not exist in TiDB Cloud
     tidbConn.execute(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -32,7 +32,70 @@ if (isTiDB) {
         INDEX idx_prt_hash (token_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `).catch(err => {
-      console.warn('[DATABASE] TiDB table auto-init note:', err.message);
+      console.warn('[DATABASE] TiDB password_reset_tokens auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS service_pricing (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        category VARCHAR(32) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        unit VARCHAR(64) NULL,
+        description TEXT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_pricing_category (category)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB service_pricing auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(64) NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(64) NOT NULL,
+        customer_email VARCHAR(255) NULL,
+        booking_type VARCHAR(32) NOT NULL,
+        trip_type VARCHAR(64) NOT NULL,
+        service_name VARCHAR(255) NOT NULL,
+        pickup_area VARCHAR(255) NOT NULL,
+        drop_location TEXT NULL,
+        date VARCHAR(64) NOT NULL,
+        time VARCHAR(64) NOT NULL,
+        calculated_fare DECIMAL(10,2) NOT NULL,
+        payment_mode VARCHAR(64) DEFAULT 'cash',
+        status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+        cancellation_reason TEXT NULL,
+        assigned_driver_id VARCHAR(64) NULL,
+        assigned_driver_name VARCHAR(255) NULL,
+        assigned_driver_phone VARCHAR(64) NULL,
+        idempotency_key VARCHAR(128) NULL UNIQUE,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_bookings_user_id (user_id),
+        INDEX idx_bookings_phone (customer_phone),
+        INDEX idx_bookings_date_status (date, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB bookings auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NULL,
+        action VARCHAR(128) NOT NULL,
+        resource_type VARCHAR(64) NOT NULL,
+        resource_id VARCHAR(64) NULL,
+        details TEXT NULL,
+        ip_address VARCHAR(64) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_audit_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB audit_logs auto-init note:', err.message);
     });
   } catch (err) {
     console.error('[DATABASE] Failed to initialize TiDB Cloud connection:', err.message);
