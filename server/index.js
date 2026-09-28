@@ -22,6 +22,7 @@ import bookingsRouter from './routes/bookings.js';
 import driversRouter from './routes/drivers.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
+import pricingRouter from './routes/pricing.js';
 
 export const app = express();
 
@@ -171,6 +172,8 @@ app.use('/api/admin', adminRouter);
 app.use('/admin', adminRouter);
 app.use('/api/chat', chatRouter);
 app.use('/chat', chatRouter);
+app.use('/api/pricing', pricingRouter);
+app.use('/pricing', pricingRouter);
 
 // 7. Serve Production Frontend Static Assets (if dist exists)
 if (fs.existsSync(distDir)) {
@@ -182,7 +185,8 @@ if (fs.existsSync(distDir)) {
       req.path.startsWith('/bookings') || 
       req.path.startsWith('/drivers') || 
       req.path.startsWith('/admin') || 
-      req.path.startsWith('/chat');
+      req.path.startsWith('/chat') ||
+      req.path.startsWith('/pricing');
 
     if (req.method === 'GET' && !isApiRequest) {
       return res.sendFile(path.join(distDir, 'index.html'));

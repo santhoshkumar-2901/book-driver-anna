@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
-import { calculateAuthoritativeFare } from './pricingService.js';
+import { calculateAuthoritativeFare, getAllPricing } from './pricingService.js';
 import { logAuditEvent } from './auditService.js';
 
 // Valid booking state machine transitions
@@ -52,7 +52,8 @@ export async function createBooking({
     }
   }
 
-  // 3. Authoritative Fare Calculation on Backend
+  // 3. Authoritative Fare Calculation on Backend using dynamic live pricing
+  const pricingData = await getAllPricing().catch(() => null);
   const fareResult = calculateAuthoritativeFare({
     bookingCategory,
     selectedClassId,
@@ -62,7 +63,7 @@ export async function createBooking({
     roundTripDuration,
     outstationTripType,
     outstationPackage
-  });
+  }, pricingData?.map || null);
 
   // 4. Generate Cryptographically Secure Booking ID
   const prefix = bookingCategory === 'class' ? 'BDA-CLS-' : bookingCategory === 'vehicle' ? 'BDA-VEH-' : 'BDA-DRV-';

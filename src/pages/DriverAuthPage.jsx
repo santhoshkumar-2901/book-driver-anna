@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Car, ShieldCheck, CheckCircle2, MapPin, ArrowRight, LogIn, UserPlus, 
+import {
+  Car, ShieldCheck, CheckCircle2, MapPin, ArrowRight, LogIn, UserPlus,
   Sparkles, Lock, Phone, User, Eye, EyeOff, AlertCircle, Award, Check, QrCode
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
@@ -11,10 +11,10 @@ import { apiClient } from '../services/apiClient';
 const DEFAULT_DRIVERS = [];
 
 
-export default function DriverAuthPage({ 
-  initialMode = 'login', 
-  onLoginSuccess, 
-  onSwitchMode 
+export default function DriverAuthPage({
+  initialMode = 'login',
+  onLoginSuccess,
+  onSwitchMode
 }) {
   const [authMode, setAuthMode] = useState(initialMode);
   const [showPassword, setShowPassword] = useState(false);
@@ -175,6 +175,7 @@ export default function DriverAuthPage({
       return;
     }
 
+
     setIsLoading(true);
 
     try {
@@ -212,7 +213,7 @@ export default function DriverAuthPage({
           const updated = [driverData, ...drivers.filter(d => d.id !== driverData.id && d.phone !== driverData.phone)];
           localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
           window.dispatchEvent(new CustomEvent('bda_driver_registered'));
-        } catch (err) {}
+        } catch (err) { }
 
         resetForm();
         setSuccessMessage(`Driver partner profile registered! Welcome to the fleet, Anna ${driverData.name}.`);
@@ -232,7 +233,7 @@ export default function DriverAuthPage({
 
   return (
     <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-y-auto overflow-x-hidden font-sans selection:bg-emerald-400 selection:text-slate-950 max-w-full">
-      
+
       {/* Background Ambience & Grid */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -266,15 +267,15 @@ export default function DriverAuthPage({
 
           {/* Card Wrapper */}
           <div className="bg-slate-900/90 border border-slate-800 hover:border-emerald-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 backdrop-blur-xl shadow-2xl transition-all duration-300">
-            
+
             {/* Header / Mode Switcher */}
             <div className="text-center space-y-1 mb-3">
               <h1 className="text-xl sm:text-2xl font-extrabold text-white font-['Outfit']">
                 {authMode === 'login' ? 'Login' : 'Signup'}
               </h1>
               <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto">
-                {authMode === 'login' 
-                  ? 'Log in to access your Bengaluru trip dashboard & daily earnings.' 
+                {authMode === 'login'
+                  ? 'Log in to access your Bengaluru trip dashboard & daily earnings.'
                   : 'Join 1,800+ verified drivers. Drive Bangalore cars with assured payouts.'}
               </p>
             </div>
@@ -284,11 +285,10 @@ export default function DriverAuthPage({
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  authMode === 'login'
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'login'
                     ? 'bg-emerald-400 text-slate-950 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Login</span>
@@ -297,11 +297,10 @@ export default function DriverAuthPage({
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  authMode === 'signup'
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${authMode === 'signup'
                     ? 'bg-emerald-400 text-slate-950 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Signup</span>
@@ -347,7 +346,7 @@ export default function DriverAuthPage({
                   className="sr-only hidden"
                   readOnly
                 />
-                
+
                 {/* Mobile or DL Number */}
                 <div className="space-y-1">
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
@@ -490,7 +489,7 @@ export default function DriverAuthPage({
                   className="sr-only hidden"
                   readOnly
                 />
-                
+
                 {/* Full Name */}
                 <div className="space-y-0.5">
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">

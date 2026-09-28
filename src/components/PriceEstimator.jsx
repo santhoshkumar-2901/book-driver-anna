@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SteeringWheel } from './Icons';
 import { Car, Clock, ShieldCheck, MapPin, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { BANGALORE_AREAS, VEHICLE_SERVICES } from '../data/mockData';
+import { usePricing } from '../context/PricingContext';
 
 export default function PriceEstimator({ openBookingModal }) {
   const [bookingType, setBookingType] = useState('driver'); // 'driver' or 'vehicle'
@@ -14,27 +15,34 @@ export default function PriceEstimator({ openBookingModal }) {
   // Vehicle estimator state
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_SERVICES[0]);
   const [vehicleTripType, setVehicleTripType] = useState('daily'); // 'hourly', 'daily', 'outstation'
+  const { getPrice } = usePricing();
 
-  // Driver price calculation
+  const getVehicleDailyRate = (category, fallback) => {
+    const key = `vehicle_${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}_daily`;
+    return getPrice(key, fallback);
+  };
+
+  // Driver price calculation using live pricing
   const calculateDriverFare = () => {
-    let base = 199;
-    if (driverDuration === '2') base = 199;
-    else if (driverDuration === '4') base = 349;
-    else if (driverDuration === '8') base = 699;
-    else if (driverDuration === '12') base = 899;
+    let base = getPrice('driver_hourly_2hr', 199);
+    if (driverDuration === '2') base = getPrice('driver_hourly_2hr', 199);
+    else if (driverDuration === '4') base = getPrice('driver_hourly_4hr', 349);
+    else if (driverDuration === '8') base = getPrice('driver_hourly_8hr', 599);
+    else if (driverDuration === '12') base = getPrice('driver_hourly_12hr', 899);
 
-    if (driverTripCategory === 'night') base += 150;
-    if (driverTripCategory === 'outstation') base = 1199;
+    if (driverTripCategory === 'night') base = getPrice('driver_night_party', 399);
+    if (driverTripCategory === 'outstation') base = getPrice('driver_outstation_12hr', 1199);
 
     const gst = Math.round(base * 0.05);
     return { base, gst, total: base + gst };
   };
 
-  // Vehicle price calculation
+  // Vehicle price calculation using live pricing
   const calculateVehicleFare = () => {
-    let base = selectedVehicle.dailyRate || 1999;
-    if (vehicleTripType === 'hourly') base = Math.round(selectedVehicle.dailyRate * 0.6);
-    else if (vehicleTripType === 'outstation') base = Math.round(selectedVehicle.dailyRate * 1.3);
+    const daily = getVehicleDailyRate(selectedVehicle.category, selectedVehicle.dailyRate || 1999);
+    let base = daily;
+    if (vehicleTripType === 'hourly') base = Math.round(daily * 0.6);
+    else if (vehicleTripType === 'outstation') base = Math.round(daily * 1.3);
 
     const gst = Math.round(base * 0.05);
     return { base, gst, total: base + gst };

@@ -29,7 +29,6 @@ import DrivingClassEnrollmentModal from './components/DrivingClassEnrollmentModa
 import CancelBookingModal from './components/CancelBookingModal';
 import Chatbot from './components/Chatbot';
 import RidePaymentModal from './components/RidePaymentModal';
-import ActiveRideBanner from './components/ActiveRideBanner';
 import UserProfileModal from './components/UserProfileModal';
 import PostBookingAuthPromptModal from './components/PostBookingAuthPromptModal';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -37,6 +36,7 @@ import { apiClient } from './services/apiClient';
 import { broadcastBookingUpdate, onBookingUpdate } from './utils/broadcastSync';
 import { SUPPORT_HELPLINE } from './data/mockData';
 import { isDummyOrDemoUser } from './utils/userValidation';
+import { useUserBookingBadge } from './utils/useUserBookingBadge';
 
 /**
  * Resolves a given URL pathname into application route details:
@@ -459,6 +459,9 @@ export default function App() {
   });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentRideData, setPaymentRideData] = useState(null);
+
+  // Small red dot indicator for user profile when any booking is pending or confirmed and unpaid
+  const hasActiveBookingBadge = useUserBookingBadge(clientUser);
 
   // Sync activeRide changes to localStorage
   useEffect(() => {
@@ -931,6 +934,7 @@ export default function App() {
         clientUser={clientUser}
         onLogout={handleClientLogout}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        hasActiveBookingBadge={hasActiveBookingBadge}
         onOpenAuth={(mode = 'login') => {
           changePage(mode === 'signup' ? 'signup' : 'login');
         }}
@@ -1047,18 +1051,6 @@ export default function App() {
       {/* Sticky Bottom-Right Gemini AI Chatbot */}
       <Chatbot openBookingModal={openBookingModal} />
 
-      {/* Floating Active Ride Tracking Banner */}
-      <ActiveRideBanner 
-        activeRide={activeRide}
-        onOpenPayment={() => {
-          setPaymentRideData({
-            ...activeRide,
-            initialStep: 'payment'
-          });
-          setIsPaymentModalOpen(true);
-        }}
-      />
-
       {/* Post-Ride Digital Payment & Rating Modal */}
       <ErrorBoundary fallback={null}>
         <RidePaymentModal 
@@ -1073,6 +1065,18 @@ export default function App() {
             try {
               localStorage.removeItem('bda_active_ride');
             } catch (err) {}
+            const pId = details?.rideId || paymentRideData?.id;
+            if (pId) {
+              try {
+                const paid = JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]');
+                if (!paid.includes(pId)) {
+                  paid.push(pId);
+                  localStorage.setItem('bda_paid_bookings', JSON.stringify(paid));
+                }
+              } catch (e) {}
+              broadcastBookingUpdate({ bookingId: pId, status: 'Completed', isPaid: true });
+              window.dispatchEvent(new CustomEvent('bda_payment_completed', { detail: { bookingId: pId } }));
+            }
           }}
         />
       </ErrorBoundary>
@@ -1085,6 +1089,7 @@ export default function App() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleClientLogout}
         openBookingModal={openBookingModal}
+        hasActiveBookingBadge={hasActiveBookingBadge}
       />
 
       {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}

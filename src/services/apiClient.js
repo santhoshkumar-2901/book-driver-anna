@@ -7,7 +7,7 @@
  * - Graceful fallback handling
  */
 
-const API_BASE = import.meta.env.VITE_API_URL 
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
   ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api` 
   : '/api';
 
@@ -202,8 +202,14 @@ export const apiClient = {
   createAdminDriver: (driverData) => request('/admin/drivers', { method: 'POST', body: driverData }),
   deleteAdminDriver: (driverId) => request(`/admin/drivers/${driverId}`, { method: 'DELETE' }),
   clearAllData: () => request('/admin/system/clear-data', { method: 'POST' }),
+  getAdminPricing: () => request('/admin/pricing', { method: 'GET' }),
+  updateAdminPricing: (items) => request('/admin/pricing', { method: 'PUT', body: { items } }),
+  resetAdminPricing: () => request('/admin/pricing/reset', { method: 'POST' }),
 
-  // 5. Chatbot Endpoint
+  // 5. Pricing Public Endpoint
+  getPublicPricing: () => request('/pricing', { method: 'GET' }),
+
+  // 6. Chatbot Endpoint
   sendChatMessage: (message, history = []) => 
     request('/chat', { method: 'POST', body: { message, history } })
 };

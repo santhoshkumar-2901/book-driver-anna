@@ -6,6 +6,7 @@ import DateInput from './DateInput';
 import { toDDMMYYYY, toYYYYMMDD, getTodayDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
+import { usePricing } from '../context/PricingContext';
 
 export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal, onRequireAuth }) {
   useScrollLock(isOpen);
@@ -72,6 +73,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     if (initialData.pickupArea) setPickupArea(initialData.pickupArea);
     if (initialData.dropLocation) setDropLocation(initialData.dropLocation);
     if (initialData.roundTripDuration) setRoundTripDuration(initialData.roundTripDuration);
+    else if (initialData.driverDuration) setRoundTripDuration(`${initialData.driverDuration}hr`);
     if (initialData.outstationTripType) setOutstationTripType(initialData.outstationTripType);
     if (initialData.outstationPackage) setOutstationPackage(initialData.outstationPackage);
     if (initialData.outstationDestination) setOutstationDestination(initialData.outstationDestination);
@@ -89,49 +91,72 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     setIsSubmitting(false);
   };
 
+  const { getPrice, formatPrice, refreshPricing } = usePricing();
+
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      if (typeof refreshPricing === 'function') {
+        refreshPricing();
+      }
     }
   }, [isOpen, clientUser]);
 
   if (!isOpen) return null;
 
-  // Dynamic fare calculation
+  // Dynamic fare calculation using live pricing tariffs
   const calculateTotalFare = () => {
     let base = 299;
 
     if (bookingCategory === 'class') {
-      const cls = DRIVING_CLASSES.find(c => c.id === selectedClassId) || DRIVING_CLASSES[0];
-      base = cls.basePrice;
+      if (selectedClassId === 'class-beginner') base = getPrice('class_beginner', 5999);
+      else if (selectedClassId === 'class-refresher') base = getPrice('class_refresher', 3499);
+      else if (selectedClassId === 'class-own-car') base = getPrice('class_own_car', 2999);
+      else if (selectedClassId === 'class-automatic') base = getPrice('class_automatic', 3999);
+      else {
+        const classKeyMap = {
+          'class-beginner': 'class_beginner',
+          'class-refresher': 'class_refresher',
+          'class-own-car': 'class_own_car',
+          'class-automatic': 'class_automatic'
+        };
+        const cls = DRIVING_CLASSES.find(c => c.id === selectedClassId) || DRIVING_CLASSES[0];
+        base = getPrice(classKeyMap[cls.id] || 'class_beginner', cls.basePrice || 5999);
+      }
+      return { base, gst: 0, total: base };
     } else if (bookingCategory === 'vehicle') {
-      if (vehicleCategory === 'Sedan') base = 1999;
-      else if (vehicleCategory === 'SUV') base = 3499;
-      else if (vehicleCategory === '12 Seater') base = 5499;
-      else if (vehicleCategory === '24 Seater') base = 7999;
-      else if (vehicleCategory === '32 Seater') base = 10999;
+      if (vehicleCategory === 'Sedan') base = getPrice('vehicle_sedan_daily', 1999);
+      else if (vehicleCategory === 'SUV') base = getPrice('vehicle_suv_daily', 3499);
+      else if (vehicleCategory === '12 Seater') base = getPrice('vehicle_tempo_12_daily', 5499);
+      else if (vehicleCategory === '24 Seater') base = getPrice('vehicle_bus_24_daily', 7999);
+      else if (vehicleCategory === '32 Seater') base = getPrice('vehicle_coach_32_daily', 10999);
+      else base = 1999;
     } else {
       if (driverTripOption === 'one-way') {
-        base = dropLocation.includes('Airport') ? 899 : 299;
+        base = (dropLocation && dropLocation.toLowerCase().includes('airport')) 
+          ? getPrice('driver_airport_drop', 899) 
+          : getPrice('driver_one_way_city', 299);
       } else if (driverTripOption === 'round-trip') {
-        if (roundTripDuration.includes('4hr')) base = 349;
-        else if (roundTripDuration.includes('8hr')) base = 599;
-        else if (roundTripDuration.includes('12hr')) base = 899;
-        else base = 1299;
+        if (roundTripDuration.includes('2hr')) base = getPrice('driver_hourly_2hr', 199);
+        else if (roundTripDuration.includes('4hr')) base = getPrice('driver_hourly_4hr', 349);
+        else if (roundTripDuration.includes('6hr')) base = getPrice('driver_hourly_6hr', 499);
+        else if (roundTripDuration.includes('8hr')) base = getPrice('driver_hourly_8hr', 599);
+        else if (roundTripDuration.includes('12hr')) base = getPrice('driver_hourly_12hr', 899);
+        else base = getPrice('driver_hourly_4hr', 349);
       } else {
         // Outstation Driver pricing
         if (outstationTripType === 'one-way') {
-          if (outstationPackage.includes('150 km')) base = 1199;
-          else if (outstationPackage.includes('300 km')) base = 1799;
-          else if (outstationPackage.includes('500 km')) base = 2399;
-          else base = 1499;
+          if (outstationPackage.includes('150 km')) base = getPrice('driver_outstation_150km', 1199);
+          else if (outstationPackage.includes('300 km')) base = getPrice('driver_outstation_300km', 1799);
+          else if (outstationPackage.includes('500 km')) base = getPrice('driver_outstation_500km', 2399);
+          else base = getPrice('driver_outstation_150km', 1499);
         } else {
           // Round Trip
-          if (outstationPackage.includes('12hr')) base = 1199;
-          else if (outstationPackage.includes('24hr')) base = 1999;
-          else if (outstationPackage.includes('46hr')) base = 3899;
-          else if (outstationPackage.includes('72hr')) base = 5799;
-          else base = 1999;
+          if (outstationPackage.includes('12hr')) base = getPrice('driver_outstation_12hr', 1199);
+          else if (outstationPackage.includes('24hr')) base = getPrice('driver_outstation_24hr', 1999);
+          else if (outstationPackage.includes('46hr')) base = getPrice('driver_outstation_46hr', 3899);
+          else if (outstationPackage.includes('72hr')) base = getPrice('driver_outstation_72hr', 5799);
+          else base = getPrice('driver_outstation_24hr', 1999);
         }
       }
     }
@@ -397,13 +422,14 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {[
-                  { id: 'Sedan', label: 'Sedan', cap: '4 Seater', price: '₹1,999' },
-                  { id: 'SUV', label: 'SUV', cap: '6-7 Seater', price: '₹3,499' },
-                  { id: '12 Seater', label: '12 Seater', cap: 'Traveller', price: '₹5,499' },
-                  { id: '24 Seater', label: '24 Seater', cap: 'Mini Bus', price: '₹7,999' },
-                  { id: '32 Seater', label: '32 Seater', cap: 'Coach Bus', price: '₹10,999' }
+                  { id: 'Sedan', label: 'Sedan', cap: '4 Seater', priceKey: 'vehicle_sedan_daily', fallback: 1999 },
+                  { id: 'SUV', label: 'SUV', cap: '6-7 Seater', priceKey: 'vehicle_suv_daily', fallback: 3499 },
+                  { id: '12 Seater', label: '12 Seater', cap: 'Traveller', priceKey: 'vehicle_tempo_12_daily', fallback: 5499 },
+                  { id: '24 Seater', label: '24 Seater', cap: 'Mini Bus', priceKey: 'vehicle_bus_24_daily', fallback: 7999 },
+                  { id: '32 Seater', label: '32 Seater', cap: 'Coach Bus', priceKey: 'vehicle_coach_32_daily', fallback: 10999 }
                 ].map((v) => {
                   const isSelected = vehicleCategory === v.id;
+                  const displayPrice = formatPrice(v.priceKey, v.fallback);
                   return (
                     <button
                       key={v.id}
@@ -419,7 +445,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>{v.cap}</div>
                       {/* Clean price text without any box/border background */}
                       <div className={`text-[11px] font-black mt-0.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>
-                        {v.price}
+                        {displayPrice}
                       </div>
                     </button>
                   );
@@ -479,12 +505,13 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { id: '2hr', label: '2hr', price: '₹199' },
-                  { id: '4hr', label: '4hr', price: '₹349' },
-                  { id: '6hr', label: '6hr', price: '₹499' },
-                  { id: '12hr', label: '12hr', price: '₹899' }
+                  { id: '2hr', label: '2hr', priceKey: 'driver_hourly_2hr', fallback: 199 },
+                  { id: '4hr', label: '4hr', priceKey: 'driver_hourly_4hr', fallback: 349 },
+                  { id: '6hr', label: '6hr', priceKey: 'driver_hourly_6hr', fallback: 499 },
+                  { id: '12hr', label: '12hr', priceKey: 'driver_hourly_12hr', fallback: 899 }
                 ].map((dur) => {
                   const isSelected = roundTripDuration === dur.id;
+                  const displayPrice = formatPrice(dur.priceKey, dur.fallback);
                   return (
                     <button
                       key={dur.id}
@@ -497,7 +524,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       }`}
                     >
                       <div className="text-xs font-bold">{dur.label}</div>
-                      <div className={`text-[10px] font-black mt-0.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{dur.price}</div>
+                      <div className={`text-[10px] font-black mt-0.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{displayPrice}</div>
                     </button>
                   );
                 })}
@@ -586,17 +613,18 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {(outstationTripType === 'one-way' ? [
-                    { id: 'One Way (Up to 150 km)', label: 'Up to 150 km', sub: 'Mysuru, Hassan', price: '₹1,199' },
-                    { id: 'One Way (Up to 300 km)', label: 'Up to 300 km', sub: 'Coorg, Chikmagalur', price: '₹1,799' },
-                    { id: 'One Way (Up to 500 km)', label: 'Up to 500 km', sub: 'Wayanad, Ooty, Chennai', price: '₹2,399' },
-                    { id: 'One Way Custom Drop', label: 'Custom Drop', sub: 'Any Destination Spot', price: '₹1,499' }
+                    { id: 'One Way (Up to 150 km)', label: 'Up to 150 km', sub: 'Mysuru, Hassan', priceKey: 'driver_outstation_150km', fallback: 1199 },
+                    { id: 'One Way (Up to 300 km)', label: 'Up to 300 km', sub: 'Coorg, Chikmagalur', priceKey: 'driver_outstation_300km', fallback: 1799 },
+                    { id: 'One Way (Up to 500 km)', label: 'Up to 500 km', sub: 'Wayanad, Ooty, Chennai', priceKey: 'driver_outstation_500km', fallback: 2399 },
+                    { id: 'One Way Custom Drop', label: 'Custom Drop', sub: 'Any Destination Spot', priceKey: 'driver_outstation_150km', fallback: 1499 }
                   ] : [
-                    { id: 'Round trip 12hr', label: 'Round trip 12hr', sub: 'Day Trip (Nandi Hills)', price: '₹1,199' },
-                    { id: 'Round trip 24hr', label: 'Round trip 24hr', sub: '1-Day Getaway', price: '₹1,999' },
-                    { id: 'Round trip 46hr', label: 'Round trip 46hr', sub: 'Weekend Vacation', price: '₹3,899' },
-                    { id: 'Round trip 72hr', label: 'Round trip 72hr', sub: '3-Day Road Trip', price: '₹5,799' }
+                    { id: 'Round trip 12hr', label: 'Round trip 12hr', sub: 'Day Trip (Nandi Hills)', priceKey: 'driver_outstation_12hr', fallback: 1199 },
+                    { id: 'Round trip 24hr', label: 'Round trip 24hr', sub: '1-Day Getaway', priceKey: 'driver_outstation_24hr', fallback: 1999 },
+                    { id: 'Round trip 46hr', label: 'Round trip 46hr', sub: 'Weekend Vacation', priceKey: 'driver_outstation_46hr', fallback: 3899 },
+                    { id: 'Round trip 72hr', label: 'Round trip 72hr', sub: '3-Day Road Trip', priceKey: 'driver_outstation_72hr', fallback: 5799 }
                   ]).map((pkg) => {
                     const isSelected = outstationPackage === pkg.id;
+                    const displayPrice = formatPrice(pkg.priceKey, pkg.fallback);
                     return (
                       <button
                         key={pkg.id}
@@ -610,7 +638,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       >
                         <div className="text-xs font-bold">{pkg.label}</div>
                         <div className={`text-[10px] truncate ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>{pkg.sub}</div>
-                        <div className={`text-[11px] font-black mt-1 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{pkg.price}</div>
+                        <div className={`text-[11px] font-black mt-1 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{displayPrice}</div>
                       </button>
                     );
                   })}
@@ -705,6 +733,13 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DRIVING_CLASSES.map((cls) => {
                   const isSelected = selectedClassId === cls.id;
+                  const classPriceKey = {
+                    'class-beginner': 'class_beginner',
+                    'class-refresher': 'class_refresher',
+                    'class-own-car': 'class_own_car',
+                    'class-automatic': 'class_automatic'
+                  }[cls.id] || 'class_beginner';
+                  const displayPrice = formatPrice(classPriceKey, cls.basePrice);
                   return (
                     <div
                       key={cls.id}
@@ -719,7 +754,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                         <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-400 border border-amber-500/30">
                           {cls.badge}
                         </span>
-                        <span className="text-base font-black text-amber-400">₹{cls.basePrice}</span>
+                        <span className="text-base font-black text-amber-400">{displayPrice}</span>
                       </div>
                       <h4 className="font-extrabold text-sm text-white">{cls.name}</h4>
                       <p className="text-[11px] text-slate-400 font-medium">{cls.duration}</p>
@@ -990,9 +1025,20 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-bold text-slate-300">Payment Option</span>
-              <span className="text-sm font-extrabold text-amber-400 font-['Outfit']">
-                Total ₹{fareInfo.total}
-              </span>
+              <div className="text-right">
+                <span className="text-sm font-extrabold text-amber-400 font-['Outfit']">
+                  Total ₹{fareInfo.total.toLocaleString('en-IN')}
+                </span>
+                {fareInfo.gst > 0 ? (
+                  <span className="block text-[10px] text-slate-400 font-medium">
+                    (₹{fareInfo.base.toLocaleString('en-IN')} base + ₹{fareInfo.gst.toLocaleString('en-IN')} 5% GST)
+                  </span>
+                ) : (
+                  <span className="block text-[10px] text-emerald-400 font-medium">
+                    (All-Inclusive Package)
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
@@ -1038,7 +1084,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
             ) : (
               <>
                 <ShieldCheck className="w-5 h-5" />
-                <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total})</span>
+                <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total.toLocaleString('en-IN')})</span>
               </>
             )}
           </button>

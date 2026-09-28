@@ -13,6 +13,7 @@ import { apiClient } from '../services/apiClient';
 import { onBookingUpdate } from '../utils/broadcastSync';
 import RidePaymentModal from './RidePaymentModal';
 import { isDummyOrDemoUser } from '../utils/userValidation';
+import { useUserBookingBadge } from '../utils/useUserBookingBadge';
 
 // Helper to determine if the active user is a demo or dummy account (neutralized in production)
 export const isDemoUser = (user) => {
@@ -41,9 +42,12 @@ export default function UserProfileModal({
   onLogout, 
   onProfileUpdate, 
   bookings = [], 
-  onCancelBooking 
+  onCancelBooking,
+  hasActiveBookingBadge: externalBadge
 }) {
   useScrollLock(isOpen);
+  const internalBadge = useUserBookingBadge(clientUser);
+  const hasActiveBookingBadge = externalBadge !== undefined ? externalBadge : internalBadge;
 
   // Automatically log out and close if opened with a legacy dummy/demo account
   useEffect(() => {
@@ -506,8 +510,17 @@ export default function UserProfileModal({
         {/* Modal Header Bar */}
         <div className="flex items-center justify-between border-b border-slate-800 px-4 sm:px-5 py-3.5 sm:py-4 shrink-0 bg-slate-900 gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm sm:text-base flex items-center justify-center shrink-0">
-              {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+            <div className="relative">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-slate-800 border border-slate-700 text-amber-500 font-bold text-sm sm:text-base flex items-center justify-center shrink-0">
+                {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              {hasActiveBookingBadge && (
+                <span 
+                  data-testid="modal-profile-booking-dot"
+                  className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-sm shadow-red-500/50" 
+                  title="You have an active booking pending or confirmed"
+                />
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
@@ -559,6 +572,12 @@ export default function UserProfileModal({
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>My Bookings ({userBookings.length})</span>
+            {hasActiveBookingBadge && (
+              <span 
+                data-testid="modal-bookings-tab-dot"
+                className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" 
+              />
+            )}
           </button>
 
           <button

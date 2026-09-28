@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/rbac.js';
 import { logAuditEvent } from '../services/auditService.js';
 import { updateBookingStatus } from '../services/bookingService.js';
 import { normalizeExperienceYears } from '../services/authService.js';
+import { getAllPricing, updateServicePricing, resetServicePricing } from '../services/pricingService.js';
 
 const router = Router();
 
@@ -409,6 +410,48 @@ router.post('/system/clear-data', async (req, res, next) => {
     res.json({
       success: true,
       message: 'All test bookings, dummy customers, and test drivers have been permanently cleared for production.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/pricing (Retrieve live tariff pricing for all services)
+router.get('/pricing', async (req, res, next) => {
+  try {
+    const pricing = await getAllPricing();
+    res.json({
+      success: true,
+      data: pricing
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/pricing (Update service tariff prices)
+router.put('/pricing', async (req, res, next) => {
+  try {
+    const updates = req.body.items || req.body;
+    const updatedPricing = await updateServicePricing(updates, req.user.id, req.ip);
+    res.json({
+      success: true,
+      message: 'Service pricing successfully updated and synchronized across the platform.',
+      data: updatedPricing
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/pricing/reset (Reset service tariffs to factory defaults)
+router.post('/pricing/reset', async (req, res, next) => {
+  try {
+    const resetPricing = await resetServicePricing(req.user.id, req.ip);
+    res.json({
+      success: true,
+      message: 'All service tariffs have been restored to factory defaults.',
+      data: resetPricing
     });
   } catch (err) {
     next(err);

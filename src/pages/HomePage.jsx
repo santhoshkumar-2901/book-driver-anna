@@ -6,11 +6,14 @@ import {
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
 import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE } from '../data/mockData';
+import { usePricing } from '../context/PricingContext';
 
 export default function HomePage({ 
   setActivePage, 
   openBookingModal 
 }) {
+  const { formatPrice } = usePricing();
+
   return (
     <div className="space-y-12 pb-16">
       
@@ -123,15 +126,15 @@ export default function HomePage({
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
                   <span>Hourly In-City:</span>
-                  <span className="font-semibold text-white">From ₹199 / 2 hrs</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_hourly_2hr', 199)} / 2 hrs</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Airport Transfer:</span>
-                  <span className="font-semibold text-white">₹899 flat</span>
+                  <span className="font-semibold text-white">{formatPrice('driver_airport_drop', 899)} flat</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Outstation Driver:</span>
-                  <span className="font-semibold text-white">From ₹1,199 / day</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_outstation_12hr', 1199)} / day</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Gear Compatibility:</span>
@@ -176,15 +179,15 @@ export default function HomePage({
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
                   <span>Compact Sedan (Dzire):</span>
-                  <span className="font-semibold text-white">₹1,999 / day</span>
+                  <span className="font-semibold text-white">{formatPrice('vehicle_sedan_daily', 1999)} / day</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>7-Seater SUV (Innova):</span>
-                  <span className="font-semibold text-white">₹3,499 / day</span>
+                  <span className="font-semibold text-white">{formatPrice('vehicle_suv_daily', 3499)} / day</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>12-Seater Tempo:</span>
-                  <span className="font-semibold text-white">₹5,499 / day</span>
+                  <span className="font-semibold text-white">{formatPrice('vehicle_tempo_12_daily', 5499)} / day</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Sanitization & Fuel:</span>
@@ -229,15 +232,15 @@ export default function HomePage({
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
                   <span>Beginner Course (15 Days):</span>
-                  <span className="font-semibold text-white">₹5,999 all-inc</span>
+                  <span className="font-semibold text-white">{formatPrice('class_beginner', 5999)} all-inc</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Personal Car Refresher:</span>
-                  <span className="font-semibold text-white">₹2,999 (7 Days)</span>
+                  <span className="font-semibold text-white">{formatPrice('class_own_car', 2999)} (7 Days)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Automatic Specialist:</span>
-                  <span className="font-semibold text-white">₹3,999 (10 Days)</span>
+                  <span className="font-semibold text-white">{formatPrice('class_automatic', 3999)} (10 Days)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Pickup:</span>

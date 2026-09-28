@@ -82,6 +82,16 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS service_pricing (
+  id TEXT PRIMARY KEY,
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  price REAL NOT NULL,
+  unit TEXT,
+  description TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id);
@@ -93,4 +103,5 @@ CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings(assigned_driver_
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_reset_user_id ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_category ON service_pricing(category);
 `;

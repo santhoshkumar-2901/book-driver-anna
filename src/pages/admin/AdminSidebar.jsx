@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2 
+  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2, Tag 
 } from 'lucide-react';
 import { SteeringWheel } from '../../components/Icons';
 
@@ -164,6 +164,28 @@ export default function AdminSidebar({
             }`}>
               {usersCount}
             </span>
+          </button>
+
+          {/* Sidebar Item 6: Pricing */}
+          <button
+            onClick={() => navigateToTab('pricing')}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'pricing'
+                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Tag className="w-4 h-4 shrink-0" />
+              <span>Pricing</span>
+            </div>
+            {activeTab === 'pricing' ? (
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-amber-400 border border-slate-700">
+                Tariffs
+              </span>
+            )}
           </button>
         </nav>
 
@@ -331,6 +353,18 @@ export default function AdminSidebar({
               {usersCount}
             </span>
           </button>
+
+          <button
+            onClick={() => navigateToTab('pricing')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activeTab === 'pricing'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Tag className="w-3.5 h-3.5" />
+            <span>Pricing</span>
+          </button>
         </div>
       </div>
 
@@ -479,6 +513,23 @@ export default function AdminSidebar({
                   activeTab === 'users' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
                 }`}>
                   {usersCount}
+                </span>
+              </button>
+
+              <button
+                onClick={() => navigateToTab('pricing')}
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'pricing'
+                    ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Tag className="w-4 h-4 shrink-0" />
+                  <span>Pricing</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-amber-400">
+                  Tariffs
                 </span>
               </button>
             </nav>

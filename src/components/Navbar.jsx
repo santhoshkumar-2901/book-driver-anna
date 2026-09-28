@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { useTheme } from '../utils/themeContext';
+import { useUserBookingBadge } from '../utils/useUserBookingBadge';
 
 export default function Navbar({
   activePage,
@@ -27,10 +28,13 @@ export default function Navbar({
   clientUser,
   onLogout,
   onOpenProfile,
-  onOpenAuth
+  onOpenAuth,
+  hasActiveBookingBadge: externalBadge
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme, isDark } = useTheme();
+  const internalBadge = useUserBookingBadge(clientUser);
+  const hasActiveBookingBadge = externalBadge !== undefined ? externalBadge : internalBadge;
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -132,8 +136,18 @@ export default function Navbar({
                   title={`Account: ${clientUser.name} (${clientUser.phone})`}
                   aria-label={`Open account profile for ${clientUser.name}`}
                 >
-                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
-                    {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                  <div className="relative">
+                    <div className="w-6 h-6 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
+                      {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    {/* Small red dot on user profile: only shows when booking is pending or confirmed, disappears after paid */}
+                    {hasActiveBookingBadge && (
+                      <span 
+                        data-testid="profile-booking-dot"
+                        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-sm shadow-red-500/50" 
+                        title="You have an active booking pending or confirmed"
+                      />
+                    )}
                   </div>
                   <span className="hidden sm:inline-block text-xs font-semibold text-slate-200 max-w-[80px] md:max-w-[110px] truncate">
                     {clientUser.name ? clientUser.name.split(' ')[0] : 'Account'}
@@ -251,8 +265,18 @@ export default function Navbar({
               <div className="pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-sm flex items-center justify-center shrink-0">
-                      {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-sm flex items-center justify-center shrink-0">
+                        {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      {/* Small red dot on mobile user profile avatar */}
+                      {hasActiveBookingBadge && (
+                        <span 
+                          data-testid="mobile-profile-booking-dot"
+                          className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-sm shadow-red-500/50" 
+                          title="You have an active booking pending or confirmed"
+                        />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-100 text-sm truncate">{clientUser.name}</div>
@@ -277,10 +301,16 @@ export default function Navbar({
                     if (onOpenProfile) onOpenProfile();
                     setMobileMenuOpen(false);
                   }}
-                  className="btn-secondary w-full py-2.5 text-xs flex items-center justify-center gap-2"
+                  className="btn-secondary w-full py-2.5 text-xs flex items-center justify-center gap-2 relative"
                 >
                   <User className="w-4 h-4 text-amber-500" />
                   <span>My Profile & Ride History</span>
+                  {hasActiveBookingBadge && (
+                    <span 
+                      data-testid="mobile-profile-button-dot"
+                      className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" 
+                    />
+                  )}
                 </button>
               </div>
             ) : (

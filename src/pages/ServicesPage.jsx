@@ -5,8 +5,25 @@ import {
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import { BOOK_DRIVER_TRIP_TYPES, VEHICLE_SERVICES, BANGALORE_AREAS, DRIVING_CLASSES, DRIVING_CLASS_HIGHLIGHTS, SUPPORT_HELPLINE } from '../data/mockData';
+import { usePricing } from '../context/PricingContext';
 
 export default function ServicesPage({ openBookingModal }) {
+  const { getPrice, formatPrice } = usePricing();
+
+  const getVehicleDailyRate = (category, fallback) => {
+    const key = `vehicle_${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}_daily`;
+    return getPrice(key, fallback);
+  };
+
+  const getVehicleKmRate = (category, fallback) => {
+    const key = `vehicle_${category.toLowerCase().replace(/[^a-z0-9]/g, '_')}_km`;
+    return getPrice(key, fallback);
+  };
+
+  const getClassPrice = (classId, fallback) => {
+    const key = `class_${classId.replace('class-', '').replace(/[^a-z0-9]/g, '_')}`;
+    return getPrice(key, fallback);
+  };
   const [activeServiceTab, setActiveServiceTab] = useState('driver'); // 'driver', 'vehicle', 'class'
   const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState('All');
   const categories = ['All', 'Sedan', 'SUV', '12 Seater', '24 Seater', '32 Seater'];
@@ -23,7 +40,7 @@ export default function ServicesPage({ openBookingModal }) {
     openBookingModal('vehicle', { 
       vehicleCategory: veh.category,
       vehicleName: veh.name,
-      vehicleRate: veh.dailyRate
+      vehicleRate: getVehicleDailyRate(veh.category, veh.dailyRate)
     });
   };
 
@@ -135,7 +152,7 @@ export default function ServicesPage({ openBookingModal }) {
                     <Navigation className="w-3.5 h-3.5" /> One Way
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ ₹249
+                    Starts @ {formatPrice('driver_one_way_city', 299)}
                   </span>
                 </div>
 
@@ -183,7 +200,7 @@ export default function ServicesPage({ openBookingModal }) {
                     <Clock className="w-3.5 h-3.5" /> Round Trip
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ ₹199
+                    Starts @ {formatPrice('driver_hourly_2hr', 199)}
                   </span>
                 </div>
 
@@ -234,7 +251,7 @@ export default function ServicesPage({ openBookingModal }) {
                     <Compass className="w-3.5 h-3.5" /> Outstation
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ ₹1,199
+                    Starts @ {formatPrice('driver_outstation_12hr', 1199)}
                   </span>
                 </div>
 
@@ -347,7 +364,7 @@ export default function ServicesPage({ openBookingModal }) {
                       {veh.badge}
                     </span>
                     <span className="absolute bottom-3 right-3 bg-slate-950/90 text-white font-mono font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-800">
-                      ₹{veh.dailyRate} / Day
+                      ₹{getVehicleDailyRate(veh.category, veh.dailyRate)} / Day
                     </span>
                   </div>
 
@@ -386,7 +403,7 @@ export default function ServicesPage({ openBookingModal }) {
 
                 <div className="p-6 pt-0 flex items-center justify-between border-t border-slate-800/80 mt-4">
                   <div className="text-[11px] text-slate-400">
-                    Outstation Rate: <span className="text-amber-400 font-bold">₹{veh.outstationPerKm}/km</span>
+                    Outstation Rate: <span className="text-amber-400 font-bold">₹{getVehicleKmRate(veh.category, veh.outstationPerKm)}/km</span>
                   </div>
 
                   <button
@@ -460,7 +477,7 @@ export default function ServicesPage({ openBookingModal }) {
                       {cls.badge}
                     </span>
                     <span className="text-2xl font-black text-amber-400 font-['Outfit']">
-                      ₹{cls.basePrice}
+                      ₹{getClassPrice(cls.id, cls.basePrice)}
                     </span>
                   </div>
 

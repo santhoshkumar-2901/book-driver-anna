@@ -14,6 +14,7 @@ import AdminDriverTab from './admin/AdminDriverTab';
 import AdminVehicleTab from './admin/AdminVehicleTab';
 import AdminClassTab from './admin/AdminClassTab';
 import AdminUsersTab from './admin/AdminUsersTab';
+import AdminPricingTab from './admin/AdminPricingTab';
 import AdminModals from './admin/AdminModals';
 
 // Initial state for bookings, rentals, academy enrollments, and clients (empty on clean boot)
@@ -38,7 +39,8 @@ export const ADMIN_TAB_ROUTES = {
   'for-driver': '/admin/driver',
   'for-vehicle': '/admin/vehicle',
   'for-class': '/admin/class',
-  'users': '/admin/users'
+  'users': '/admin/users',
+  'pricing': '/admin/pricing'
 };
 
 export const parseTabFromPath = (path) => {
@@ -58,6 +60,9 @@ export const parseTabFromPath = (path) => {
   }
   if (clean === '/admin/users' || clean === '/admin/user' || clean === '/admin/clients' || clean === '/admin/customers') {
     return 'users';
+  }
+  if (clean === '/admin/pricing' || clean === '/admin/prices' || clean === '/admin/tariffs') {
+    return 'pricing';
   }
   return 'dashboard';
 };
@@ -173,7 +178,8 @@ export default function AdminPage({ onReturnToClient }) {
         'for-driver': 'Driver Bookings Management • Admin • Book Driver Anna',
         'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
         'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
-        'users': 'Customers & Fleet Partners • Admin • Book Driver Anna'
+        'users': 'Customers & Fleet Partners • Admin • Book Driver Anna',
+        'pricing': 'Service Tariffs & Pricing Management • Admin • Book Driver Anna'
       };
       document.title = tabTitles[newTab] || 'Admin Portal • Book Driver Anna';
     }
@@ -192,7 +198,8 @@ export default function AdminPage({ onReturnToClient }) {
             'for-driver': 'Driver Bookings Management • Admin • Book Driver Anna',
             'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
             'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
-            'users': 'Customers & Fleet Partners • Admin • Book Driver Anna'
+            'users': 'Customers & Fleet Partners • Admin • Book Driver Anna',
+            'pricing': 'Service Tariffs & Pricing Management • Admin • Book Driver Anna'
           };
           document.title = tabTitles[tab] || 'Admin Portal • Book Driver Anna';
         }
@@ -1564,6 +1571,10 @@ export default function AdminPage({ onReturnToClient }) {
             handleOpenDeleteUserModal={handleOpenDeleteUserModal}
             onToggleDriverDuty={handleToggleDriverDuty}
           />
+        )}
+
+        {activeTab === 'pricing' && (
+          <AdminPricingTab />
         )}
       </main>
 
