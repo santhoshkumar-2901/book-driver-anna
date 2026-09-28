@@ -150,6 +150,10 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
 
     // HomePage uses dynamic pricing hook
     assert.match(homePageCode, /usePricing\(\)/, 'HomePage must consume usePricing hook');
+
+    // Pricing section in admin panel does not display the word 'tariff'
+    assert.doesNotMatch(pricingTabCode, /tariff/i, 'AdminPricingTab must not contain the word tariff');
+    assert.doesNotMatch(sidebarCode, />\s*Tariffs\s*</i, 'AdminSidebar must not display Tariffs badge');
   });
 
   test('8. Admin SPA route /admin/pricing is registered and correctly parsed', () => {

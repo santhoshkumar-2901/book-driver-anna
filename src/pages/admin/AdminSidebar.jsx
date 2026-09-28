@@ -179,12 +179,8 @@ export default function AdminSidebar({
               <Tag className="w-4 h-4 shrink-0" />
               <span>Pricing</span>
             </div>
-            {activeTab === 'pricing' ? (
+            {activeTab === 'pricing' && (
               <ChevronRight className="w-4 h-4 shrink-0" />
-            ) : (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-amber-400 border border-slate-700">
-                Tariffs
-              </span>
             )}
           </button>
         </nav>
@@ -528,9 +524,6 @@ export default function AdminSidebar({
                   <Tag className="w-4 h-4 shrink-0" />
                   <span>Pricing</span>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-amber-400">
-                  Tariffs
-                </span>
               </button>
             </nav>
 

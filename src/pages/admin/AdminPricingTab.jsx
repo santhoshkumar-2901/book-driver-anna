@@ -75,7 +75,7 @@ export default function AdminPricingTab() {
       await updatePricing(payload);
       setStatusMessage({
         type: 'success',
-        text: `Successfully updated ${payload.length} service tariff${payload.length > 1 ? 's' : ''}! Changes are now live on the main site.`
+        text: `Successfully updated ${payload.length} service price${payload.length > 1 ? 's' : ''}! Changes are now live on the main site.`
       });
 
       setTimeout(() => {
@@ -172,14 +172,14 @@ export default function AdminPricingTab() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-bold mb-2.5">
               <Tag className="w-3.5 h-3.5" />
-              <span>Live Pricing & Tariff Engine</span>
+              <span>Live Pricing Engine</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-1" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] tracking-tight">
               Service Pricing Management
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Configure official tariffs for drivers, fleet rentals, and driving courses. Any price updated here synchronizes in real-time across the client home page, tariff cards, price estimators, and booking checkout calculations.
+              Configure official prices for drivers, fleet rentals, and driving courses. Any price updated here synchronizes in real-time across the client home page, price cards, price estimators, and booking checkout calculations.
             </p>
           </div>
 
@@ -207,7 +207,7 @@ export default function AdminPricingTab() {
               {isSaving ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving Tariffs...</span>
+                  <span>Saving Prices...</span>
                 </>
               ) : (
                 <>
@@ -339,7 +339,7 @@ export default function AdminPricingTab() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search service tariff..."
+            placeholder="Search service price..."
             className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
           />
         </div>
@@ -444,7 +444,7 @@ export default function AdminPricingTab() {
       {filteredItems.length === 0 && (
         <div className="text-center py-12 bg-slate-900/40 border border-slate-800 rounded-3xl p-8 space-y-3">
           <Tag className="w-8 h-8 text-slate-500 mx-auto" />
-          <h3 className="text-sm font-bold text-white">No service tariffs match your filter</h3>
+          <h3 className="text-sm font-bold text-white">No service prices match your filter</h3>
           <p className="text-xs text-slate-400">Try changing the category or clearing the search query.</p>
           <button
             onClick={() => { setActiveCategory('all'); setSearchQuery(''); }}
@@ -465,7 +465,7 @@ export default function AdminPricingTab() {
 
             <div>
               <h3 className="text-base font-bold text-white font-['Outfit']">
-                Reset All Service Tariffs to Defaults?
+                Reset All Service Prices to Defaults?
               </h3>
               <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
                 This will revert all driver packages, vehicle rental daily rates, and driving class fees back to the original company baseline prices. This immediately synchronizes to the client website.

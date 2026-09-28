@@ -179,7 +179,7 @@ export default function AdminPage({ onReturnToClient }) {
         'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
         'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
         'users': 'Customers & Fleet Partners • Admin • Book Driver Anna',
-        'pricing': 'Service Tariffs & Pricing Management • Admin • Book Driver Anna'
+        'pricing': 'Service Pricing Management • Admin • Book Driver Anna'
       };
       document.title = tabTitles[newTab] || 'Admin Portal • Book Driver Anna';
     }
@@ -199,7 +199,7 @@ export default function AdminPage({ onReturnToClient }) {
             'for-vehicle': 'Vehicle Rentals Management • Admin • Book Driver Anna',
             'for-class': 'Driving Academy Enrollments • Admin • Book Driver Anna',
             'users': 'Customers & Fleet Partners • Admin • Book Driver Anna',
-            'pricing': 'Service Tariffs & Pricing Management • Admin • Book Driver Anna'
+            'pricing': 'Service Pricing Management • Admin • Book Driver Anna'
           };
           document.title = tabTitles[tab] || 'Admin Portal • Book Driver Anna';
         }
