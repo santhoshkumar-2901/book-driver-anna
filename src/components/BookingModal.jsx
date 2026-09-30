@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Clock, MapPin, Phone, User, ShieldCheck, Check, Sparkles, AlertCircle, Navigation, Compass, ArrowRight, Users, Snowflake, Sun, Banknote, Smartphone, Lock, Star, Briefcase, Car, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { BANGALORE_AREAS, BOOK_DRIVER_TRIP_TYPES, DRIVING_CLASSES } from '../data/mockData';
@@ -7,6 +7,9 @@ import { toDDMMYYYY, toYYYYMMDD, getTodayDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
 import { usePricing } from '../context/PricingContext';
+import { generateClientBookingIdempotencyKey } from '../utils/idempotency.js';
+
+export { generateClientBookingIdempotencyKey };
 
 export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal, onRequireAuth }) {
   useScrollLock(isOpen);
@@ -55,6 +58,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const idempotencyKeyRef = useRef(null);
 
   useEffect(() => {
     if (initialType) {
@@ -80,6 +84,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   }, [initialType, initialData, isOpen]);
 
   const resetForm = () => {
+    idempotencyKeyRef.current = null;
     setCustomerName(clientUser?.name || '');
     setCustomerPhone(clientUser?.phone || '');
     setCustomerEmail(clientUser?.email || '');
@@ -96,9 +101,12 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      idempotencyKeyRef.current = generateClientBookingIdempotencyKey();
       if (typeof refreshPricing === 'function') {
         refreshPricing();
       }
+    } else {
+      idempotencyKeyRef.current = null;
     }
   }, [isOpen, clientUser]);
 
@@ -227,7 +235,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     }
 
     const bookingDetails = {
-      bookingId: 'BDA-' + Math.floor(100000 + Math.random() * 900000),
+      bookingId: null,
       bookingType: bookingCategory,
       driverTripOption: bookingCategory === 'driver' ? driverTripOption : undefined,
       vehicleCategory: bookingCategory === 'vehicle' ? vehicleCategory : undefined,
@@ -264,6 +272,14 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       assignedAnna: null
     };
 
+    // Generate idempotency key if not already assigned for this submission attempt
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateClientBookingIdempotencyKey();
+    }
+    const currentIdempotencyKey = idempotencyKeyRef.current;
+    bookingDetails.idempotencyKey = currentIdempotencyKey;
+    payloadForApi.idempotencyKey = currentIdempotencyKey;
+
     // If client is not logged in, do NOT create server booking yet. Intercept and prompt login/signup!
     if (!clientUser && onRequireAuth) {
       onRequireAuth(bookingDetails);
@@ -274,29 +290,29 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
     // Client IS logged in: call backend API for authoritative booking creation and slot locking
     setIsSubmitting(true);
+    setFormError('');
     try {
-      let serverBooking = null;
-      try {
-        const serverRes = await apiClient.createBooking(payloadForApi);
-        if (serverRes && serverRes.data && serverRes.data.booking) {
-          serverBooking = serverRes.data.booking;
-        }
-      } catch (apiErr) {
-        if (apiErr.code === 'SLOT_UNAVAILABLE' || apiErr.code === 'INVALID_DATE') {
-          setFormError(apiErr.message);
-          return;
-        }
-        console.warn('[BOOKING] API call fallback:', apiErr.message);
+      const serverRes = await apiClient.createBooking(payloadForApi);
+      if (!serverRes?.data?.booking) {
+        throw new Error('Booking could not be confirmed by the server.');
       }
 
-      if (serverBooking) {
-        bookingDetails.bookingId = serverBooking.id;
-        bookingDetails.totalFare = serverBooking.calculated_fare;
+      const serverBooking = serverRes.data.booking;
+      bookingDetails.bookingId = serverBooking.id;
+      bookingDetails.id = serverBooking.id;
+      bookingDetails.totalFare = serverBooking.calculated_fare;
+      bookingDetails.status = serverBooking.status || 'CONFIRMED';
+      if (serverBooking.assigned_driver_name) {
+        bookingDetails.assignedAnna = serverBooking.assigned_driver_name;
       }
 
       onBookingComplete(bookingDetails);
       resetForm();
       onClose();
+    } catch (apiErr) {
+      console.error('[BOOKING] API creation failed:', apiErr);
+      setFormError(apiErr.message || 'Failed to create booking. Please try again.');
+      // Keep idempotencyKeyRef.current unchanged so user retrying will submit with the EXACT same idempotency key
     } finally {
       setIsSubmitting(false);
     }

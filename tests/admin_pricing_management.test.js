@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { startTestServer } from './testHelper.js';
 import { bootstrapAdmin } from '../server/scripts/bootstrapAdmin.js';
-import { calculateAuthoritativeFare } from '../server/services/pricingService.js';
+import { calculateAuthoritativeFare, getAllPricing } from '../server/services/pricingService.js';
 
 describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', () => {
   let server, baseUrl;
@@ -189,12 +189,16 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(classFare.totalFare, 5999);
   });
 
-  test('10. Health check endpoint reports hasPricingTable is true and database is healthy', async () => {
+  test('10. Health check endpoint reports service is healthy without leaking table metadata; pricing table is initialized', async () => {
     const res = await fetch(`${baseUrl}/api/health`);
     assert.strictEqual(res.status, 200, 'Health check should return HTTP 200');
     const health = await res.json();
     assert.strictEqual(health.status, 'healthy');
-    assert.strictEqual(health.database.hasPricingTable, true, 'Health check must report hasPricingTable: true');
+    assert.strictEqual(health.database, undefined, 'Public health check must not leak internal database metadata');
+
+    // Verify pricing table is present and accessible via pricing service
+    const pricingData = await getAllPricing();
+    assert.ok(Array.isArray(pricingData.list) && pricingData.list.length > 0, 'Pricing service must return configured tariffs');
   });
 
   test('11. Database schema and initialization code auto-create service_pricing table for TiDB and SQLite', () => {

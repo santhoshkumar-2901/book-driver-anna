@@ -90,4 +90,22 @@ describe('Production Seed Gating & Admin Bootstrap Script Tests', () => {
     assert.strictEqual(duplicateResult.id, dbRecord.id);
   });
 
+  test('4. bootstrapAdmin fails clearly when email is missing (no default email allowed)', async () => {
+    const origEnvEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
+    delete process.env.BOOTSTRAP_ADMIN_EMAIL;
+
+    try {
+      await assert.rejects(
+        async () => {
+          await bootstrapAdmin({ password: 'StrongPassword123!' });
+        },
+        /Admin email is required/
+      );
+    } finally {
+      if (origEnvEmail !== undefined) {
+        process.env.BOOTSTRAP_ADMIN_EMAIL = origEnvEmail;
+      }
+    }
+  });
+
 });

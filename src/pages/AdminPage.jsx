@@ -222,16 +222,6 @@ export default function AdminPage({ onReturnToClient }) {
     }
   }, [isAdminLoggedIn]);
 
-  // Ensure authentic admin token is active whenever admin portal is accessed
-  useEffect(() => {
-    if (isAdminLoggedIn) {
-      const storedToken = localStorage.getItem('bda_admin_token');
-      if (!storedToken) {
-        apiClient.adminSession({ phone: loggedInAdminPhone })
-          .catch(() => {});
-      }
-    }
-  }, [isAdminLoggedIn, loggedInAdminPhone]);
 
   // Persistent Driver Bookings State
   const [driverBookings, setDriverBookings] = useState(() => {
@@ -670,6 +660,40 @@ export default function AdminPage({ onReturnToClient }) {
           });
         }
       })
+      .catch((err) => {
+        console.error('[ADMIN] Failed to fetch users from server:', err.message);
+      });
+  }, [isAdminLoggedIn]);
+
+  // Sync registered drivers with backend server database when admin is logged in
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    apiClient.getAdminDrivers()
+      .then((res) => {
+        if (res && res.data && Array.isArray(res.data.drivers)) {
+          const serverDrivers = res.data.drivers.map(d => ({
+            id: d.id,
+            name: d.name,
+            phone: d.phone,
+            email: d.email || '',
+            area: d.hub_area || d.area || 'Bangalore',
+            status: d.status || 'Active',
+            isOnline: Boolean(d.is_available ?? (d.status === 'Active')),
+            licenseNumber: d.license_number || d.licenseNumber || '',
+            rating: d.rating || 5.0,
+            totalTrips: d.total_trips || 0,
+            upiId: d.upi_id || ''
+          }));
+          const cleanDrivers = sanitizeDrivers(serverDrivers);
+          setRegisteredDrivers(cleanDrivers);
+          try {
+            localStorage.setItem('bda_registered_drivers', JSON.stringify(cleanDrivers));
+          } catch (e) {}
+        }
+      })
+      .catch((err) => {
+        console.error('[ADMIN] Failed to fetch drivers from server:', err.message);
+      });
   }, [isAdminLoggedIn]);
 
   // Sync server bookings with admin dashboard when admin is logged in
@@ -857,7 +881,9 @@ export default function AdminPage({ onReturnToClient }) {
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[ADMIN] Failed to fetch bookings from server:', err.message);
+      });
   }, [isAdminLoggedIn]);
 
   // Search & Filters
@@ -887,56 +913,8 @@ export default function AdminPage({ onReturnToClient }) {
       return;
     }
 
-    if (authMode === 'register') {
-      if (!submittedFullName) {
-        setAuthError('Please enter your full name');
-        return;
-      }
-      if (!submittedPhone) {
-        setAuthError('Please enter your mobile phone number');
-        return;
-      }
-      if (submittedPassword.length < 6) {
-        setAuthError('Password must be at least 6 characters long');
-        return;
-      }
-      if (submittedSecretKey !== 'ANNA2026') {
-        setAuthError('Invalid Admin Secret Key.');
-        return;
-      }
-    }
-
     setIsAuthSubmitting(true);
     try {
-      if (authMode === 'register') {
-        const nameToSave = submittedFullName;
-        const phoneToSave = submittedPhone;
-        const emailLower = submittedEmail.toLowerCase();
-
-        const res = await apiClient.adminRegister({
-          name: nameToSave,
-          email: emailLower,
-          phone: phoneToSave,
-          password: submittedPassword,
-          secretKey: submittedSecretKey
-        });
-
-        if (res && res.data && res.data.user) {
-          resetAuthForm();
-          setLoggedInAdminName(res.data.user.name || nameToSave);
-          setLoggedInAdminPhone(res.data.user.phone || phoneToSave);
-          setIsAdminLoggedIn(true);
-          localStorage.setItem('bda_admin_logged_in', 'true');
-          localStorage.setItem('bda_admin_name', res.data.user.name || nameToSave);
-          localStorage.setItem('bda_admin_phone', res.data.user.phone || phoneToSave);
-          const requestedTab = parseTabFromPath(window.location.pathname);
-          navigateToTab(requestedTab, true);
-          return;
-        }
-        setAuthError('Administrator registration failed.');
-        return;
-      }
-
       const res = await apiClient.adminLogin({
         identifier: submittedEmail,
         password: submittedPassword
@@ -989,6 +967,7 @@ export default function AdminPage({ onReturnToClient }) {
 
   // State map for admin-typed driver details (bookingId -> { name, phone })
   const [driverInputState, setDriverInputState] = useState({});
+  const [assigningBookingId, setAssigningBookingId] = useState(null);
 
   const handleDriverInputChange = (bookingId, field, value) => {
     setDriverInputState(prev => ({
@@ -1034,88 +1013,103 @@ export default function AdminPage({ onReturnToClient }) {
     const typedPhone = (overridePhone !== null ? overridePhone : driverInputState[bookingId]?.phone)?.trim();
     
     if (!typedName || !typedPhone) {
-      console.warn('[ADMIN] Cannot accept & assign driver without valid driver name and phone.');
+      alert('⚠️ Cannot accept & assign driver without valid driver name and phone.');
       return false;
     }
 
     const finalName = typedName;
     const finalPhone = typedPhone;
 
-    // Look up assigned driver UPI from registered drivers fleet
+    // Look up assigned driver from registered drivers fleet
     const matchedDriver = registeredDrivers.find(d => {
       const dClean = (d.phone || '').replace(/[^0-9]/g, '');
       const tClean = finalPhone.replace(/[^0-9]/g, '');
       return (tClean && dClean && (tClean === dClean || tClean.includes(dClean) || dClean.includes(tClean))) ||
              (d.name && d.name.toLowerCase().trim() === finalName.toLowerCase().trim());
     });
-    const finalUpi = matchedDriver?.upiId || `${finalName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'driver'}@oksbi`;
 
-    // Update input state as well so the inputs reflect the assigned driver
-    setDriverInputState(prev => ({
-      ...prev,
-      [bookingId]: {
-        name: finalName,
-        phone: finalPhone
-      }
-    }));
+    if (!matchedDriver || !matchedDriver.id) {
+      alert('⚠️ Cannot assign driver: Please select a verified driver from the fleet. Fabricated or unregistered drivers cannot be assigned.');
+      return false;
+    }
 
-    // Synchronously update localStorage so immediate listeners or storage readers see the updated booking
+    const finalUpi = matchedDriver?.upiId || '';
+
+    setAssigningBookingId(bookingId);
+
+    // 1. Authoritative Backend Update FIRST
     try {
-      const currentList = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updatedList = currentList.map(b => (b.id === bookingId ? {
-        ...b,
-        assignedDriver: finalName,
-        assignedDriverPhone: finalPhone,
-        assignedDriverUpi: finalUpi,
-        status: 'Assigned'
-      } : b));
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updatedList));
-    } catch (e) {}
-
-    // 1. Update React state immediately
-    setDriverBookings(prev => {
-      const updated = prev.map(b => {
-        if (b.id === bookingId) {
-          return {
-            ...b,
-            assignedDriver: finalName,
-            assignedDriverPhone: finalPhone,
-            assignedDriverUpi: finalUpi,
-            status: 'Assigned'
-          };
-        }
-        return b;
-      });
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
-      return updated;
-    });
-
-    // 2. Broadcast booking update event to client listeners across all tabs and windows
-    broadcastBookingUpdate({
-      bookingId,
-      status: 'Assigned',
-      assignedDriver: finalName,
-      assignedDriverPhone: finalPhone,
-      assignedDriverUpi: finalUpi
-    });
-
-    // 3. Persist to authoritative backend database with driver details
-    try {
-      if (!localStorage.getItem('bda_admin_token')) {
-        await apiClient.adminSession({ phone: loggedInAdminPhone }).catch(() => {});
-      }
-      await apiClient.updateAdminBooking(bookingId, {
+      const res = await apiClient.updateAdminBooking(bookingId, {
         status: 'ASSIGNED',
+        assignedDriverId: matchedDriver?.id,
         driverName: finalName,
         driverPhone: finalPhone,
         assignedDriverName: finalName,
         assignedDriverPhone: finalPhone
       });
-    } catch (err) {
-      console.warn('[ADMIN] Backend booking status update note:', err.message);
-    }
 
-    return true;
+      if (!res?.data?.booking) {
+        throw new Error('Driver assignment could not be confirmed by the server.');
+      }
+
+      const confirmedBooking = res.data.booking;
+
+      // 2. Update input state so the inputs reflect the assigned driver
+      setDriverInputState(prev => ({
+        ...prev,
+        [bookingId]: {
+          name: finalName,
+          phone: finalPhone
+        }
+      }));
+
+      // 3. Update React state using backend confirmed booking
+      setDriverBookings(prev => {
+        const updated = prev.map(b => {
+          if (b.id === bookingId) {
+            return {
+              ...b,
+              ...confirmedBooking,
+              assignedDriver: finalName,
+              assignedDriverPhone: finalPhone,
+              assignedDriverUpi: finalUpi,
+              status: 'Assigned'
+            };
+          }
+          return b;
+        });
+
+        // 4. Update non-authoritative convenience cache only on success
+        try {
+          localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+        } catch (e) {}
+
+        return updated;
+      });
+
+      // 5. Broadcast booking update event to client listeners across all tabs and windows
+      broadcastBookingUpdate({
+        bookingId,
+        status: 'Assigned',
+        assignedDriver: finalName,
+        assignedDriverPhone: finalPhone,
+        assignedDriverUpi: finalUpi
+      });
+
+      return true;
+    } catch (err) {
+      console.error('[ADMIN] Backend booking status update failed:', err);
+      let errorMsg = err.message || 'Failed to assign driver.';
+      if (err.status === 409 || err.code === 'SLOT_UNAVAILABLE') {
+        errorMsg = 'The selected driver is already booked for this booking slot. Please choose another driver.';
+      } else if (err.status === 400 || err.code === 'INVALID_DRIVER') {
+        errorMsg = err.message || 'Assigned driver must exist and have Active status.';
+      }
+      alert(`⚠️ Assignment Failed: ${errorMsg}`);
+      return false;
+    } finally {
+      setAssigningBookingId(null);
+    }
   };
 
   // WhatsApp Sender ONLY to Client (Enabled ONLY after Accept & Assign)
@@ -1525,6 +1519,7 @@ export default function AdminPage({ onReturnToClient }) {
             handleAcceptAndAssignDriver={handleAcceptAndAssignDriver}
             registeredDrivers={registeredDrivers}
             sendWhatsAppToClientForDriver={sendWhatsAppToClientForDriver}
+            assigningBookingId={assigningBookingId}
           />
         )}
 

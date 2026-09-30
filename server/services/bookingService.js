@@ -1,14 +1,15 @@
 import crypto from 'crypto';
-import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
+import { queryOne, queryAll, execute, withTransaction, isTiDB } from '../db/database.js';
 import { calculateAuthoritativeFare, getAllPricing } from './pricingService.js';
 import { logAuditEvent } from './auditService.js';
+import { isValidCalendarDate, getTodayIST } from '../middleware/validate.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
   'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
-  'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED', 'PENDING'],
-  'ASSIGNED': ['IN_PROGRESS', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'PENDING'],
-  'IN_PROGRESS': ['COMPLETED', 'CANCELLED'],
+  'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED'],
+  'ASSIGNED': ['IN_PROGRESS', 'CONFIRMED', 'CANCELLED'],
+  'IN_PROGRESS': ['COMPLETED'],
   'COMPLETED': [], // Terminal
   'CANCELLED': []  // Terminal
 };
@@ -35,8 +36,15 @@ export async function createBooking({
   idempotencyKey = null,
   ipAddress = null
 }) {
-  // 1. Validate Date: Cannot book in the past
-  const today = new Date().toISOString().split('T')[0];
+  // 1. Validate Date: Must be a valid calendar date in YYYY-MM-DD format and cannot be in the past (IST)
+  if (!date || !isValidCalendarDate(date)) {
+    const err = new Error('Booking date must be a valid calendar date in YYYY-MM-DD format.');
+    err.statusCode = 400;
+    err.code = 'INVALID_INPUT';
+    throw err;
+  }
+
+  const today = getTodayIST();
   if (date < today) {
     const err = new Error('Booking date cannot be in the past.');
     err.statusCode = 400;
@@ -84,7 +92,33 @@ export async function createBooking({
 
     // Check if user requested a specific driver
     if (preferredDriverId) {
-      // Check if driver is already booked for this slot
+      // 1. Verify the driver exists and is Active with row-level serialization for TiDB
+      // In TiDB (distributed MySQL), SELECT ... FOR UPDATE acquires a pessimistic lock on the driver row,
+      // serializing concurrent booking attempts for the same driver.
+      // In SQLite, withTransaction uses BEGIN IMMEDIATE which acquires an exclusive DB-level lock.
+      const driverQuery = isTiDB
+        ? 'SELECT id, name, status FROM drivers WHERE id = ? FOR UPDATE'
+        : 'SELECT id, name, status FROM drivers WHERE id = ?';
+      const driver = await tx.queryOne(
+        driverQuery,
+        [preferredDriverId]
+      );
+
+      if (!driver) {
+        throw Object.assign(new Error('The requested driver does not exist.'), {
+          statusCode: 400,
+          code: 'DRIVER_NOT_FOUND'
+        });
+      }
+
+      if (driver.status !== 'Active') {
+        throw Object.assign(new Error(`The requested driver is currently ${driver.status.toLowerCase()} and cannot accept new bookings.`), {
+          statusCode: 400,
+          code: 'DRIVER_NOT_ACTIVE'
+        });
+      }
+
+      // 2. Check if driver is already booked for this slot
       const conflict = await tx.queryOne(`
         SELECT id FROM bookings 
         WHERE assigned_driver_id = ? 
@@ -154,14 +188,17 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   }
 
   // Authorization Check:
-  // 1. User owns the booking OR is Admin
-  // 2. OR requester provided matching phone number for guest bookings
-  const isOwner = requesterUser && (booking.user_id === requesterUser.id || requesterUser.role === 'admin');
-  const isPhoneMatch = requesterPhone && (
-    booking.customer_phone.replace(/[^0-9]/g, '').endsWith(requesterPhone.replace(/[^0-9]/g, '').slice(-10))
-  );
+  // 1. Admin always authorized
+  // 2. Authenticated user who owns the booking (booking.user_id === requesterUser.id)
+  // 3. Guest booking (booking.user_id IS NULL): requester must supply matching phone number
+  const isAdmin = requesterUser && requesterUser.role === 'admin';
+  const isOwner = requesterUser && booking.user_id && (booking.user_id === requesterUser.id);
+  const cleanBookingPhone = (booking.customer_phone || '').replace(/[^0-9]/g, '').slice(-10);
+  const cleanRequesterPhone = (requesterPhone || '').replace(/[^0-9]/g, '').slice(-10);
+  const isGuestBooking = !booking.user_id;
+  const isPhoneMatch = isGuestBooking && cleanRequesterPhone && cleanBookingPhone.endsWith(cleanRequesterPhone);
 
-  if (!isOwner && !isPhoneMatch) {
+  if (!isAdmin && !isOwner && !isPhoneMatch) {
     await logAuditEvent({
       userId: requesterUser?.id || null,
       action: 'UNAUTHORIZED_CANCEL_ATTEMPT',
@@ -177,8 +214,8 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   }
 
   // State Machine Validation: Only PENDING, CONFIRMED, or ASSIGNED can be cancelled
-  if (booking.status === 'COMPLETED') {
-    const err = new Error('Completed trips cannot be cancelled.');
+  if (booking.status === 'COMPLETED' || booking.status === 'IN_PROGRESS') {
+    const err = new Error(`Trips in '${booking.status}' status cannot be cancelled.`);
     err.statusCode = 400;
     err.code = 'INVALID_STATE_TRANSITION';
     throw err;
@@ -188,11 +225,31 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
     return { booking, alreadyCancelled: true };
   }
 
-  await execute(`
+  const CANCELLABLE_STATES = ['PENDING', 'CONFIRMED', 'ASSIGNED'];
+  if (!CANCELLABLE_STATES.includes(booking.status)) {
+    const err = new Error(`Cannot cancel booking with status '${booking.status}'.`);
+    err.statusCode = 400;
+    err.code = 'INVALID_STATE_TRANSITION';
+    throw err;
+  }
+
+  // Atomic conditional update
+  const result = await execute(`
     UPDATE bookings 
     SET status = 'CANCELLED', cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
+    WHERE id = ? AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED')
   `, [reason, bookingId]);
+
+  if (result.affectedRows === 0) {
+    const current = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (current && current.status === 'CANCELLED') {
+      return { booking: current, alreadyCancelled: true };
+    }
+    const err = new Error('Booking could not be cancelled due to a concurrent state change.');
+    err.statusCode = 409;
+    err.code = 'CONCURRENT_MODIFICATION';
+    throw err;
+  }
 
   await logAuditEvent({
     userId: requesterUser?.id || null,
@@ -214,9 +271,13 @@ export async function updateBookingStatus({
   assignedDriverName = undefined,
   assignedDriverPhone = undefined,
   requesterUser, 
-  ipAddress = null 
+  ipAddress = null,
+  tx = null
 }) {
-  const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+  const qOne = tx ? tx.queryOne : queryOne;
+  const exec = tx ? tx.execute : execute;
+
+  const booking = await qOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
   if (!booking) {
     const err = new Error('Booking not found.');
     err.statusCode = 404;
@@ -240,6 +301,14 @@ export async function updateBookingStatus({
   }
 
   const currentStatus = String(booking.status).toUpperCase();
+
+  // Terminal state protection: never resurrect or alter COMPLETED or CANCELLED bookings
+  if (currentStatus === 'COMPLETED' || currentStatus === 'CANCELLED') {
+    const err = new Error(`Cannot modify or transition booking in terminal '${booking.status}' status.`);
+    err.statusCode = 400;
+    err.code = 'INVALID_STATE_TRANSITION';
+    throw err;
+  }
 
   // Validate state machine transition (allow same status or permitted transition)
   const allowed = ALLOWED_STATE_TRANSITIONS[currentStatus] || [];
@@ -266,10 +335,30 @@ export async function updateBookingStatus({
     params.push(assignedDriverPhone);
   }
 
-  updateSql += ` WHERE id = ?`;
-  params.push(bookingId);
+  updateSql += ` WHERE id = ? AND status = ?`;
+  params.push(bookingId, booking.status);
 
-  await execute(updateSql, params);
+  const result = await exec(updateSql, params);
+
+  if (result.affectedRows === 0) {
+    const current = await qOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (!current) {
+      const err = new Error('Booking not found.');
+      err.statusCode = 404;
+      err.code = 'BOOKING_NOT_FOUND';
+      throw err;
+    }
+    if (current.status === 'COMPLETED' || current.status === 'CANCELLED') {
+      const err = new Error(`Cannot modify or transition booking in terminal '${current.status}' status.`);
+      err.statusCode = 400;
+      err.code = 'INVALID_STATE_TRANSITION';
+      throw err;
+    }
+    const err = new Error('Booking could not be updated due to a concurrent state change.');
+    err.statusCode = 409;
+    err.code = 'CONCURRENT_MODIFICATION';
+    throw err;
+  }
 
   await logAuditEvent({
     userId: requesterUser?.id || null,
@@ -280,7 +369,7 @@ export async function updateBookingStatus({
     ipAddress
   });
 
-  return await queryOne(`
+  return await qOne(`
     SELECT b.*, 
            COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
            COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone

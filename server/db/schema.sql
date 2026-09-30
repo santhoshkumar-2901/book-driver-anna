@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS drivers (
   specialization TEXT DEFAULT 'Manual & Automatic Cars',
   rating REAL DEFAULT 4.95,
   trips_completed INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'On Duty', 'Off Duty', 'Suspended')),
+  upi_id TEXT DEFAULT NULL,
+  status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive', 'On Duty', 'Off Duty', 'Suspended')),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

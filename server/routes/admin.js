@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, execute, withTransaction } from '../db/database.js';
+import { queryOne, queryAll, execute, withTransaction, isTiDB } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { logAuditEvent } from '../services/auditService.js';
 import { updateBookingStatus } from '../services/bookingService.js';
 import { normalizeExperienceYears } from '../services/authService.js';
 import { getAllPricing, updateServicePricing, resetServicePricing } from '../services/pricingService.js';
+import { ENV } from '../config/env.js';
 
 const router = Router();
 
@@ -88,42 +89,70 @@ router.patch('/bookings/:id', async (req, res, next) => {
     const bookingId = req.params.id;
     const { status, assignedDriverId, assignedDriverName, assignedDriverPhone, driverName, driverPhone } = req.body;
 
-    const existing = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
-    if (!existing) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'BOOKING_NOT_FOUND', message: 'Booking not found.' }
-      });
-    }
+    const updated = await withTransaction(async (tx) => {
+      const lockBookingSql = isTiDB
+        ? 'SELECT * FROM bookings WHERE id = ? FOR UPDATE'
+        : 'SELECT * FROM bookings WHERE id = ?';
+      const existing = await tx.queryOne(lockBookingSql, [bookingId]);
+      if (!existing) {
+        const err = new Error('Booking not found.');
+        err.statusCode = 404;
+        err.code = 'BOOKING_NOT_FOUND';
+        throw err;
+      }
 
-    let updated;
-    if (status) {
-      updated = await updateBookingStatus({
+      // Terminal state protection: never resurrect or alter COMPLETED or CANCELLED bookings
+      if (existing.status === 'COMPLETED' || existing.status === 'CANCELLED') {
+        const err = new Error(`Cannot assign driver or modify booking in terminal '${existing.status}' status.`);
+        err.statusCode = 400;
+        err.code = 'INVALID_STATE_TRANSITION';
+        throw err;
+      }
+
+      if (assignedDriverId) {
+        const lockDriverSql = isTiDB
+          ? 'SELECT id, status FROM drivers WHERE id = ? FOR UPDATE'
+          : 'SELECT id, status FROM drivers WHERE id = ?';
+        const driver = await tx.queryOne(lockDriverSql, [assignedDriverId]);
+        if (!driver || driver.status !== 'Active') {
+          const err = new Error('Assigned driver must exist and have Active status.');
+          err.statusCode = 400;
+          err.code = 'INVALID_DRIVER';
+          throw err;
+        }
+
+        // Check for slot conflict with another active booking for this driver
+        const conflict = await tx.queryOne(`
+          SELECT id
+          FROM bookings
+          WHERE assigned_driver_id = ?
+            AND date = ?
+            AND time = ?
+            AND id != ?
+            AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
+          LIMIT 1
+        `, [assignedDriverId, existing.date, existing.time, bookingId]);
+
+        if (conflict) {
+          const err = new Error('The assigned driver is already booked for this date and time slot.');
+          err.statusCode = 409;
+          err.code = 'SLOT_UNAVAILABLE';
+          throw err;
+        }
+      }
+
+      const targetStatus = status || (existing.status === 'PENDING' || existing.status === 'CONFIRMED' ? 'ASSIGNED' : existing.status);
+      return await updateBookingStatus({
         bookingId,
-        newStatus: status,
+        newStatus: targetStatus,
         assignedDriverId,
         assignedDriverName: assignedDriverName || driverName,
         assignedDriverPhone: assignedDriverPhone || driverPhone,
         requesterUser: req.user,
-        ipAddress: req.ip
+        ipAddress: req.ip,
+        tx
       });
-    } else if (assignedDriverId !== undefined) {
-      await execute('UPDATE bookings SET assigned_driver_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
-        assignedDriverId,
-        'ASSIGNED',
-        bookingId
-      ]);
-      updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
-
-      await logAuditEvent({
-        userId: req.user.id,
-        action: 'ADMIN_ASSIGNED_DRIVER',
-        resourceType: 'booking',
-        resourceId: bookingId,
-        details: { driverId: assignedDriverId },
-        ipAddress: req.ip
-      });
-    }
+    });
 
     res.json({
       success: true,
@@ -196,6 +225,13 @@ router.post('/users', async (req, res, next) => {
       });
     }
 
+    if (!password || typeof password !== 'string' || password.trim().length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Password is required and must be at least 8 characters long.' }
+      });
+    }
+
     const existing = await queryOne('SELECT id FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?', [
       email.trim(),
       phone.trim()
@@ -208,7 +244,7 @@ router.post('/users', async (req, res, next) => {
     }
 
     const id = 'USR-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    const passwordHash = bcrypt.hashSync(password || 'password123', 10);
+    const passwordHash = bcrypt.hashSync(password.trim(), 10);
 
     await execute(`
       INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
@@ -288,11 +324,18 @@ router.get('/drivers', async (req, res, next) => {
 // POST /api/admin/drivers (Add new driver)
 router.post('/drivers', async (req, res, next) => {
   try {
-    const { name, phone, licenseNumber, hubArea, experienceYears, specialization } = req.body;
+    const { name, phone, licenseNumber, password, hubArea, experienceYears, specialization } = req.body;
     if (!name || !phone || !licenseNumber) {
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_INPUT', message: 'Driver name, phone, and license number are required.' }
+      });
+    }
+
+    if (!password || typeof password !== 'string' || password.trim().length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'A valid driver password of at least 8 characters is required.' }
       });
     }
 
@@ -308,7 +351,7 @@ router.post('/drivers', async (req, res, next) => {
 
     const usrId = 'USR-DRV-' + crypto.randomBytes(3).toString('hex').toUpperCase();
     const drvId = 'DRV-' + crypto.randomBytes(2).toString('hex').toUpperCase();
-    const driverHash = bcrypt.hashSync('driver123', 10);
+    const driverHash = bcrypt.hashSync(password.trim(), 10);
     const email = `${name.toLowerCase().replace(/\s+/g, '.')}@driveranna.com`;
 
     const created = await withTransaction(async (tx) => {
@@ -364,6 +407,7 @@ router.delete('/drivers/:id', async (req, res, next) => {
     }
 
     await withTransaction(async (tx) => {
+      await tx.execute('UPDATE bookings SET assigned_driver_id = NULL WHERE assigned_driver_id = ?', [drvId]);
       await tx.execute('DELETE FROM drivers WHERE id = ?', [drvId]);
       await tx.execute('DELETE FROM users WHERE id = ?', [driver.user_id]);
     });
@@ -386,16 +430,23 @@ router.delete('/drivers/:id', async (req, res, next) => {
   }
 });
 
-// POST /api/admin/system/clear-data (Production Reset: Clear all bookings, drivers, customers, keeping current admin)
+// POST /api/admin/system/clear-data (Development/Test Reset: Clear bookings, drivers, customers, keeping current admin)
 router.post('/system/clear-data', async (req, res, next) => {
   try {
+    if (ENV.IS_PRODUCTION || process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'System data clearing is disabled in production.' }
+      });
+    }
+
     const currentAdminId = req.user.id;
 
     await withTransaction(async (tx) => {
       await tx.execute('DELETE FROM bookings');
       await tx.execute('DELETE FROM drivers');
       await tx.execute("DELETE FROM users WHERE role != 'admin' OR (id != ? AND email = 'admin@bookdriveranna.com')", [currentAdminId]);
-      await tx.execute('DELETE FROM audit_logs');
+      // Note: audit_logs is NOT deleted! Audit history remains preserved.
     });
 
     await logAuditEvent({
@@ -409,7 +460,7 @@ router.post('/system/clear-data', async (req, res, next) => {
 
     res.json({
       success: true,
-      message: 'All test bookings, dummy customers, and test drivers have been permanently cleared for production.'
+      message: 'All test bookings, dummy customers, and test drivers have been cleared.'
     });
   } catch (err) {
     next(err);
@@ -452,6 +503,31 @@ router.post('/pricing/reset', async (req, res, next) => {
       success: true,
       message: 'All service tariffs have been restored to factory defaults.',
       data: resetPricing
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/diagnostics (Protected admin system diagnostics)
+router.get('/diagnostics', async (req, res, next) => {
+  try {
+    const driversRow = await queryOne('SELECT COUNT(*) as count FROM drivers');
+    const adminsRow = await queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+    const usersRow = await queryOne('SELECT COUNT(*) as count FROM users');
+    const bookingsRow = await queryOne('SELECT COUNT(*) as count FROM bookings');
+
+    res.json({
+      success: true,
+      data: {
+        database: {
+          status: 'connected',
+          userCount: Number(usersRow?.count || 0),
+          adminCount: Number(adminsRow?.count || 0),
+          driverCount: Number(driversRow?.count || 0),
+          bookingCount: Number(bookingsRow?.count || 0)
+        }
+      }
     });
   } catch (err) {
     next(err);

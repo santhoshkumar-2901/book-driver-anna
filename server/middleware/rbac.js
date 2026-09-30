@@ -25,6 +25,13 @@ export function requireRole(...allowedRoles) {
 
 export async function checkBookingOwnership(req, res, next) {
   try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required.' }
+      });
+    }
+
     const bookingId = req.params.id || req.body.bookingId;
     if (!bookingId) {
       return res.status(400).json({
@@ -41,23 +48,32 @@ export async function checkBookingOwnership(req, res, next) {
       });
     }
 
-    // Admins have override access
-    if (req.user && req.user.role === 'admin') {
+    // 1. Admins have override access
+    if (req.user.role === 'admin') {
       req.booking = booking;
       return next();
     }
 
-    // Check if authenticated user owns the booking
-    if (req.user && booking.user_id === req.user.id) {
+    // 2. Customer ownership verification
+    if (booking.user_id && booking.user_id === req.user.id) {
       req.booking = booking;
       return next();
+    }
+
+    // 3. Assigned driver verification
+    if (req.user.role === 'driver') {
+      const driver = await queryOne('SELECT id, status FROM drivers WHERE user_id = ?', [req.user.id]);
+      if (driver && driver.status === 'Active' && booking.assigned_driver_id === driver.id) {
+        req.booking = booking;
+        return next();
+      }
     }
 
     return res.status(403).json({
       success: false,
       error: {
         code: 'FORBIDDEN',
-        message: 'Access denied: You do not own this booking.'
+        message: 'Access denied: You are not authorized to access this booking.'
       }
     });
   } catch (err) {

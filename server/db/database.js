@@ -21,6 +21,46 @@ if (isTiDB) {
     console.log('[DATABASE] Initialized TiDB Cloud connection (Serverless HTTP Driver)');
     // Auto-create essential tables if not exist in TiDB Cloud
     tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        phone VARCHAR(64) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(32) NOT NULL DEFAULT 'customer',
+        area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+        status VARCHAR(32) NOT NULL DEFAULT 'Active',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_users_email (email),
+        INDEX idx_users_phone (phone)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB users auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS drivers (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL UNIQUE,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(64) NOT NULL,
+        license_number VARCHAR(64) NOT NULL UNIQUE,
+        hub_area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+        experience_years VARCHAR(64) DEFAULT '5 Years',
+        specialization VARCHAR(255) DEFAULT 'Manual & Automatic Cars',
+        rating DECIMAL(3,2) DEFAULT 4.95,
+        trips_completed INT DEFAULT 0,
+        upi_id VARCHAR(255) DEFAULT NULL,
+        status VARCHAR(32) DEFAULT 'Active',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_drivers_phone (phone),
+        INDEX idx_drivers_license (license_number)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB drivers auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
         user_id VARCHAR(64) NOT NULL,
@@ -76,10 +116,23 @@ if (isTiDB) {
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_bookings_user_id (user_id),
         INDEX idx_bookings_phone (customer_phone),
-        INDEX idx_bookings_date_status (date, status)
+        INDEX idx_bookings_date_status (date, status),
+        INDEX idx_bookings_driver_slot (assigned_driver_id, date, time)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `).catch(err => {
       console.warn('[DATABASE] TiDB bookings auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
+      CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings (assigned_driver_id, date, time);
+    `).catch(err => {
+      const isExpected = err?.message?.includes('Duplicate key') ||
+        err?.message?.includes('already exists') ||
+        err?.code === 'ER_DUP_KEYNAME' ||
+        err?.errno === 1061;
+      if (!isExpected) {
+        console.warn('[DATABASE] TiDB idx_bookings_driver_slot auto-init note:', err.message);
+      }
     });
 
     tidbConn.execute(`
@@ -102,6 +155,10 @@ if (isTiDB) {
     throw err;
   }
 } else {
+  if (ENV.IS_PRODUCTION) {
+    throw new Error('DATABASE_URL is required in production.');
+  }
+
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
   let dbFilePath;
 
@@ -144,6 +201,9 @@ if (isTiDB) {
   } catch (e) {}
   try {
     sqliteDb.exec('ALTER TABLE bookings ADD COLUMN assigned_driver_phone TEXT;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec("ALTER TABLE drivers ADD COLUMN upi_id TEXT DEFAULT NULL;");
   } catch (e) {}
 
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
@@ -227,6 +287,8 @@ export async function exec(sql) {
   }
 }
 
+let sqliteTxMutex = Promise.resolve();
+
 /**
  * Execute operations within a transaction
  */
@@ -259,28 +321,40 @@ export async function withTransaction(callback) {
       throw err;
     }
   } else {
-    sqliteDb.exec('BEGIN IMMEDIATE;');
+    // SQLite operates on a single connection handle; serialize concurrent async transactions
+    // to prevent "cannot start a transaction within a transaction" errors.
+    let release;
+    const currentLock = new Promise((resolve) => { release = resolve; });
+    const previousLock = sqliteTxMutex;
+    sqliteTxMutex = previousLock.then(() => currentLock, () => currentLock);
+    await previousLock;
+
     try {
-      const txExecutor = {
-        queryOne: async (sql, params = []) => {
-          const row = sqliteDb.prepare(sql).get(...params);
-          return row ? normalizeRow(row) : null;
-        },
-        queryAll: async (sql, params = []) => {
-          const rows = sqliteDb.prepare(sql).all(...params);
-          return normalizeRows(rows);
-        },
-        execute: async (sql, params = []) => {
-          const res = sqliteDb.prepare(sql).run(...params);
-          return { affectedRows: res.changes, insertId: res.lastInsertRowid };
-        }
-      };
-      const result = await callback(txExecutor);
-      sqliteDb.exec('COMMIT;');
-      return result;
-    } catch (err) {
-      sqliteDb.exec('ROLLBACK;');
-      throw err;
+      sqliteDb.exec('BEGIN IMMEDIATE;');
+      try {
+        const txExecutor = {
+          queryOne: async (sql, params = []) => {
+            const row = sqliteDb.prepare(sql).get(...params);
+            return row ? normalizeRow(row) : null;
+          },
+          queryAll: async (sql, params = []) => {
+            const rows = sqliteDb.prepare(sql).all(...params);
+            return normalizeRows(rows);
+          },
+          execute: async (sql, params = []) => {
+            const res = sqliteDb.prepare(sql).run(...params);
+            return { affectedRows: res.changes, insertId: res.lastInsertRowid };
+          }
+        };
+        const result = await callback(txExecutor);
+        sqliteDb.exec('COMMIT;');
+        return result;
+      } catch (err) {
+        try { sqliteDb.exec('ROLLBACK;'); } catch (e) {}
+        throw err;
+      }
+    } finally {
+      release();
     }
   }
 }
@@ -303,287 +377,3 @@ export const db = {
     };
   }
 };
-
-let adminProvisionPromise = null;
-
-/**
- * Universal Production Administrator Provisioning & Sync
- * Works seamlessly across both SQLite (local / ephemeral) and TiDB Cloud (production).
- * Auto-heals missing admin users, role mismatches, and synchronizes password hashes.
- */
-export async function ensureProductionAdmins(force = false) {
-  if (adminProvisionPromise && !force) {
-    return adminProvisionPromise;
-  }
-
-  adminProvisionPromise = (async () => {
-    // If TiDB Cloud, ensure users and essential tables exist first
-    if (isTiDB && tidbConn) {
-      try {
-        await tidbConn.execute(`
-          CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR(64) NOT NULL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL UNIQUE,
-            phone VARCHAR(64) NOT NULL UNIQUE,
-            password_hash VARCHAR(255) NOT NULL,
-            role VARCHAR(32) NOT NULL DEFAULT 'customer',
-            area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
-            status VARCHAR(32) NOT NULL DEFAULT 'Active',
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        `);
-      } catch (err) {
-        console.warn('[DATABASE] TiDB users table ensure notice:', err.message);
-      }
-    }
-
-    const adminsToProvision = [
-      {
-        id: 'ADM-PROD-PRIMARY',
-        name: 'Book Driver Anna Administrator',
-        email: (process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com').trim().toLowerCase(),
-        password: process.env.ADMIN_PASSWORD || 'adminpassword@bda',
-        phone: (process.env.ADMIN_PHONE || '+91 78991 20704').trim(),
-        area: 'Bengaluru HQ'
-      },
-      {
-        id: 'ADM-PROD-ROOT',
-        name: 'System Operations Admin',
-        email: 'admin@bookdriveranna.com',
-        password: process.env.ADMIN_PASSWORD || 'Admin@Anna2026!',
-        phone: '+91 98765 00000',
-        area: 'Bengaluru HQ'
-      }
-    ];
-
-    for (const adm of adminsToProvision) {
-      try {
-        const existing = await queryOne(
-          'SELECT id, name, email, phone, password_hash, role, status FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
-          [adm.email, adm.phone]
-        );
-
-        const targetHash = bcrypt.hashSync(adm.password, 10);
-
-        if (!existing) {
-          await execute(`
-            INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
-            VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
-          `, [adm.id, adm.name, adm.email, adm.phone, targetHash, adm.area]);
-          console.log(`[DATABASE] Production administrator ensured (created): ${adm.email}`);
-        } else {
-          const isPasswordValid = bcrypt.compareSync(adm.password, existing.password_hash || '');
-          const isRoleAdmin = (existing.role || '').toLowerCase() === 'admin';
-          const isActive = existing.status === 'Active';
-          const isEmailMatch = (existing.email || '').toLowerCase() === adm.email.toLowerCase();
-
-          if (!isPasswordValid || !isRoleAdmin || !isActive || !isEmailMatch) {
-            await execute(
-              'UPDATE users SET name = ?, email = ?, password_hash = ?, role = ?, status = ?, area = ? WHERE id = ?',
-              [adm.name, adm.email, targetHash, 'admin', 'Active', adm.area, existing.id]
-            );
-            console.log(`[DATABASE] Production administrator synchronized: ${adm.email}`);
-          }
-        }
-      } catch (err) {
-        console.warn(`[DATABASE] Admin provisioning note for ${adm.email}:`, err.message);
-      }
-    }
-  })().catch((err) => {
-    adminProvisionPromise = null;
-    throw err;
-  });
-
-  return adminProvisionPromise;
-}
-
-// Trigger unified admin provisioning on startup for both SQLite and TiDB Cloud
-ensureProductionAdmins().catch((err) => {
-  console.warn('[DATABASE] Initial admin ensure notice:', err.message);
-});
-
-let driverProvisionPromise = null;
-
-export const DEFAULT_PRODUCTION_DRIVERS = [
-  {
-    driverId: 'DRV-1001',
-    userId: 'USR-DRV-1001',
-    name: 'Manjunath Gowda',
-    phone: '+91 98860 12345',
-    email: 'manjunath.gowda@driveranna.com',
-    licenseNumber: 'KA-04-2021-0098745',
-    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
-    hubArea: 'Indiranagar',
-    experienceYears: 12,
-    specialization: 'Manual & Automatic Cars',
-    rating: 4.98,
-    tripsCompleted: 3420,
-    upiId: 'manjunath.gowda@oksbi'
-  },
-  {
-    driverId: 'DRV-1002',
-    userId: 'USR-DRV-1002',
-    name: 'Venkatesh Prasad',
-    phone: '+91 98450 67890',
-    email: 'venkatesh.prasad@driveranna.com',
-    licenseNumber: 'KA-05-2020-0081234',
-    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
-    hubArea: 'Koramangala',
-    experienceYears: 9,
-    specialization: 'Automatic Luxury & SUVs',
-    rating: 4.95,
-    tripsCompleted: 2890,
-    upiId: 'venkatesh.prasad@okaxis'
-  },
-  {
-    driverId: 'DRV-1003',
-    userId: 'USR-DRV-1003',
-    name: 'Suresh Kumar',
-    phone: '+91 99002 55667',
-    email: 'suresh.kumar@driveranna.com',
-    licenseNumber: 'KA-01-2019-0043120',
-    password: process.env.DRIVER_DEFAULT_PASSWORD || 'driver123',
-    hubArea: 'Whitefield',
-    experienceYears: 14,
-    specialization: 'All Cars & Heavy Sedans',
-    rating: 4.96,
-    tripsCompleted: 4150,
-    upiId: 'suresh.anna@paytm'
-  }
-];
-
-/**
- * Universal Production Driver Partner Fleet Provisioning & Sync
- * Works seamlessly across both SQLite (local / ephemeral) and TiDB Cloud (production).
- * Auto-creates tables, heals missing driver partner records, and synchronizes credentials.
- */
-export async function ensureProductionDrivers(force = false) {
-  if (driverProvisionPromise && !force) {
-    return driverProvisionPromise;
-  }
-
-  driverProvisionPromise = (async () => {
-    // 1. If TiDB Cloud, ensure drivers table exists
-    if (isTiDB && tidbConn) {
-      try {
-        await tidbConn.execute(`
-          CREATE TABLE IF NOT EXISTS drivers (
-            id VARCHAR(64) NOT NULL PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL UNIQUE,
-            name VARCHAR(255) NOT NULL,
-            phone VARCHAR(64) NOT NULL,
-            license_number VARCHAR(64) NOT NULL UNIQUE,
-            hub_area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
-            experience_years VARCHAR(64) DEFAULT '5 Years',
-            specialization VARCHAR(255) DEFAULT 'Manual & Automatic Cars',
-            rating DECIMAL(3,2) DEFAULT 4.95,
-            trips_completed INT DEFAULT 0,
-            upi_id VARCHAR(255) DEFAULT 'anna.driver@oksbi',
-            status VARCHAR(32) DEFAULT 'Active',
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_drivers_phone (phone),
-            INDEX idx_drivers_license (license_number)
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        `);
-      } catch (err) {
-        console.warn('[DATABASE] TiDB drivers table ensure notice:', err.message);
-      }
-      try {
-        await tidbConn.execute('ALTER TABLE drivers MODIFY COLUMN experience_years VARCHAR(64) DEFAULT "5 Years";').catch(() => {});
-      } catch (e) {}
-    } else if (sqliteDb) {
-      try {
-        sqliteDb.exec("ALTER TABLE drivers ADD COLUMN upi_id TEXT DEFAULT 'anna.driver@oksbi';");
-      } catch (e) {}
-    }
-
-    // 2. Ensure each production driver partner exists
-    for (const drv of DEFAULT_PRODUCTION_DRIVERS) {
-      try {
-        const cleanPhone = drv.phone.replace(/[^0-9]/g, '').slice(-10);
-        let user = await queryOne(
-          'SELECT id, name, email, phone, password_hash, role, status FROM users WHERE LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?',
-          [drv.email, drv.phone, `%${cleanPhone}`]
-        );
-
-        const targetHash = bcrypt.hashSync(drv.password, 10);
-
-        if (!user) {
-          await execute(`
-            INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
-            VALUES (?, ?, ?, ?, ?, 'driver', ?, 'Active')
-          `, [drv.userId, drv.name, drv.email, drv.phone, targetHash, drv.hubArea]);
-          user = { id: drv.userId };
-          console.log(`[DATABASE] Production driver user created: ${drv.name} (${drv.phone})`);
-        } else {
-          const isPasswordValid = bcrypt.compareSync(drv.password, user.password_hash || '');
-          const isRoleDriver = (user.role || '').toLowerCase() === 'driver';
-          if (!isPasswordValid || !isRoleDriver) {
-            await execute(
-              'UPDATE users SET password_hash = ?, role = ?, status = ? WHERE id = ?',
-              [targetHash, 'driver', 'Active', user.id]
-            );
-          }
-        }
-
-        // Check if driver profile exists
-        const driverRecord = await queryOne(
-          'SELECT id FROM drivers WHERE user_id = ? OR LOWER(license_number) = LOWER(?)',
-          [user.id, drv.licenseNumber]
-        );
-
-        if (!driverRecord) {
-          try {
-            await execute(`
-              INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, upi_id, status)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
-            `, [
-              drv.driverId,
-              user.id,
-              drv.name,
-              drv.phone,
-              drv.licenseNumber,
-              drv.hubArea,
-              drv.experienceYears,
-              drv.specialization,
-              drv.rating,
-              drv.tripsCompleted,
-              drv.upiId
-            ]);
-          } catch (e) {
-            await execute(`
-              INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, experience_years, specialization, rating, trips_completed, status)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
-            `, [
-              drv.driverId,
-              user.id,
-              drv.name,
-              drv.phone,
-              drv.licenseNumber,
-              drv.hubArea,
-              drv.experienceYears,
-              drv.specialization,
-              drv.rating,
-              drv.tripsCompleted
-            ]);
-          }
-          console.log(`[DATABASE] Production driver profile created: ${drv.name} [DL: ${drv.licenseNumber}]`);
-        }
-      } catch (err) {
-        console.warn(`[DATABASE] Driver provisioning note for ${drv.name}:`, err.message);
-      }
-    }
-  })().catch((err) => {
-    driverProvisionPromise = null;
-    throw err;
-  });
-
-  return driverProvisionPromise;
-}
-
-// Trigger driver provisioning on startup for both SQLite and TiDB Cloud
-ensureProductionDrivers().catch((err) => {
-  console.warn('[DATABASE] Initial driver ensure notice:', err.message);
-});
-

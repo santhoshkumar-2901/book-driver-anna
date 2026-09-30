@@ -32,16 +32,10 @@ export default function Chatbot({ openBookingModal }) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [notificationBubble, setNotificationBubble] = useState(true);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-
-  // Check if API key is present in environment or storage
-  useEffect(() => {
-    setHasApiKey(Boolean(getActiveApiKey()));
-  }, []);
 
   // Auto-scroll messages to bottom
   const scrollToBottom = () => {
@@ -80,38 +74,21 @@ export default function Chatbot({ openBookingModal }) {
     setIsLoading(true);
 
     try {
-      const activeKey = getActiveApiKey();
-      
-      if (activeKey) {
-        // Send to live Gemini API
-        const history = [...messages, userMessage];
-        const geminiReply = await sendQueryToGemini(history, activeKey);
+      // Send to live Gemini API via backend /api/chat proxy
+      const history = [...messages, userMessage];
+      const geminiReply = await sendQueryToGemini(history);
 
-        const annaResponse = {
-          id: 'anna-' + Date.now(),
-          sender: 'anna',
-          text: geminiReply,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actions: [
-            { label: '🚗 Book a Driver', type: 'driver' },
-            { label: '🚙 Book a Vehicle', type: 'vehicle' }
-          ]
-        };
-        setMessages(prev => [...prev, annaResponse]);
-      } else {
-        // Instant smart local knowledge response
-        await new Promise(r => setTimeout(r, 450)); // natural reading pause
-        const offlineResult = getOfflineKnowledgeResponse(query);
-
-        const annaResponse = {
-          id: 'anna-' + Date.now(),
-          sender: 'anna',
-          text: offlineResult.text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actions: offlineResult.actions || []
-        };
-        setMessages(prev => [...prev, annaResponse]);
-      }
+      const annaResponse = {
+        id: 'anna-' + Date.now(),
+        sender: 'anna',
+        text: geminiReply,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        actions: [
+          { label: '🚗 Book a Driver', type: 'driver' },
+          { label: '🚙 Book a Vehicle', type: 'vehicle' }
+        ]
+      };
+      setMessages(prev => [...prev, annaResponse]);
     } catch (err) {
       console.warn('Gemini request encountered an issue:', err);
       // Fallback seamlessly to local knowledge base

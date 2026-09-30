@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { createBooking, cancelBooking, getUserBookings } from '../services/bookingService.js';
-import { bookingRateLimiter } from '../middleware/rateLimiter.js';
+import { bookingRateLimiter, lookupRateLimiter } from '../middleware/rateLimiter.js';
 import { validateBookingInput } from '../middleware/validate.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { checkBookingOwnership } from '../middleware/rbac.js';
 import { queryOne, execute } from '../db/database.js';
+import { logAuditEvent } from '../services/auditService.js';
 
 const router = Router();
 
@@ -64,7 +65,7 @@ router.get('/my', requireAuth, async (req, res, next) => {
 });
 
 // POST /api/bookings/lookup (Secure lookup requiring BOTH Booking ID AND Phone Number)
-router.post('/lookup', async (req, res, next) => {
+router.post('/lookup', lookupRateLimiter, async (req, res, next) => {
   try {
     const { bookingId, phone } = req.body;
 
@@ -77,7 +78,20 @@ router.post('/lookup', async (req, res, next) => {
 
     const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
     const booking = await queryOne(`
-      SELECT b.*, 
+      SELECT b.id,
+             b.customer_name,
+             b.customer_phone,
+             b.service_name,
+             b.booking_type,
+             b.trip_type,
+             b.pickup_area,
+             b.drop_location,
+             b.date,
+             b.time,
+             b.calculated_fare,
+             b.payment_mode,
+             b.status,
+             b.created_at,
              COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
              COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
       FROM bookings b
@@ -133,21 +147,82 @@ router.post('/:id/cancel', optionalAuth, async (req, res, next) => {
   }
 });
 
-// POST /api/bookings/:id/complete (Mark trip completed & payment settled)
-router.post('/:id/complete', optionalAuth, async (req, res, next) => {
+// POST /api/bookings/:id/complete (Mark trip completed & payment settled with strict actor verification)
+router.post('/:id/complete', requireAuth, async (req, res, next) => {
   try {
     const bookingId = req.params.id;
     const { paymentMode } = req.body || {};
+
     const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
     if (!booking) {
-      return res.status(404).json({ success: false, error: { code: 'BOOKING_NOT_FOUND', message: 'Booking not found.' } });
+      return res.status(404).json({
+        success: false,
+        error: { code: 'BOOKING_NOT_FOUND', message: 'Booking not found.' }
+      });
     }
 
-    await execute(`
+    // Role & Ownership Verification:
+    // Only administrators and active assigned drivers can complete a booking upon duty end & payment settlement.
+    // Customers cannot complete bookings.
+    let isAuthorized = false;
+
+    if (req.user.role === 'admin') {
+      isAuthorized = true;
+    } else if (req.user.role === 'driver') {
+      const driver = await queryOne('SELECT id, status FROM drivers WHERE user_id = ?', [req.user.id]);
+      if (driver && driver.status === 'Active' && booking.assigned_driver_id === driver.id) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied: You are not authorized to complete or settle this booking.'
+        }
+      });
+    }
+
+    // State Machine Validation:
+    // Only pre-completion states ('CONFIRMED', 'ASSIGNED', 'IN_PROGRESS') can be completed.
+    // Explicitly reject PENDING, CANCELLED, and COMPLETED.
+    const COMPLETABLE_STATES = ['CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+    if (!COMPLETABLE_STATES.includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATE_TRANSITION',
+          message: `Cannot complete booking in '${booking.status}' status.`
+        }
+      });
+    }
+
+    const result = await execute(`
       UPDATE bookings 
       SET status = 'COMPLETED', payment_mode = COALESCE(?, payment_mode), updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND status IN ('CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
     `, [paymentMode || null, bookingId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'CONCURRENT_MODIFICATION',
+          message: 'Booking state changed concurrently. Completion failed.'
+        }
+      });
+    }
+
+    await logAuditEvent({
+      userId: req.user.id,
+      action: 'BOOKING_COMPLETED',
+      resourceType: 'booking',
+      resourceId: bookingId,
+      details: { paymentMode: paymentMode || booking.payment_mode },
+      ipAddress: req.ip
+    });
 
     const updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
     res.json({ success: true, data: { booking: updated } });
@@ -157,7 +232,7 @@ router.post('/:id/complete', optionalAuth, async (req, res, next) => {
 });
 
 // GET /api/bookings/:id (Get single booking with ownership verification)
-router.get('/:id', optionalAuth, checkBookingOwnership, (req, res) => {
+router.get('/:id', requireAuth, checkBookingOwnership, (req, res) => {
   res.json({
     success: true,
     data: { booking: req.booking }

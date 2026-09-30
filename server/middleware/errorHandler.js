@@ -50,8 +50,8 @@ export function errorHandler(err, req, res, next) {
     ? 'An unexpected error occurred. Our engineering team has been notified.'
     : (err.message || 'An error occurred processing your request.');
 
-  // Set diagnostic header for inspection in serverless production environments
-  if (err.message) {
+  // Set diagnostic header ONLY in development/test environments (strictly prohibited in production)
+  if (!ENV.IS_PRODUCTION && process.env.NODE_ENV !== 'production' && err.message) {
     res.setHeader('X-Debug-Error-Msg', String(err.message).replace(/[\r\n]+/g, ' ').substring(0, 200));
   }
 

@@ -68,45 +68,20 @@ KEY INFORMATION ABOUT BOOK DRIVER ANNA SERVICES:
 Keep responses concise, cheerful, accurate, and encourage the customer to book right away!
 `;
 
-// Helper to get active API key
-export const getActiveApiKey = () => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const local = localStorage.getItem('bda_gemini_api_key');
-      if (local) return local;
-    }
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return import.meta.env.VITE_GEMINI_API_KEY || '';
-    }
-  } catch (e) {
-    // Ignore in non-browser context
-  }
-  return '';
-};
-
-// Save custom API key to localStorage
-export const saveActiveApiKey = (key) => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      if (key && key.trim()) {
-        localStorage.setItem('bda_gemini_api_key', key.trim());
-      } else {
-        localStorage.removeItem('bda_gemini_api_key');
-      }
-    }
-  } catch (e) {
-    // Ignore in non-browser context
-  }
-};
+// Safe no-op helpers for compatibility
+export const getActiveApiKey = () => '';
+export const saveActiveApiKey = () => {};
 
 /**
- * Call Gemini REST API
+ * Call Gemini AI via secure backend proxy (/api/chat).
+ * If the backend is unavailable or unconfigured, falls back seamlessly to
+ * the local offline knowledge base engine.
  */
-export async function sendQueryToGemini(messages, customApiKey = null) {
-  // 1. First attempt secure backend proxy so API key is never exposed to browser
+export async function sendQueryToGemini(messages) {
+  const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
+  const userText = lastUserMsg ? lastUserMsg.text : '';
+
   try {
-    const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
-    const userText = lastUserMsg ? lastUserMsg.text : '';
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -119,71 +94,12 @@ export async function sendQueryToGemini(messages, customApiKey = null) {
       }
     }
   } catch (proxyErr) {
-    // Continue to direct API or fallback
+    // Continue to local knowledge-base fallback
   }
 
-  const apiKey = customApiKey || getActiveApiKey();
-
-  if (!apiKey) {
-    throw new Error('NO_API_KEY');
-  }
-
-  // Format history for Gemini API
-  const contents = messages.map(msg => ({
-    role: msg.sender === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.text }]
-  }));
-
-  const payload = {
-    contents,
-    systemInstruction: {
-      parts: [{ text: SYSTEM_PROMPT }]
-    },
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 600,
-      topP: 0.95
-    }
-  };
-
-  // Try gemini-1.5-flash first, fallback to gemini-2.0-flash
-  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
-
-  let lastError = null;
-
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const message = errData?.error?.message || `HTTP ${response.status}`;
-        throw new Error(message);
-      }
-
-      const data = await response.json();
-      const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (replyText) {
-        return replyText.trim();
-      }
-    } catch (err) {
-      lastError = err;
-      // If error is invalid key, don't retry other models
-      if (err.message && (err.message.includes('API_KEY_INVALID') || err.message.includes('API key not valid'))) {
-        throw new Error('API_KEY_INVALID: Please check your Gemini API key.');
-      }
-    }
-  }
-
-  throw lastError || new Error('Failed to reach Gemini API.');
+  // Graceful offline knowledge-base fallback
+  const offline = getOfflineKnowledgeResponse(userText);
+  return offline.text;
 }
 
 /**

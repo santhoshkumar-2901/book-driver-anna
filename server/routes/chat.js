@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { queryGeminiAI } from '../services/geminiProxyService.js';
+import { chatRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // POST /api/chat
-router.post('/', async (req, res, next) => {
+router.post('/', chatRateLimiter, async (req, res, next) => {
   try {
     const { message, history } = req.body;
     if (!message || typeof message !== 'string') {

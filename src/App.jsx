@@ -341,25 +341,31 @@ export default function App() {
 
         // Create booking in backend database now that client is authenticated
         let serverBooking = null;
+        const idemKey = b.idempotencyKey || null;
         try {
-          const res = await apiClient.createBooking(apiPayload);
+          const res = await apiClient.createBooking(apiPayload, idemKey);
           if (res && res.data && res.data.booking) {
             serverBooking = res.data.booking;
           }
         } catch (err) {
-          console.warn('[AUTH LOGIN] Backend booking creation note:', err.message);
+          console.error('[AUTH LOGIN] Backend booking creation failed:', err.message);
+        }
+
+        if (!serverBooking) {
+          alert('Booking could not be confirmed by the server. Please try booking again.');
+          return;
         }
 
         const finalBooking = {
           ...b,
-          id: serverBooking ? serverBooking.id : b.bookingId,
-          bookingId: serverBooking ? serverBooking.id : b.bookingId,
+          id: serverBooking.id,
+          bookingId: serverBooking.id,
           userId: userData.id || null,
           customerName: userData.name || b.customerName,
           customerPhone: userData.phone || b.customerPhone,
           customerEmail: userData.email || b.customerEmail,
-          totalFare: serverBooking ? serverBooking.calculated_fare : b.totalFare,
-          fare: serverBooking ? serverBooking.calculated_fare : b.totalFare,
+          totalFare: serverBooking.calculated_fare,
+          fare: serverBooking.calculated_fare,
           status: 'Pending'
         };
 
@@ -738,7 +744,7 @@ export default function App() {
 
     if (bookingDetails.bookingType === 'class') {
       const newClassBooking = {
-        enrollmentId: bookingDetails.bookingId || ('BDA-CLS-' + Math.floor(1000 + Math.random() * 9000)),
+        enrollmentId: bookingDetails.bookingId || bookingDetails.id || null,
         userId: bookingUserId,
         emailAddress: bookingUserEmail,
         fullName: bookingDetails.customerName,
@@ -765,7 +771,7 @@ export default function App() {
 
     } else if (bookingDetails.bookingType === 'vehicle') {
       const newVehicleBooking = {
-        id: bookingDetails.bookingId || ('BDA-VEH-' + Math.floor(1000 + Math.random() * 9000)),
+        id: bookingDetails.bookingId || bookingDetails.id || null,
         userId: bookingUserId,
         customerEmail: bookingUserEmail,
         customerName: bookingDetails.customerName,
@@ -793,7 +799,7 @@ export default function App() {
 
     } else {
       const newDriverBooking = {
-        id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
+        id: bookingDetails.bookingId || bookingDetails.id || null,
         userId: bookingUserId,
         customerEmail: bookingUserEmail,
         customerName: bookingDetails.customerName,
@@ -821,7 +827,7 @@ export default function App() {
 
     // Set active ride for real-time tracking and post-ride fare settlement
     setActiveRide({
-      id: bookingDetails.bookingId || ('BDA-DRV-' + Math.floor(1000 + Math.random() * 9000)),
+      id: bookingDetails.bookingId || bookingDetails.id || null,
       driverName: null,
       driverPhone: SUPPORT_HELPLINE,
       driverRating: 5.0,

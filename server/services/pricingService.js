@@ -372,9 +372,12 @@ export async function updateServicePricing(updates, userId = null, ipAddress = n
   }
 
   for (const item of itemsToUpdate) {
+    if (item.price === null || item.price === undefined || item.price === '') {
+      throw Object.assign(new Error(`Invalid price for item '${item.id}'. Price must be a finite non-negative number.`), { statusCode: 400 });
+    }
     const numPrice = Number(item.price);
-    if (isNaN(numPrice) || numPrice < 0) {
-      throw Object.assign(new Error(`Invalid price for item '${item.id}'. Price must be a non-negative number.`), { statusCode: 400 });
+    if (!Number.isFinite(numPrice) || numPrice < 0) {
+      throw Object.assign(new Error(`Invalid price for item '${item.id}'. Price must be a finite non-negative number.`), { statusCode: 400 });
     }
   }
 
@@ -410,12 +413,21 @@ export async function updateServicePricing(updates, userId = null, ipAddress = n
 export async function resetServicePricing(userId = null, ipAddress = null) {
   await withTransaction(async (tx) => {
     for (const item of DEFAULT_PRICING) {
-      await tx.execute(
-        `INSERT INTO service_pricing (id, category, name, price, unit, description, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(id) DO UPDATE SET price = excluded.price, updated_at = CURRENT_TIMESTAMP`,
-        [item.id, item.category, item.name, item.price, item.unit, item.description]
-      );
+      if (isTiDB) {
+        await tx.execute(
+          `INSERT INTO service_pricing (id, category, name, price, unit, description, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON DUPLICATE KEY UPDATE price = VALUES(price), unit = VALUES(unit), description = VALUES(description), updated_at = CURRENT_TIMESTAMP`,
+          [item.id, item.category, item.name, item.price, item.unit, item.description]
+        );
+      } else {
+        await tx.execute(
+          `INSERT INTO service_pricing (id, category, name, price, unit, description, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(id) DO UPDATE SET price = excluded.price, unit = excluded.unit, description = excluded.description, updated_at = CURRENT_TIMESTAMP`,
+          [item.id, item.category, item.name, item.price, item.unit, item.description]
+        );
+      }
     }
   });
 

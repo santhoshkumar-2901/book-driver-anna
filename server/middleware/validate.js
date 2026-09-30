@@ -1,6 +1,41 @@
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Returns today's calendar date in YYYY-MM-DD format in Asia/Kolkata (IST) timezone.
+ */
+export function getTodayIST(refDate = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(refDate);
+}
+
+/**
+ * Validates that a date string is in YYYY-MM-DD format AND represents a real calendar date,
+ * strictly accounting for month lengths (30 vs 31 days) and February leap years.
+ */
+export function isValidCalendarDate(dateStr) {
+  if (typeof dateStr !== 'string') return false;
+  if (!DATE_REGEX.test(dateStr)) return false;
+
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  return day <= daysInMonth[month - 1];
+}
+
 export function isValidIndianPhone(phone) {
   if (typeof phone !== 'string') return false;
   const digits = phone.replace(/[^0-9]/g, '');
@@ -166,14 +201,14 @@ export function validateBookingInput(req, res, next) {
     });
   }
 
-  if (!date || !DATE_REGEX.test(date)) {
+  if (!date || !isValidCalendarDate(date)) {
     return res.status(400).json({
       success: false,
-      error: { code: 'INVALID_INPUT', message: 'Booking date must be in YYYY-MM-DD format.' }
+      error: { code: 'INVALID_INPUT', message: 'Booking date must be a valid calendar date in YYYY-MM-DD format.' }
     });
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayIST();
   if (date < today) {
     return res.status(400).json({
       success: false,

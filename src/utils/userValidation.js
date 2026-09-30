@@ -56,3 +56,18 @@ export function isDummyOrDemoUser(user) {
 
   return false;
 }
+
+/**
+ * UPI Virtual Payment Address (VPA) Validator
+ *
+ * Validates format: username@bankhandle
+ * - username: 2-256 alphanumeric characters, dots, hyphens, underscores
+ * - bankhandle: 2-64 alphanumeric characters
+ *
+ * Fails closed on missing, non-string, or malformed values (e.g. '@', 'hello@', '@okaxis', 'abc@').
+ */
+export function isValidUpi(vpa) {
+  if (!vpa || typeof vpa !== 'string') return false;
+  const trimmed = vpa.trim();
+  return /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9]{2,64}$/.test(trimmed);
+}

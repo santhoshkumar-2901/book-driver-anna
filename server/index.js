@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ENV } from './config/env.js';
 import { ALLOWED_ORIGINS } from './config/security.js';
-import { isTiDB, queryOne, queryAll, ensureProductionAdmins, ensureProductionDrivers } from './db/database.js';
+import { isTiDB, queryOne, queryAll } from './db/database.js';
 import { seedDatabase } from './db/seed.js';
 import { generalRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -48,7 +48,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "https://generativelanguage.googleapis.com"]
+      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -56,31 +56,29 @@ app.use(helmet({
   noSniff: true // MIME sniffing defense
 }));
 
-// 2. Strict CORS Configuration supporting localhost, Vercel deployments, and configured origins
+// 2. Strict CORS Configuration with Explicit Origin Allowlist
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, server-to-server, or same-origin)
+    // Allow requests with no origin (mobile apps, curl, server-to-server, same-origin)
     if (!origin) return callback(null, true);
 
-    try {
-      const parsedUrl = new URL(origin);
-      // Allow localhost and local IPs
-      if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
-        return callback(null, true);
-      }
-      // Allow any Vercel domain (*.vercel.app)
-      if (parsedUrl.hostname.endsWith('.vercel.app') || parsedUrl.hostname === 'vercel.app') {
-        return callback(null, true);
-      }
-    } catch (e) {}
+    // In development and test environments, allow localhost and 127.0.0.1
+    if (!ENV.IS_PRODUCTION) {
+      try {
+        const parsedUrl = new URL(origin);
+        if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+          return callback(null, true);
+        }
+      } catch (e) {}
+    }
 
-    // Allow configured origins from CORS_ORIGIN
-    if (ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+    // Verify against explicit allowlist from environment configuration
+    if (ALLOWED_ORIGINS.includes(origin)) {
       return callback(null, true);
     }
 
-    // In production or preview deployments, allow web clients without CORS rejection
-    return callback(null, true);
+    // Explicitly reject unauthorized origins (do NOT silently allow arbitrary origins)
+    return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -91,83 +89,23 @@ app.use(cors({
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
-// 4. Global API Rate Limiter
-app.use('/api', generalRateLimiter);
+// 4. Global API Rate Limiter (enforced on both /api and alias mount paths)
+app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing'], generalRateLimiter);
 
-// 5. Healthcheck Endpoint
+// 5. Minimal Public Healthcheck Endpoint (Zero internal metrics, counts, or configuration disclosure)
 app.get(['/api/health', '/health'], async (req, res) => {
-  let dbStatus = 'ok';
-  let dbError = null;
-  let driverCount = 0;
-  let userCount = 0;
-  let adminCount = 0;
-  let hasResetTokensTable = false;
-  let hasPricingTable = false;
-
+  let isDbHealthy = false;
   try {
     const testRow = await queryOne('SELECT 1 as test');
-    dbStatus = testRow ? 'connected' : 'null_result';
-
-    try {
-      const drivers = await queryAll('SELECT COUNT(*) as count FROM drivers');
-      driverCount = drivers[0]?.count ?? 0;
-    } catch (e) {
-      driverCount = `error: ${e.message}`;
-    }
-
-    try {
-      const admins = await queryAll("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
-      adminCount = admins[0]?.count ?? 0;
-    } catch (e) {
-      adminCount = `error: ${e.message}`;
-    }
-
-    try {
-      const users = await queryAll('SELECT COUNT(*) as count FROM users');
-      userCount = users[0]?.count ?? 0;
-    } catch (e) {
-      userCount = `error: ${e.message}`;
-    }
-
-    try {
-      await queryOne('SELECT COUNT(*) as count FROM password_reset_tokens');
-      hasResetTokensTable = true;
-    } catch (e) {
-      hasResetTokensTable = false;
-      dbError = e.message;
-    }
-
-    try {
-      await queryOne('SELECT COUNT(*) as count FROM service_pricing');
-      hasPricingTable = true;
-    } catch (e) {
-      hasPricingTable = false;
-    }
+    isDbHealthy = Boolean(testRow);
   } catch (err) {
-    dbStatus = 'error';
-    dbError = err.message;
+    isDbHealthy = false;
   }
 
   res.json({
-    status: dbStatus === 'connected' ? 'healthy' : 'degraded',
-    service: 'Book Driver Anna Production API',
-    time: new Date().toISOString(),
-    environment: ENV.NODE_ENV,
-    database: {
-      driver: isTiDB ? 'tidb' : 'sqlite',
-      status: dbStatus,
-      error: dbError,
-      userCount,
-      adminCount,
-      driverCount,
-      hasResetTokensTable,
-      hasPricingTable
-    },
-    emailConfig: {
-      hasGmailUser: Boolean(ENV.GMAIL_USER),
-      hasGmailPassword: Boolean(ENV.GMAIL_APP_PASSWORD),
-      appUrl: ENV.APP_URL
-    }
+    status: isDbHealthy ? 'healthy' : 'degraded',
+    service: 'Book Driver Anna API',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -209,8 +147,7 @@ if (fs.existsSync(distDir)) {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize DB seed & ensure production admin accounts and service pricing in all environments
-ensureProductionAdmins().catch((err) => console.error('[ADMIN ENSURE ERROR]', err.message));
+// Initialize DB seed & ensure service pricing in all environments
 ensureServicePricing().catch((err) => console.error('[PRICING ENSURE ERROR]', err.message));
 
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DB_SEED !== 'true') {

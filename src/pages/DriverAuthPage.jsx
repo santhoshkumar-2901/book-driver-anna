@@ -189,7 +189,7 @@ export default function DriverAuthPage({
         phone: formattedPhone,
         dlNumber: signupDl.trim().toUpperCase(),
         password: signupPassword,
-        upiId: signupUpi.trim() || 'anna.driver@oksbi',
+        upiId: signupUpi.trim(),
         area: signupArea,
         vehicleType: signupVehicleType,
         experienceYears: signupExperience
@@ -435,35 +435,6 @@ export default function DriverAuthPage({
                     </>
                   )}
                 </button>
-
-                {/* Verified Driver Partner Access Helper */}
-                <div className="mt-3 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-[10px] space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Verified Fleet Driver
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginIdentifier('9886012345');
-                        setLoginPassword('driver123');
-                        if (loginIdentifierRef.current) loginIdentifierRef.current.value = '9886012345';
-                        if (loginPasswordRef.current) loginPasswordRef.current.value = 'driver123';
-                      }}
-                      className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
-                    >
-                      Fill Credentials
-                    </button>
-                  </div>
-                  <div className="text-slate-400 flex flex-wrap items-center justify-between gap-1 font-mono text-[9.5px]">
-                    <span>Mobile: <strong className="text-slate-200">98860 12345</strong></span>
-                    <span>DL: <strong className="text-slate-200">KA-04-2021-0098745</strong></span>
-                    <span>PIN: <strong className="text-emerald-400">driver123</strong></span>
-                  </div>
-                </div>
-
-
-
               </form>
             ) : (
               /* =========================================================================

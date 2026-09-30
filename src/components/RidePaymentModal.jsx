@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { useScrollLock } from '../utils/useScrollLock';
+import { isValidUpi } from '../utils/userValidation';
 import { SUPPORT_HELPLINE } from '../data/mockData';
 
 export default function RidePaymentModal({ 
@@ -60,9 +61,10 @@ export default function RidePaymentModal({
       const activeDriver = JSON.parse(localStorage.getItem('bda_driver_user') || 'null');
       if (activeDriver?.upiId) return activeDriver.upiId;
     } catch (e) {}
-    const sanitizedHandle = String(driverName || 'driver').toLowerCase().replace(/[^a-z0-9]/g, '');
-    return `${sanitizedHandle || 'driver'}@oksbi`;
+    return '';
   })();
+
+  const hasValidUpi = isValidUpi(resolvedDriverUpi);
 
   // States
   const [currentStep, setCurrentStep] = useState(
@@ -149,11 +151,18 @@ export default function RidePaymentModal({
   ];
 
   // Dynamic UPI payment URL and scannable QR Code image URL generated from driver UPI
-  const upiPayUri = `upi://pay?pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`;
-  const upiParams = `pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`;
-  const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiPayUri)}`;
+  const upiPayUri = hasValidUpi
+    ? `upi://pay?pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`
+    : '';
+  const upiParams = hasValidUpi
+    ? `pa=${encodeURIComponent(resolvedDriverUpi)}&pn=${encodeURIComponent(driverName)}&am=${totalAmountToPay}&cu=INR&tn=${encodeURIComponent(`BDA Ride ${rideData.id || ''}`.trim())}`
+    : '';
+  const dynamicQrCodeUrl = hasValidUpi
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiPayUri)}`
+    : '';
 
   const getUpiDeepLink = (appId = selectedUpiApp) => {
+    if (!hasValidUpi) return '';
     switch (appId) {
       case 'gpay':
         return `tez://upi/pay?${upiParams}`;
@@ -178,6 +187,7 @@ export default function RidePaymentModal({
   };
 
   const launchUpiPaymentApp = (appId = selectedUpiApp) => {
+    if (!hasValidUpi) return;
     const specificAppUri = getUpiDeepLink(appId);
     const standardUpiUri = `upi://pay?${upiParams}`;
 
@@ -657,11 +667,16 @@ export default function RidePaymentModal({
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('upi')}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      paymentMethod === 'upi'
-                        ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
-                        : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
+                    onClick={() => {
+                      if (hasValidUpi) setPaymentMethod('upi');
+                    }}
+                    disabled={!hasValidUpi}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all ${
+                      !hasValidUpi
+                        ? 'opacity-40 cursor-not-allowed bg-slate-950/60 text-slate-500 border-slate-800'
+                        : paymentMethod === 'upi'
+                        ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm cursor-pointer'
+                        : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800 cursor-pointer'
                     }`}
                   >
                     <Smartphone className="w-5 h-5" />
@@ -672,7 +687,7 @@ export default function RidePaymentModal({
                     type="button"
                     onClick={() => setPaymentMethod('cash')}
                     className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      paymentMethod === 'cash'
+                      paymentMethod === 'cash' || !hasValidUpi
                         ? 'bg-amber-400/15 text-amber-400 border-amber-400/60 font-bold shadow-sm'
                         : 'bg-slate-950 hover:bg-slate-800/80 text-slate-400 border-slate-800'
                     }`}
@@ -682,8 +697,18 @@ export default function RidePaymentModal({
                   </button>
                 </div>
 
+                {!hasValidUpi && (
+                  <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-start gap-2 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Online UPI payment is unavailable for this driver.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Please pay by cash upon trip completion.</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sub-view for UPI */}
-                {paymentMethod === 'upi' && (
+                {paymentMethod === 'upi' && hasValidUpi && (
                   <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3 animate-in fade-in duration-200">
                     <div className="text-[11px] text-slate-400 flex items-center justify-between">
                       <span>Choose UPI app or scan Driver's QR code:</span>

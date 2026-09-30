@@ -14,7 +14,8 @@
     "start": "node server/index.js",
     "bootstrap:admin": "node server/scripts/bootstrapAdmin.js",
     "db:clean": "node server/scripts/cleanDatabase.js",
-    "test": "NODE_ENV=test node --test --test-concurrency=1 tests/**/*.test.js"
+    "db:lockdown-legacy": "node server/scripts/lockdownLegacyAccounts.js",
+    "test": "NODE_ENV=test node --import ./tests/setupEnv.js --test --test-concurrency=1 tests/**/*.test.js"
   },
   "dependencies": {
     "@tidbcloud/serverless": "^0.3.0",

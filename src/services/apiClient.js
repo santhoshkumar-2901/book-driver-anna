@@ -145,16 +145,6 @@ export const apiClient = {
     if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
     return res;
   },
-  adminRegister: async (adminData) => {
-    const res = await request('/auth/admin-register', { method: 'POST', body: adminData });
-    if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
-    return res;
-  },
-  adminSession: async (payload = {}) => {
-    const res = await request('/auth/admin-session', { method: 'POST', body: payload });
-    if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
-    return res;
-  },
   logout: () => {
     localStorage.removeItem('bda_client_token');
     localStorage.removeItem('bda_admin_token');
@@ -168,8 +158,10 @@ export const apiClient = {
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: { token, password } }),
 
   // 2. Booking Endpoints
-  createBooking: (bookingData, idempotencyKey = null) => 
-    request('/bookings', { method: 'POST', body: bookingData, idempotencyKey }),
+  createBooking: (bookingData, idempotencyKey = null) => {
+    const key = idempotencyKey || (bookingData && bookingData.idempotencyKey) || null;
+    return request('/bookings', { method: 'POST', body: bookingData, idempotencyKey: key });
+  },
   getMyBookings: () => request('/bookings/my', { method: 'GET' }),
   lookupBooking: (bookingId, phone) => 
     request('/bookings/lookup', { method: 'POST', body: { bookingId, phone } }),

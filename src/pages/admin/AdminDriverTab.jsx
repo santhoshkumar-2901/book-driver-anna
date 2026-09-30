@@ -17,7 +17,8 @@ export default function AdminDriverTab({
   handleUpdateDriverStatus,
   handleAcceptAndAssignDriver,
   registeredDrivers = [],
-  sendWhatsAppToClientForDriver
+  sendWhatsAppToClientForDriver,
+  assigningBookingId = null
 }) {
   const [assignModalBooking, setAssignModalBooking] = useState(null);
   const [openDriverDropdown, setOpenDriverDropdown] = useState(null);
@@ -40,14 +41,6 @@ export default function AdminDriverTab({
           }
         }
       } catch (e) {}
-    }
-    if (list.length === 0) {
-      list.push(
-        { id: 'DRV-SANMU', name: 'Sanmu', phone: '+91 9087654321', isOnline: true },
-        { id: 'DRV-RAJESH', name: 'Rajesh Kumar', phone: '+91 9845012345', isOnline: true },
-        { id: 'DRV-RAMESH', name: 'Ramesh Gowda', phone: '+91 9876543210', isOnline: false },
-        { id: 'DRV-MANJU', name: 'Manjunath K', phone: '+91 9123456780', isOnline: true }
-      );
     }
     return list;
   })();
@@ -267,7 +260,12 @@ export default function AdminDriverTab({
                           <span>Select Fleet Driver</span>
                           <span className="text-amber-400 font-normal">or type in slot</span>
                         </div>
-                        {availableDrivers.map(d => (
+                        {availableDrivers.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400">
+                            No drivers available
+                          </div>
+                        ) : (
+                          availableDrivers.map(d => (
                           <button
                             key={d.id || d.name}
                             type="button"
@@ -293,7 +291,7 @@ export default function AdminDriverTab({
                               {d.isOnline ? 'Online' : 'Fleet'}
                             </span>
                           </button>
-                        ))}
+                        )))}
                       </div>
                     </>
                   )}
@@ -342,6 +340,7 @@ export default function AdminDriverTab({
                       Pending
                     </button>
                     <button
+                      disabled={assigningBookingId === b.id}
                       onClick={() => {
                         const currentName = (driverInputState[b.id]?.name ?? ((b.assignedDriver && b.assignedDriver !== 'Pending Admin Acceptance') ? b.assignedDriver : '')).trim();
                         const currentPhone = (driverInputState[b.id]?.phone ?? (b.assignedDriverPhone || '')).trim();
@@ -351,11 +350,11 @@ export default function AdminDriverTab({
                           setAssignModalBooking(b);
                         }
                       }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center ${
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex-1 sm:flex-initial text-center disabled:opacity-50 disabled:cursor-not-allowed ${
                         b.status === 'Assigned' ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-400 shadow-md shadow-amber-400/20'
                       }`}
                     >
-                      Accept & Assign
+                      {assigningBookingId === b.id ? 'Assigning...' : 'Accept & Assign'}
                     </button>
                     <button
                       onClick={() => handleUpdateDriverStatus(b.id, 'Cancelled')}
@@ -400,10 +399,13 @@ export default function AdminDriverTab({
           registeredDrivers={registeredDrivers}
           initialDriverName={driverInputState[assignModalBooking.id]?.name ?? (assignModalBooking.assignedDriver || '')}
           initialDriverPhone={driverInputState[assignModalBooking.id]?.phone ?? (assignModalBooking.assignedDriverPhone || '')}
-          onConfirm={({ bookingId, driverName, driverPhone }) => {
+          onConfirm={async ({ bookingId, driverName, driverPhone }) => {
             handleDriverInputChange(bookingId, 'name', driverName);
             handleDriverInputChange(bookingId, 'phone', driverPhone);
-            handleAcceptAndAssignDriver(bookingId, driverName, driverPhone);
+            const success = await handleAcceptAndAssignDriver(bookingId, driverName, driverPhone);
+            if (success) {
+              setAssignModalBooking(null);
+            }
           }}
         />
       )}

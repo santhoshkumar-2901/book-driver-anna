@@ -82,6 +82,22 @@ export default function AssignDriverModal({
       return;
     }
 
+    if (!registeredDrivers || registeredDrivers.length === 0) {
+      setErrorMessage('No registered drivers available in fleet.');
+      return;
+    }
+
+    const matched = registeredDrivers.find(d => {
+      const dClean = (d.phone || '').replace(/[^0-9]/g, '');
+      return (cleanDigits && dClean && (cleanDigits === dClean || cleanDigits.endsWith(dClean) || dClean.endsWith(cleanDigits))) ||
+             (d.name && d.name.toLowerCase().trim() === trimmedName.toLowerCase());
+    });
+
+    if (!matched || !matched.id) {
+      setErrorMessage('Selected driver must be a verified driver from the registered fleet.');
+      return;
+    }
+
     setStep('confirm');
   };
 
@@ -149,11 +165,18 @@ export default function AssignDriverModal({
         {/* STEP 1: INPUT DRIVER DETAILS */}
         {step === 'input' && (
           <form onSubmit={handleProceedToConfirm} className="space-y-4">
+            {/* Empty fleet state notice */}
+            {(!registeredDrivers || registeredDrivers.length === 0) && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs text-center">
+                No registered drivers available in fleet.
+              </div>
+            )}
+
             {/* Quick Selector from Registered Drivers (if available) */}
             {registeredDrivers && registeredDrivers.length > 0 && (
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                  Select from Registered Drivers (Optional)
+                  Select from Registered Drivers (Verified Fleet)
                 </label>
                 <select
                   value={selectedRegisteredId}

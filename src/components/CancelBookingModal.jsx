@@ -33,6 +33,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
   const [selectedBookingToCancel, setSelectedBookingToCancel] = useState(null);
   const [cancellationReason, setCancellationReason] = useState(CANCELLATION_REASONS[0]);
   const [cancelSuccess, setCancelSuccess] = useState(null);
+  const [cancelError, setCancelError] = useState('');
 
   if (!isOpen) return null;
 
@@ -40,6 +41,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
     setSearchError('');
+    setCancelError('');
     setSearchResults(null);
     setSelectedBookingToCancel(null);
 
@@ -158,46 +160,51 @@ export default function CancelBookingModal({ isOpen, onClose }) {
     const refId = selectedBookingToCancel.refId;
     const phone = phoneInput.trim() || selectedBookingToCancel.phone;
     setIsCancelling(true);
+    setCancelError('');
 
     try {
-      try {
-        // 1. Call Backend API
-        await apiClient.cancelBooking(refId, phone, cancellationReason).catch(() => {});
-      } catch (e) {
-        // Ignore network fallback error
+      // 1. Call Backend API (authoritative source of truth)
+      const res = await apiClient.cancelBooking(refId, phone, cancellationReason);
+      const serverBooking = res?.data?.booking;
+
+      // 2. Synchronize local storage lists ONLY on verified backend success
+      const checkLists = ['bda_driver_bookings', 'bda_vehicle_bookings', 'bda_class_enrollments'];
+      for (const key of checkLists) {
+        try {
+          const existing = JSON.parse(localStorage.getItem(key) || '[]');
+          const updated = existing.map(b => {
+            if ((b.id === refId) || (b.enrollmentId === refId)) {
+              return { ...b, status: 'CANCELLED', cancelReason: cancellationReason };
+            }
+            return b;
+          });
+          localStorage.setItem(key, JSON.stringify(updated));
+        } catch (e) {}
       }
 
-    // 2. Synchronize local storage lists
-    const checkLists = ['bda_driver_bookings', 'bda_vehicle_bookings', 'bda_class_enrollments'];
-    for (const key of checkLists) {
-      try {
-        const existing = JSON.parse(localStorage.getItem(key) || '[]');
-        const updated = existing.map(b => {
-          if ((b.id === refId) || (b.enrollmentId === refId)) {
-            return { ...b, status: 'CANCELLED', cancelReason: cancellationReason };
-          }
-          return b;
-        });
-        localStorage.setItem(key, JSON.stringify(updated));
-      } catch (e) {}
-    }
+      // Dispatch global event for Admin and Pass modals to sync
+      window.dispatchEvent(new CustomEvent('bda_order_created'));
 
-    // Dispatch global event for Admin and Pass modals to sync
-    window.dispatchEvent(new CustomEvent('bda_order_created'));
+      setCancelSuccess({
+        refId: serverBooking?.id || refId,
+        serviceLabel: selectedBookingToCancel.serviceLabel,
+        customerName: selectedBookingToCancel.customerName,
+        customerPhone: selectedBookingToCancel.phone,
+        reason: cancellationReason
+      });
 
-    setCancelSuccess({
-      refId,
-      serviceLabel: selectedBookingToCancel.serviceLabel,
-      customerName: selectedBookingToCancel.customerName,
-      customerPhone: selectedBookingToCancel.phone,
-      reason: cancellationReason
-    });
+      if (searchResults) {
+        setSearchResults(prev => prev.map(item => item.refId === refId ? { ...item, status: 'CANCELLED' } : item));
+      }
 
-    if (searchResults) {
-      setSearchResults(prev => prev.map(item => item.refId === refId ? { ...item, status: 'CANCELLED' } : item));
-    }
-
-    setSelectedBookingToCancel(null);
+      setSelectedBookingToCancel(null);
+    } catch (err) {
+      console.error('[CANCEL] Failed to cancel booking:', err);
+      let errorMsg = err.message || 'Failed to cancel booking. Please try again.';
+      if (err.code === 'INVALID_STATE_TRANSITION' || (err.message && err.message.toLowerCase().includes('transition')) || (err.message && err.message.toLowerCase().includes('in_progress'))) {
+        errorMsg = 'This booking can no longer be cancelled as it is already in progress, completed, or cancelled.';
+      }
+      setCancelError(errorMsg);
     } finally {
       setIsCancelling(false);
     }
@@ -208,6 +215,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
     setPhoneInput('');
     setSearchResults(null);
     setSearchError('');
+    setCancelError('');
     setSelectedBookingToCancel(null);
     setCancelSuccess(null);
     onClose();
@@ -377,6 +385,13 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                 </div>
               </div>
 
+              {cancelError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-400 text-xs font-semibold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Please select reason for cancellation:
@@ -395,7 +410,7 @@ export default function CancelBookingModal({ isOpen, onClose }) {
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedBookingToCancel(null)}
+                  onClick={() => { setSelectedBookingToCancel(null); setCancelError(''); }}
                   className="py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
                 >
                   Keep Booking

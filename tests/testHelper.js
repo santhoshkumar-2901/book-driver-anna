@@ -1,3 +1,4 @@
+import './setupEnv.js';
 import http from 'http';
 import { app } from '../server/index.js';
 

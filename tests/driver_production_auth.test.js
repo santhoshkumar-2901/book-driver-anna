@@ -1,16 +1,34 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { startTestServer } from './testHelper.js';
-import { ensureProductionDrivers, queryOne } from '../server/db/database.js';
+import { registerDriver } from '../server/services/authService.js';
+import { execute } from '../server/db/database.js';
 
 describe('Production Driver Authentication & Fleet Verification Suite', () => {
   let server, baseUrl;
+  const testDriverPhone = '+91 98860 12345';
+  const testDriverDl = 'KA-04-2021-0098745';
+  const testDriverPassword = 'testDriverPassword123!';
+  const testDriverUpi = 'manjunath.gowda@oksbi';
+  const testDriverName = 'Manjunath Gowda';
 
   before(async () => {
     const s = await startTestServer();
     server = s.server;
     baseUrl = s.baseUrl;
-    await ensureProductionDrivers();
+
+    // Clean up existing test fixture if present in test sqlite DB
+    await execute('DELETE FROM drivers WHERE phone = ? OR license_number = ?', [testDriverPhone, testDriverDl]);
+    await execute('DELETE FROM users WHERE phone = ? OR phone LIKE ?', [testDriverPhone, '%9886012345']);
+
+    await registerDriver({
+      name: testDriverName,
+      phone: testDriverPhone,
+      dlNumber: testDriverDl,
+      password: testDriverPassword,
+      upiId: testDriverUpi,
+      area: 'Indiranagar'
+    });
   });
 
   after(() => {
@@ -33,7 +51,7 @@ describe('Production Driver Authentication & Fleet Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: '9886012345',
-        password: 'driver123'
+        password: testDriverPassword
       })
     });
 
@@ -51,7 +69,7 @@ describe('Production Driver Authentication & Fleet Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: 'KA-04-2021-0098745',
-        password: 'driver123'
+        password: testDriverPassword
       })
     });
 
@@ -67,7 +85,7 @@ describe('Production Driver Authentication & Fleet Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: 'KA0420210098745',
-        password: 'driver123'
+        password: testDriverPassword
       })
     });
 
@@ -121,7 +139,7 @@ describe('Production Driver Authentication & Fleet Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: '9886012345',
-        password: 'driver123'
+        password: testDriverPassword
       })
     });
     const loginData = await loginRes.json();
@@ -154,7 +172,7 @@ describe('Production Driver Authentication & Fleet Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: '9999999999',
-        password: 'driver123'
+        password: testDriverPassword
       })
     });
     assert.strictEqual(notFoundRes.status, 401);

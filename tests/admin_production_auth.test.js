@@ -78,11 +78,12 @@ describe('Production Admin Authentication & Serverless Routing Suite', () => {
     assert.ok(data.data?.token);
   });
 
-  test('5. /api/auth/admin-register accepts ANNA2026 secret key', async () => {
+  test('5. /api/auth/admin-register rejects hardcoded ANNA2026 and requires configured ENV secret', async () => {
     const uniqueEmail = `test_admin_${Date.now()}@bookdriveranna.com`;
     const uniquePhone = `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`;
 
-    const res = await fetch(`${baseUrl}/api/auth/admin-register`, {
+    // 1. Rejected with old hardcoded secret
+    const badRes = await fetch(`${baseUrl}/api/auth/admin-register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -94,60 +95,87 @@ describe('Production Admin Authentication & Serverless Routing Suite', () => {
         area: 'Indiranagar'
       })
     });
+    assert.strictEqual(badRes.status, 403, 'Old hardcoded secret must return HTTP 403');
 
-    assert.strictEqual(res.status, 201, 'Admin registration with ANNA2026 should return HTTP 201');
-    const data = await res.json();
+    // 2. Accepted with configured ENV secret
+    const goodRes = await fetch(`${baseUrl}/api/auth/admin-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Test Ops Admin',
+        email: uniqueEmail,
+        phone: uniquePhone,
+        password: 'ValidSecurePass2026!',
+        secretKey: process.env.ADMIN_REGISTRATION_SECRET,
+        area: 'Indiranagar'
+      })
+    });
+    assert.strictEqual(goodRes.status, 201, 'Configured ENV secret should return HTTP 201');
+    const data = await goodRes.json();
     assert.strictEqual(data.success, true);
     assert.strictEqual(data.data?.user?.email, uniqueEmail.toLowerCase());
     assert.ok(data.data?.token, 'Response should contain token');
   });
 
-  test('6. /api/auth/admin-session successfully restores session for authenticated admin', async () => {
+  test('6. /api/auth/admin-session is permanently removed and returns HTTP 404', async () => {
     const res = await fetch(`${baseUrl}/api/auth/admin-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: testAdminEmail })
     });
 
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
-    assert.strictEqual(data.success, true);
-    assert.ok(data.data?.token);
-    assert.strictEqual(data.data?.user?.email, testAdminEmail.toLowerCase());
+    assert.strictEqual(res.status, 404, 'POST /api/auth/admin-session must return 404');
   });
 
   test('7. api/index.js exports a function handler compatible with Vercel serverless functions', () => {
     assert.strictEqual(typeof handler, 'function', 'handler must be an exported function');
   });
 
-  test('8. ensureProductionAdmins ensures standard admin accounts (bookdriveranna@gmail.com) can log in', async () => {
-    const adminEmail = process.env.ADMIN_EMAIL || 'bookdriveranna@gmail.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'adminpassword@bda';
-
+  test('8. Automatic admin provisioning is disabled; unseeded accounts cannot log in', async () => {
+    const unprovisionedEmail = `unseeded_admin_${Date.now()}@bookdriveranna.com`;
     const res = await fetch(`${baseUrl}/api/auth/admin-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        identifier: adminEmail,
-        password: adminPassword
+        identifier: unprovisionedEmail,
+        password: 'UnseededAdminPass2026!'
       })
     });
 
-    assert.strictEqual(res.status, 200, 'Standard production admin should log in with HTTP 200');
-    const data = await res.json();
-    assert.strictEqual(data.success, true);
-    assert.strictEqual(data.data?.user?.email, adminEmail.toLowerCase());
-    assert.strictEqual(data.data?.user?.role, 'admin');
-    assert.ok(data.data?.token);
+    assert.strictEqual(res.status, 401, 'Unseeded admin should receive 401 instead of auto-provisioning');
   });
 
-  test('9. Healthcheck endpoint reports adminCount correctly in database metrics', async () => {
-    const res = await fetch(`${baseUrl}/api/health`);
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
-    assert.strictEqual(data.status, 'healthy');
-    assert.ok(typeof data.database?.adminCount === 'number' || typeof data.database?.adminCount === 'string');
-    assert.ok(Number(data.database?.adminCount) >= 1, 'adminCount must be at least 1');
+  test('9. Public healthcheck does not leak internal metrics; admin diagnostics provides metrics to authorized admin', async () => {
+    // 1. Verify public healthcheck is minimal and leaks no database or configuration details
+    const publicRes = await fetch(`${baseUrl}/api/health`);
+    assert.strictEqual(publicRes.status, 200);
+    const publicData = await publicRes.json();
+    assert.strictEqual(publicData.status, 'healthy');
+    assert.strictEqual(publicData.database, undefined, 'Public healthcheck must not disclose database object');
+    assert.strictEqual(publicData.userCount, undefined, 'Public healthcheck must not disclose userCount');
+    assert.strictEqual(publicData.adminCount, undefined, 'Public healthcheck must not disclose adminCount');
+    assert.strictEqual(publicData.emailConfig, undefined, 'Public healthcheck must not disclose emailConfig');
+
+    // 2. Verify protected admin diagnostics provides metrics to authenticated admin
+    const loginRes = await fetch(`${baseUrl}/api/auth/admin-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: testAdminEmail,
+        password: testAdminPassword
+      })
+    });
+    const loginData = await loginRes.json();
+    const adminToken = loginData.data?.token;
+
+    const diagRes = await fetch(`${baseUrl}/api/admin/diagnostics`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert.strictEqual(diagRes.status, 200);
+    const diagData = await diagRes.json();
+    assert.strictEqual(diagData.success, true);
+    assert.ok(typeof diagData.data?.database?.adminCount === 'number');
+    assert.ok(Number(diagData.data?.database?.adminCount) >= 1, 'adminCount must be at least 1 in protected admin diagnostics');
   });
 
 });

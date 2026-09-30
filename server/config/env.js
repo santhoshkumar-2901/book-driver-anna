@@ -4,16 +4,28 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Resilient fallbacks for production/serverless environments where env vars may not yet be defined
-const jwtSecret = process.env.JWT_SECRET || 'bda-secure-production-jwt-fallback-key-2026-32chars!';
-const adminSecret = process.env.ADMIN_REGISTRATION_SECRET || 'ANNA2026';
+// Strict validation of authentication secrets and production database - no fallback secrets or automatic generation allowed
+const jwtSecret = (process.env.JWT_SECRET || '').trim();
+const adminSecret = (process.env.ADMIN_REGISTRATION_SECRET || '').trim();
+const databaseUrl = (process.env.NODE_ENV === 'test') ? '' : (process.env.DATABASE_URL || '').trim();
 
-if (!process.env.JWT_SECRET) {
-  console.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. Using secure fallback secret. Set JWT_SECRET in production settings.');
-}
-
-if (!process.env.ADMIN_REGISTRATION_SECRET) {
-  console.warn('[SECURITY WARNING] ADMIN_REGISTRATION_SECRET is not set. Using fallback secret.');
+if (isProduction) {
+  if (!jwtSecret || jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET is required in production and must be at least 32 characters.');
+  }
+  if (!adminSecret || adminSecret.length < 32) {
+    throw new Error('ADMIN_REGISTRATION_SECRET is required in production and must be at least 32 characters.');
+  }
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required in production.');
+  }
+} else {
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET is required and must be explicitly configured.');
+  }
+  if (!adminSecret) {
+    throw new Error('ADMIN_REGISTRATION_SECRET is required and must be explicitly configured.');
+  }
 }
 
 export const ENV = {
@@ -24,10 +36,7 @@ export const ENV = {
   JWT_SECRET: jwtSecret,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
 
-  GEMINI_API_KEY:
-    process.env.GEMINI_API_KEY ||
-    process.env.VITE_GEMINI_API_KEY ||
-    '',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
 
   ADMIN_REGISTRATION_SECRET: adminSecret,
 
@@ -35,13 +44,18 @@ export const ENV = {
     process.env.CORS_ORIGIN ||
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000',
 
+  FRONTEND_ORIGIN: (process.env.FRONTEND_ORIGIN || 'https://book-driver-anna.vercel.app').replace(/\/+$/, ''),
+
+  // Authoritative default UPI configuration (never silently falls back to real personal address in production)
+  DEFAULT_UPI_ID: process.env.DEFAULT_UPI_ID || (isProduction ? '' : 'test.driver@fakeupi'),
+
   DB_PATH:
     process.env.DB_PATH ||
     (process.env.NODE_ENV === 'test'
       ? './bda_test_database.sqlite'
       : './bda_database.sqlite'),
 
-  DATABASE_URL: process.env.DATABASE_URL || '',
+  DATABASE_URL: databaseUrl,
 
   // Production Email Delivery Configuration (Gmail SMTP & Resend Fallback)
   GMAIL_USER: process.env.GMAIL_USER || '',

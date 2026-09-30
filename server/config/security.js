@@ -1,6 +1,10 @@
 import { ENV } from './env.js';
 
-export const ALLOWED_ORIGINS = ENV.CORS_ORIGIN.split(',').map(o => o.trim());
+export const ALLOWED_ORIGINS = Array.from(new Set([
+  ...ENV.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean),
+  ENV.FRONTEND_ORIGIN,
+  ENV.APP_URL
+].filter(Boolean)));
 
 export const AUTH_COOKIE_NAME = 'bda_auth_token';
 
@@ -34,5 +38,15 @@ export const RATE_LIMITS = {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // 300 requests
     message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests. Please slow down.' } }
+  },
+  CHAT: {
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 20, // 20 chat messages per 5 minutes
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Chat rate limit reached. Please wait a few minutes before sending more messages.' } }
+  },
+  LOOKUP: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 lookups per 15 minutes
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many booking lookup attempts. Please try again later.' } }
   }
 };

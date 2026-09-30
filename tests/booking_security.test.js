@@ -13,18 +13,19 @@ describe('Booking Security, Integrity, & Concurrency Tests', () => {
     baseUrl = s.baseUrl;
 
     // Ensure a test driver fixture exists for slot-locking concurrency testing
-    const existingDriver = db.prepare('SELECT id FROM drivers WHERE id = ?').get(testDriverId);
-    if (!existingDriver) {
-      db.prepare(`
-        INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
-        VALUES (?, ?, ?, ?, ?, 'driver', 'Indiranagar', 'Active')
-      `).run('USR-DRV-TEST', 'Test Driver Fixture', 'test_driver_fixture@driveranna.com', '+91 98860 99999', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy');
+    // Ensure a clean test driver fixture exists for slot-locking concurrency testing
+    db.prepare('DELETE FROM drivers WHERE id = ?').run(testDriverId);
+    db.prepare('DELETE FROM users WHERE id = ? OR phone = ? OR email = ?').run('USR-DRV-TEST', '+91 98860 99999', 'test_driver_fixture@driveranna.com');
 
-      db.prepare(`
-        INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, status)
-        VALUES (?, ?, 'Test Driver Fixture', '+91 98860 99999', 'KA-TEST-001', 'Indiranagar', 'Active')
-      `).run(testDriverId, 'USR-DRV-TEST');
-    }
+    db.prepare(`
+      INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
+      VALUES (?, ?, ?, ?, ?, 'driver', 'Indiranagar', 'Active')
+    `).run('USR-DRV-TEST', 'Test Driver Fixture', 'test_driver_fixture@driveranna.com', '+91 98860 99999', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy');
+
+    db.prepare(`
+      INSERT INTO drivers (id, user_id, name, phone, license_number, hub_area, status)
+      VALUES (?, ?, 'Test Driver Fixture', '+91 98860 99999', 'KA-TEST-001', 'Indiranagar', 'Active')
+    `).run(testDriverId, 'USR-DRV-TEST');
   });
 
   after(() => {

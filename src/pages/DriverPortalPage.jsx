@@ -15,7 +15,7 @@ import {
 } from '../utils/driverDutyHelpers';
 import { SUPPORT_HELPLINE } from '../data/mockData';
 import SOSButton from '../components/SOSButton';
-import { isDummyOrDemoUser } from '../utils/userValidation';
+import { isDummyOrDemoUser, isValidUpi } from '../utils/userValidation';
 import { apiClient } from '../services/apiClient';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
@@ -42,9 +42,10 @@ export default function DriverPortalPage({
     } catch (e) {}
     return true;
   });
-  const [acceptedTrips, setAcceptedTrips] = useState(() => {
-    return getDriverDuties(driverUser).myAssigned;
-  });
+  const [acceptedTrips, setAcceptedTrips] = useState([]);
+  const [isLoadingDuties, setIsLoadingDuties] = useState(true);
+  const [dutiesError, setDutiesError] = useState(null);
+  const [startingTripId, setStartingTripId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [todayEarnings, setTodayEarnings] = useState(driverUser?.earningsToday || 0);
   const [lifetimeTrips, setLifetimeTrips] = useState(driverUser?.trips || 0);
@@ -69,7 +70,7 @@ export default function DriverPortalPage({
         if (found?.upiId) return found.upiId;
       }
     } catch (e) {}
-    return 'anna.driver@oksbi';
+    return (driverUser?.upiId || '');
   });
   const [upiSaveSuccess, setUpiSaveSuccess] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -87,7 +88,7 @@ export default function DriverPortalPage({
   const handleSaveUpi = (e) => {
     if (e) e.preventDefault();
     const cleanUpi = driverUpi.trim();
-    if (!cleanUpi || !cleanUpi.includes('@')) {
+    if (!isValidUpi(cleanUpi)) {
       setToastMessage("Please enter a valid UPI ID (e.g. yourname@oksbi or phone@paytm)");
       setTimeout(() => setToastMessage(null), 4000);
       return;
@@ -222,16 +223,47 @@ export default function DriverPortalPage({
     } catch (e) {}
   }, [driverUser, isOnline]);
 
-  const [availableDuties, setAvailableDuties] = useState(() => {
-    return getDriverDuties(driverUser).openPool;
-  });
+  const [availableDuties, setAvailableDuties] = useState([]);
+
+  // Authoritative fetch of driver duties from backend
+  const fetchDuties = useCallback(async () => {
+    if (!driverUser) return;
+    setIsLoadingDuties(true);
+    setDutiesError(null);
+    try {
+      const res = await apiClient.getDriverDuties();
+      if (res && res.data && Array.isArray(res.data.duties)) {
+        const serverDuties = res.data.duties;
+        const activeDuties = serverDuties.filter(b => {
+          const rawStatus = (b.status || '').toUpperCase();
+          return !rawStatus.includes('COMPLET') && !rawStatus.includes('CANCEL');
+        });
+        const formatted = activeDuties.map(formatDuty);
+        setAcceptedTrips(formatted);
+
+        // Update non-authoritative convenience cache with fresh backend data
+        try {
+          localStorage.setItem('bda_driver_bookings', JSON.stringify(serverDuties));
+        } catch (e) {}
+      } else {
+        setAcceptedTrips([]);
+      }
+    } catch (err) {
+      console.warn('[DRIVER PORTAL] Failed to fetch server duties:', err.message);
+      setDutiesError(err.message || 'Unable to load duties from server.');
+    } finally {
+      setIsLoadingDuties(false);
+    }
+  }, [driverUser]);
+
+  useEffect(() => {
+    fetchDuties();
+  }, [fetchDuties]);
 
   // Real-time synchronization when admin assigns or modifies bookings across tabs and windows
   useEffect(() => {
     const reloadDuties = (payload) => {
-      const { myAssigned, openPool } = getDriverDuties(driverUser);
-      setAcceptedTrips(myAssigned);
-      setAvailableDuties(openPool);
+      fetchDuties();
 
       // Notify if a duty was just assigned to THIS driver by admin
       if (payload && (payload.bookingId || payload.id)) {
@@ -254,7 +286,7 @@ export default function DriverPortalPage({
       window.removeEventListener('bda_booking_updated', reloadDuties);
       window.removeEventListener('bda_order_created', reloadDuties);
     };
-  }, [driverUser]);
+  }, [driverUser, fetchDuties]);
 
   const handleAcceptDuty = (duty) => {
     if (!isOnline) {
@@ -299,19 +331,43 @@ export default function DriverPortalPage({
     setTimeout(() => setToastMessage(null), 5000);
   };
 
-  const handleStartTrip = (tripId) => {
-    setAcceptedTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'In Progress' } : t));
+  const handleStartTrip = async (tripId) => {
+    if (startingTripId) return;
+    const targetBookingId = tripId;
+    setStartingTripId(targetBookingId);
 
-    // Update persistent bda_driver_bookings
     try {
-      const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updated = savedBookings.map(b => (b.id === tripId || b.bookingId === tripId) ? { ...b, status: 'In Progress' } : b);
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
-    } catch (e) {}
+      const res = await apiClient.updateDutyStatus(targetBookingId, 'IN_PROGRESS');
+      const updatedBooking = res?.data?.booking;
 
-    broadcastBookingUpdate({ bookingId: tripId, status: 'In Progress' });
-    setToastMessage(`🚗 Trip ${tripId} started! Meter is running.`);
-    setTimeout(() => setToastMessage(null), 4000);
+      setAcceptedTrips(prev => prev.map(t => {
+        if (t.id === targetBookingId || t.bookingId === targetBookingId) {
+          return {
+            ...t,
+            status: 'In Progress'
+          };
+        }
+        return t;
+      }));
+
+      // Update non-authoritative convenience cache
+      try {
+        const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        const updated = savedBookings.map(b => (b.id === targetBookingId || b.bookingId === targetBookingId) ? { ...b, status: 'IN_PROGRESS' } : b);
+        localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      } catch (e) {}
+
+      broadcastBookingUpdate({ bookingId: targetBookingId, status: 'In Progress' });
+      setToastMessage(`🚗 Trip ${targetBookingId} started! Meter is running.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      console.error('[DRIVER PORTAL] Failed to start trip:', err);
+      const msg = err.message || 'Failed to start trip on server. Please try again.';
+      setToastMessage(`⚠️ Error: ${msg}`);
+      setTimeout(() => setToastMessage(null), 6000);
+    } finally {
+      setStartingTripId(null);
+    }
   };
 
   const handleConfirmSettlement = () => {
@@ -346,7 +402,9 @@ export default function DriverPortalPage({
     // Synchronize to backend database
     const bookingTargetId = settlementTrip.bookingId || settlementTrip.id;
     if (bookingTargetId) {
-      apiClient.completeBooking(bookingTargetId, settlementMethod).catch(() => {});
+      apiClient.completeBooking(bookingTargetId, settlementMethod).catch(err => {
+        console.warn('[DRIVER PORTAL] Complete booking backend note:', err.message);
+      });
     }
 
     const payload = { 
@@ -386,17 +444,18 @@ export default function DriverPortalPage({
 
   const handleOpenSettlement = (trip) => {
     setSettlementTrip(trip);
-    setSettlementMethod('online');
+    const activeUpi = (driverUpi || driverUser?.upiId || '').trim();
+    const hasUpi = isValidUpi(activeUpi);
+    setSettlementMethod(hasUpi ? 'online' : 'cash');
     const numericFare = Number(trip.payout?.replace(/[^0-9]/g, '')) || 749;
-    const activeUpi = (driverUpi || driverUser?.upiId || '').trim() || 'anna.driver@oksbi';
 
     broadcastBookingUpdate({
       bookingId: trip.id,
       status: 'Fare Settlement',
       assignedDriver: driverUser?.name || 'Driver Assigned',
       assignedDriverPhone: driverUser?.phone || '',
-      assignedDriverUpi: activeUpi,
-      driverUpi: activeUpi,
+      assignedDriverUpi: hasUpi ? activeUpi : '',
+      driverUpi: hasUpi ? activeUpi : '',
       totalFare: numericFare
     });
 
@@ -658,7 +717,19 @@ export default function DriverPortalPage({
             </span>
           </div>
 
-          {acceptedTrips.length === 0 ? (
+          {dutiesError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold flex items-center justify-between">
+              <span>⚠️ {dutiesError}</span>
+              <button onClick={fetchDuties} className="underline hover:text-white cursor-pointer ml-2">Retry</button>
+            </div>
+          )}
+
+          {isLoadingDuties && acceptedTrips.length === 0 ? (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
+              <RefreshCw className="w-6 h-6 text-amber-400 mx-auto animate-spin" />
+              <p className="text-xs text-slate-400">Loading your assigned duties...</p>
+            </div>
+          ) : acceptedTrips.length === 0 ? (
             <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-6 text-center space-y-1.5">
               <Car className="w-7 h-7 text-slate-600 mx-auto" />
               <h3 className="text-sm font-bold text-slate-300">No Duties Assigned Yet</h3>
@@ -715,10 +786,11 @@ export default function DriverPortalPage({
 
                     {trip.status !== 'In Progress' ? (
                       <button
-                        onClick={() => handleStartTrip(trip.id)}
-                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center"
+                        onClick={() => handleStartTrip(trip.bookingId || trip.id)}
+                        disabled={startingTripId === (trip.bookingId || trip.id)}
+                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Start Trip (Run Meter)
+                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip (Run Meter)'}
                       </button>
                     ) : (
                       <button
@@ -890,9 +962,14 @@ export default function DriverPortalPage({
         {/* Driver Ride Settlement Modal with Customer UPI QR Code */}
         {settlementTrip && (() => {
           const settlementNumericFare = Number(settlementTrip.payout?.replace(/[^0-9]/g, '')) || 749;
-          const effectiveDriverUpi = (driverUpi || driverUser?.upiId || '').trim() || 'anna.driver@oksbi';
-          const settlementUpiData = `upi://pay?pa=${encodeURIComponent(effectiveDriverUpi)}&pn=${encodeURIComponent(driverUser?.name || 'Driver Anna')}&am=${settlementNumericFare}&cu=INR&tn=${encodeURIComponent('Driver Anna Trip ' + settlementTrip.id)}`;
-          const settlementQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(settlementUpiData)}`;
+          const effectiveDriverUpi = (driverUpi || driverUser?.upiId || '').trim();
+          const hasValidSettlementUpi = isValidUpi(effectiveDriverUpi);
+          const settlementUpiData = hasValidSettlementUpi
+            ? `upi://pay?pa=${encodeURIComponent(effectiveDriverUpi)}&pn=${encodeURIComponent(driverUser?.name || 'Driver Anna')}&am=${settlementNumericFare}&cu=INR&tn=${encodeURIComponent('Driver Anna Trip ' + settlementTrip.id)}`
+            : '';
+          const settlementQrUrl = hasValidSettlementUpi
+            ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(settlementUpiData)}`
+            : '';
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-hidden touch-none overscroll-contain">
@@ -951,25 +1028,32 @@ export default function DriverPortalPage({
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <button 
                       type="button"
-                      onClick={() => setSettlementMethod('online')}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all cursor-pointer text-left ${
-                        settlementMethod === 'online'
-                          ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      onClick={() => {
+                        if (hasValidSettlementUpi) setSettlementMethod('online');
+                      }}
+                      disabled={!hasValidSettlementUpi}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all text-left ${
+                        !hasValidSettlementUpi
+                          ? 'opacity-40 cursor-not-allowed bg-slate-950/60 border-slate-800 text-slate-500'
+                          : settlementMethod === 'online'
+                          ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10 cursor-pointer'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center gap-1.5 font-bold text-white text-xs">
                         <QrCode className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         <span>UPI QR Code</span>
                       </div>
-                      <p className="text-[10px] text-slate-400">Customer scans & pays</p>
+                      <p className="text-[10px] text-slate-400">
+                        {hasValidSettlementUpi ? 'Customer scans & pays' : 'No UPI ID configured'}
+                      </p>
                     </button>
 
                     <button 
                       type="button"
                       onClick={() => setSettlementMethod('cash')}
                       className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all cursor-pointer text-left ${
-                        settlementMethod === 'cash'
+                        settlementMethod === 'cash' || !hasValidSettlementUpi
                           ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
                           : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                       }`}
@@ -984,7 +1068,7 @@ export default function DriverPortalPage({
                 </div>
 
                 {/* Dynamic QR Code Display for Customer Payment */}
-                {settlementMethod === 'online' ? (
+                {settlementMethod === 'online' && hasValidSettlementUpi ? (
                   <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-4 text-center space-y-3 shadow-lg shadow-black/40">
                     <div className="flex items-center justify-between px-1">
                       <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
@@ -1050,16 +1134,30 @@ export default function DriverPortalPage({
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-slate-950 border border-amber-500/40 rounded-2xl p-4 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-amber-400 font-bold">
-                      <DollarSign className="w-4 h-4" />
-                      <span>Direct Cash Handover</span>
-                    </div>
-                    <p className="text-slate-300 text-xs leading-relaxed">
-                      Please collect <strong className="text-white font-mono">₹{settlementNumericFare}</strong> in cash directly from <strong className="text-white">{settlementTrip.customerName}</strong> before concluding this ride duty.
-                    </p>
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-[11px] text-amber-200">
-                      ✓ No commission deduction. 100% of the cash fare belongs to Anna.
+                  <div className="space-y-3">
+                    {!hasValidSettlementUpi && (
+                      <div className="bg-amber-950/25 border border-amber-500/30 rounded-2xl p-3 text-center space-y-1 animate-in fade-in">
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-300">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Online UPI Settlement Unavailable</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          No UPI ID is configured for this driver account. Please collect cash directly, or configure a UPI ID in your driver portal.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="bg-slate-950 border border-amber-500/40 rounded-2xl p-4 space-y-2 text-xs">
+                      <div className="flex items-center gap-2 text-amber-400 font-bold">
+                        <DollarSign className="w-4 h-4" />
+                        <span>Direct Cash Handover</span>
+                      </div>
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Please collect <strong className="text-white font-mono">₹{settlementNumericFare}</strong> in cash directly from <strong className="text-white">{settlementTrip.customerName}</strong> before concluding this ride duty.
+                      </p>
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-[11px] text-amber-200">
+                        ✓ No commission deduction. 100% of the cash fare belongs to Anna.
+                      </div>
                     </div>
                   </div>
                 )}

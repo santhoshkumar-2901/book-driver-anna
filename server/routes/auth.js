@@ -20,7 +20,7 @@ import {
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AUTH_COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from '../config/security.js';
-import { ensureProductionAdmins, ensureProductionDrivers, queryOne, queryAll } from '../db/database.js';
+import { ENV } from '../config/env.js';
 
 const router = Router();
 
@@ -71,7 +71,6 @@ router.post('/login', authRateLimiter, validateLoginInput, async (req, res, next
 // POST /api/auth/driver-login (Dedicated Driver portal authentication)
 router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
-    await ensureProductionDrivers().catch(err => console.warn('[DATABASE] ensureProductionDrivers notice:', err.message));
     const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
@@ -93,9 +92,8 @@ router.post('/driver-login', authRateLimiter, validateLoginInput, async (req, re
 // POST /api/auth/driver-register (Driver onboarding & verification)
 router.post('/driver-register', authRateLimiter, async (req, res, next) => {
   try {
-    await ensureProductionDrivers().catch(err => console.warn('[DATABASE] ensureProductionDrivers notice:', err.message));
     const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
-    const { name, phone, dlNumber, password, upiId, area, vehicleType, experienceYears } = req.body || {};
+    const { name, phone, dlNumber, password, email, upiId, area, vehicleType, experienceYears } = req.body || {};
 
     if (!name || !phone || !dlNumber || !password) {
       return res.status(400).json({
@@ -116,6 +114,7 @@ router.post('/driver-register', authRateLimiter, async (req, res, next) => {
       phone,
       dlNumber,
       password,
+      email,
       upiId,
       area: area || 'Indiranagar',
       vehicleType: vehicleType || 'Manual & Automatic Cars',
@@ -136,7 +135,6 @@ router.post('/driver-register', authRateLimiter, async (req, res, next) => {
 // POST /api/auth/admin-login (Dedicated Admin portal authentication)
 router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res, next) => {
   try {
-    await ensureProductionAdmins().catch(err => console.warn('[DATABASE] ensureProductionAdmins notice:', err.message));
     const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await authenticateUser({
       identifier: req.body.identifier,
@@ -155,8 +153,14 @@ router.post('/admin-login', authRateLimiter, validateLoginInput, async (req, res
   }
 });
 
-// POST /api/auth/admin-register (Dedicated Admin onboarding with secret key)
+// POST /api/auth/admin-register (Dedicated Admin onboarding with secret key - disabled in production)
 router.post('/admin-register', authRateLimiter, validateRegisterInput, async (req, res, next) => {
+  if (process.env.NODE_ENV === 'production' || ENV.IS_PRODUCTION) {
+    return res.status(403).json({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'Admin registration is disabled in production.' }
+    });
+  }
   try {
     const ipAddress = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || null;
     const { user, token } = await registerAdmin({
@@ -173,49 +177,6 @@ router.post('/admin-register', authRateLimiter, validateRegisterInput, async (re
     res.status(201).json({
       success: true,
       data: { user, token }
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/auth/admin-session (Restore / maintain admin session token)
-router.post('/admin-session', async (req, res, next) => {
-  try {
-    await ensureProductionAdmins();
-    const { email, phone } = req.body || {};
-    let admin = null;
-    if (email) {
-      admin = await queryOne('SELECT * FROM users WHERE email = ? AND role = ?', [email.toLowerCase().trim(), 'admin']);
-    } else if (phone) {
-      const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
-      const allAdmins = await queryAll("SELECT * FROM users WHERE role = 'admin'");
-      admin = allAdmins.find(a => (a.phone || '').replace(/[^0-9]/g, '').endsWith(cleanPhone)) || allAdmins[0];
-    } else {
-      admin = await queryOne("SELECT * FROM users WHERE role = 'admin' LIMIT 1");
-    }
-
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'ADMIN_NOT_FOUND', message: 'No registered administrator found.' }
-      });
-    }
-
-    const token = generateToken(admin);
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: admin.id,
-          name: admin.name,
-          email: admin.email,
-          phone: admin.phone,
-          role: admin.role,
-          area: admin.area
-        },
-        token
-      }
     });
   } catch (err) {
     next(err);
