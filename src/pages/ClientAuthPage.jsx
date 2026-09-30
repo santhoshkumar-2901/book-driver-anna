@@ -236,10 +236,16 @@ export default function ClientAuthPage({
         return;
       }
       setIsLoading(false);
-      setErrorMessage('Invalid email or password.');
+      localStorage.removeItem('bda_client_user');
+      localStorage.removeItem('bda_client_token');
+      sessionStorage.removeItem('bda_client_user');
+      setErrorMessage('Invalid email/phone or password.');
     } catch (apiErr) {
       setIsLoading(false);
-      setErrorMessage(apiErr.message || 'Invalid email or password.');
+      localStorage.removeItem('bda_client_user');
+      localStorage.removeItem('bda_client_token');
+      sessionStorage.removeItem('bda_client_user');
+      setErrorMessage(apiErr?.message || 'Invalid email/phone or password.');
     }
   };
 

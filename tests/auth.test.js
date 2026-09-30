@@ -141,7 +141,7 @@ describe('Authentication & Password Security Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, false);
     assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.error.message, 'Invalid email/phone or password.');
     assert.strictEqual(data.data, undefined);
     assert.strictEqual(res.headers.get('set-cookie'), null, 'Failed login must NOT issue cookie');
   });
@@ -160,7 +160,7 @@ describe('Authentication & Password Security Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, false);
     assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.error.message, 'Invalid email/phone or password.');
   });
 
   test('8. Correct identifier + empty password returns 400', async () => {
@@ -193,7 +193,7 @@ describe('Authentication & Password Security Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, false);
     assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.error.message, 'Invalid email/phone or password.');
   });
 
   test('10. Wrong identifier + correct password returns 401', async () => {
@@ -210,7 +210,7 @@ describe('Authentication & Password Security Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, false);
     assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.error.message, 'Invalid email/phone or password.');
   });
 
   test('11. Empty identifier + password returns 400', async () => {
@@ -243,7 +243,7 @@ describe('Authentication & Password Security Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, false);
     assert.strictEqual(data.error.code, 'INVALID_CREDENTIALS');
-    assert.strictEqual(data.error.message, 'Invalid email or password.');
+    assert.strictEqual(data.error.message, 'Invalid email/phone or password.');
     assert.strictEqual(res.headers.get('set-cookie'), null);
   });
 });

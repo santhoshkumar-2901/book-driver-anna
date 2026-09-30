@@ -50,19 +50,30 @@ export function verifyToken(token) {
 }
 
 export async function registerCustomer({ name, email, phone, password, area = 'Indiranagar', ipAddress = null }) {
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
   const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+  const canonicalPhone = cleanPhone.length >= 10 ? `+91 ${last10}` : String(phone).trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
 
-  // Check duplicate email or phone (using LOWER() for cross-DB compatibility)
-  const existing = await queryOne(
-    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?',
-    [email.trim(), phone.trim(), `%${last10}`]
+  // 1. Check email
+  const existingEmail = await queryOne(
+    'SELECT id, email FROM users WHERE LOWER(email) = LOWER(?)',
+    [cleanEmail]
   );
+  if (existingEmail) {
+    const err = new Error('An account already exists with this email.');
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
 
-  if (existing) {
-    const isEmail = existing.email && existing.email.toLowerCase() === email.trim().toLowerCase();
-    const field = isEmail ? 'Email' : 'Phone number';
-    const err = new Error(`${field} is already registered. Please log in.`);
+  // 2. Check phone
+  const existingPhone = await queryOne(
+    'SELECT id, phone FROM users WHERE phone = ? OR phone = ? OR REPLACE(REPLACE(REPLACE(phone, \' \', \'\'), \'-\', \'\'), \'+\', \'\') LIKE ?',
+    [String(phone).trim(), canonicalPhone, `%${last10}`]
+  );
+  if (existingPhone) {
+    const err = new Error('An account already exists with this phone number.');
     err.statusCode = 409;
     err.code = 'USER_ALREADY_EXISTS';
     throw err;
@@ -74,9 +85,9 @@ export async function registerCustomer({ name, email, phone, password, area = 'I
   await execute(`
     INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
     VALUES (?, ?, ?, ?, ?, 'customer', ?, 'Active')
-  `, [userId, name.trim(), email.trim().toLowerCase(), phone.trim(), passwordHash, area]);
+  `, [userId, name.trim(), cleanEmail, canonicalPhone, passwordHash, area]);
 
-  const user = { id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim(), role: 'customer', area };
+  const user = { id: userId, name: name.trim(), email: cleanEmail, phone: canonicalPhone, role: 'customer', area };
   const token = generateToken(user);
 
   await logAuditEvent({
@@ -109,15 +120,30 @@ export async function registerAdmin({ name, email, phone, password, secretKey, a
     throw err;
   }
 
-  const existing = await queryOne(
-    'SELECT id, email, phone FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
-    [email.trim(), phone.trim()]
-  );
+  const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
+  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+  const canonicalPhone = cleanPhone.length >= 10 ? `+91 ${last10}` : String(phone).trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
 
-  if (existing) {
-    const isEmail = existing.email && existing.email.toLowerCase() === email.trim().toLowerCase();
-    const field = isEmail ? 'Email' : 'Phone number';
-    const err = new Error(`${field} is already registered. Please log in.`);
+  // 1. Check email
+  const existingEmail = await queryOne(
+    'SELECT id, email FROM users WHERE LOWER(email) = LOWER(?)',
+    [cleanEmail]
+  );
+  if (existingEmail) {
+    const err = new Error('An account already exists with this email.');
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
+
+  // 2. Check phone
+  const existingPhone = await queryOne(
+    'SELECT id, phone FROM users WHERE phone = ? OR phone = ? OR REPLACE(REPLACE(REPLACE(phone, \' \', \'\'), \'-\', \'\'), \'+\', \'\') LIKE ?',
+    [String(phone).trim(), canonicalPhone, `%${last10}`]
+  );
+  if (existingPhone) {
+    const err = new Error('An account already exists with this phone number.');
     err.statusCode = 409;
     err.code = 'USER_ALREADY_EXISTS';
     throw err;
@@ -129,9 +155,9 @@ export async function registerAdmin({ name, email, phone, password, secretKey, a
   await execute(`
     INSERT INTO users (id, name, email, phone, password_hash, role, area, status)
     VALUES (?, ?, ?, ?, ?, 'admin', ?, 'Active')
-  `, [adminId, name.trim(), email.trim().toLowerCase(), phone.trim(), passwordHash, area]);
+  `, [adminId, name.trim(), cleanEmail, canonicalPhone, passwordHash, area]);
 
-  const user = { id: adminId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim(), role: 'admin', area };
+  const user = { id: adminId, name: name.trim(), email: cleanEmail, phone: canonicalPhone, role: 'admin', area };
   const token = generateToken(user);
 
   await logAuditEvent({
@@ -179,16 +205,25 @@ export async function registerDriver({
   const passwordHash = hashPassword(password);
   const expYearsInt = normalizeExperienceYears(experienceYears);
 
-  // Check if ANY user with this phone or email already exists in users
-  const existingUser = await queryOne(
-    'SELECT id, name, email, phone, role, status FROM users WHERE LOWER(email) = LOWER(?) OR phone = ? OR phone LIKE ?',
-    [email.trim(), String(phone).trim(), `%${last10}`]
+  // 1. Check email
+  const existingEmail = await queryOne(
+    'SELECT id, email FROM users WHERE LOWER(email) = LOWER(?)',
+    [email.trim()]
   );
+  if (existingEmail) {
+    const err = new Error('An account already exists with this email.');
+    err.statusCode = 409;
+    err.code = 'USER_ALREADY_EXISTS';
+    throw err;
+  }
 
-  if (existingUser) {
-    const isEmail = existingUser.email && existingUser.email.toLowerCase() === email.trim().toLowerCase();
-    const field = isEmail ? 'Email' : 'Phone number';
-    const err = new Error(`${field} is already registered. Please log in.`);
+  // 2. Check phone
+  const existingPhone = await queryOne(
+    'SELECT id, phone FROM users WHERE phone = ? OR phone = ? OR REPLACE(REPLACE(REPLACE(phone, \' \', \'\'), \'-\', \'\'), \'+\', \'\') LIKE ?',
+    [String(phone).trim(), formattedPhone, `%${last10}`]
+  );
+  if (existingPhone) {
+    const err = new Error('An account already exists with this phone number.');
     err.statusCode = 409;
     err.code = 'USER_ALREADY_EXISTS';
     throw err;
@@ -285,6 +320,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
 
   const cleanPhone = trimmed.replace(/[^0-9]/g, '');
   const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : null;
+  const canonicalPhone = last10 ? `+91 ${last10}` : null;
   const cleanDl = trimmed.toUpperCase().replace(/[\s-]/g, '');
 
   let user = null;
@@ -301,6 +337,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
         WHERE (
           LOWER(u.email) = LOWER(?)
           OR u.phone = ?
+          ${canonicalPhone ? "OR u.phone = ?" : ""}
           ${last10 ? "OR REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), '+', '') LIKE ?" : ''}
           OR LOWER(d.license_number) = LOWER(?)
           OR REPLACE(REPLACE(UPPER(d.license_number), '-', ''), ' ', '') = ?
@@ -308,6 +345,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
       `, [
         trimmed,
         trimmed,
+        ...(canonicalPhone ? [canonicalPhone] : []),
         ...(last10 ? [`%${last10}`] : []),
         trimmed,
         cleanDl
@@ -329,9 +367,10 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
         WHERE (
           LOWER(email) = LOWER(?) 
           OR phone = ? 
+          ${canonicalPhone ? "OR phone = ?" : ""}
           OR REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ?
         )
-      `, [trimmed, trimmed, `%${last10}`]);
+      `, [trimmed, trimmed, ...(canonicalPhone ? [canonicalPhone] : []), `%${last10}`]);
     } else {
       user = await queryOne(`
         SELECT id, name, email, phone, password_hash, role, area, status 
@@ -353,17 +392,26 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
     verifyPassword(password, DUMMY_PASSWORD_HASH);
   }
 
-  if (!user || !isUserActive || !isHashValidBcrypt || !isPasswordValid) {
+  // Determine failure reason for server-side logging without exposing it to the client
+  let failureReason = null;
+  if (!user) {
+    failureReason = 'LOGIN_FAILED_ACCOUNT_NOT_FOUND';
+  } else if (!isUserActive) {
+    failureReason = 'LOGIN_FAILED_ACCOUNT_INACTIVE';
+  } else if (!isHashValidBcrypt || !isPasswordValid) {
+    failureReason = 'LOGIN_FAILED_INVALID_PASSWORD';
+  }
+
+  if (failureReason) {
+    console.warn(`[AUTH] Login failed: ${failureReason} (identifier: '${trimmed}')`);
     await logAuditEvent({
       userId: user?.id || null,
-      action: 'LOGIN_FAILED',
+      action: failureReason,
       resourceType: 'auth',
-      details: { identifier: trimmed },
+      details: { identifier: trimmed, reason: failureReason },
       ipAddress
     });
-    const message = requiredRole === 'driver'
-      ? 'Invalid mobile number, DL number, or password.'
-      : 'Invalid email or password.';
+    const message = 'Invalid email/phone or password.';
     const err = new Error(message);
     err.statusCode = 401;
     err.code = 'INVALID_CREDENTIALS';
@@ -386,6 +434,7 @@ export async function authenticateUser({ identifier, password, requiredRole = nu
     throw err;
   }
 
+  console.log(`[AUTH] Login success: LOGIN_SUCCESS (userId: '${user.id}', role: '${userRole}')`);
   await logAuditEvent({
     userId: user.id,
     action: 'LOGIN_SUCCESS',

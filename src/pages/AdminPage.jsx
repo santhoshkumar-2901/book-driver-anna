@@ -934,8 +934,18 @@ export default function AdminPage({ onReturnToClient }) {
         navigateToTab(requestedTab, true);
         return;
       }
+      localStorage.removeItem('bda_admin_logged_in');
+      localStorage.removeItem('bda_admin_name');
+      localStorage.removeItem('bda_admin_phone');
+      localStorage.removeItem('bda_admin_token');
+      setIsAdminLoggedIn(false);
       setAuthError('Invalid administrator credentials.');
     } catch (apiErr) {
+      localStorage.removeItem('bda_admin_logged_in');
+      localStorage.removeItem('bda_admin_name');
+      localStorage.removeItem('bda_admin_phone');
+      localStorage.removeItem('bda_admin_token');
+      setIsAdminLoggedIn(false);
       if (apiErr.status === 403 || apiErr.code === 'INSUFFICIENT_PRIVILEGES') {
         setAuthError('Access denied: You do not have administrator privileges.');
       } else if (apiErr.status === 429) {

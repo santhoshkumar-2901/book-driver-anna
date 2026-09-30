@@ -104,13 +104,15 @@ export function resolveRoute(pathname = '') {
 export function getInitialUser(storageKey) {
   if (typeof window === 'undefined') return null;
   try {
+    const tokenKey = storageKey.replace('_user', '_token');
     const storedLocal = localStorage.getItem(storageKey);
     if (storedLocal) {
       const parsed = JSON.parse(storedLocal);
-      if (isDummyOrDemoUser(parsed)) {
+      const token = parsed?.token || localStorage.getItem(tokenKey);
+      if (isDummyOrDemoUser(parsed) || !token) {
         localStorage.removeItem(storageKey);
         sessionStorage.removeItem(storageKey);
-        localStorage.removeItem(storageKey.replace('_user', '_token'));
+        localStorage.removeItem(tokenKey);
         return null;
       }
       return parsed;
@@ -118,10 +120,11 @@ export function getInitialUser(storageKey) {
     const storedSession = sessionStorage.getItem(storageKey);
     if (storedSession) {
       const parsed = JSON.parse(storedSession);
-      if (isDummyOrDemoUser(parsed)) {
+      const token = parsed?.token || localStorage.getItem(tokenKey);
+      if (isDummyOrDemoUser(parsed) || !token) {
         localStorage.removeItem(storageKey);
         sessionStorage.removeItem(storageKey);
-        localStorage.removeItem(storageKey.replace('_user', '_token'));
+        localStorage.removeItem(tokenKey);
         return null;
       }
       return parsed;
@@ -229,18 +232,16 @@ export default function App() {
         sessionStorage.removeItem('bda_driver_user');
       }
     }).catch(err => {
-      // If server explicitly responds with unauthorized, invalid token, or account disabled:
+      // If server responds with unauthorized, invalid token, account disabled, or network failure:
       // Immediately reset and purge local session so visitors never remain logged in as unauthenticated users
-      if (!err || err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED' || err.code === 'INVALID_TOKEN' || err.code === 'ACCOUNT_DISABLED') {
-        setClientUser(null);
-        setDriverUser(null);
-        localStorage.removeItem('bda_client_user');
-        localStorage.removeItem('bda_client_token');
-        localStorage.removeItem('bda_driver_user');
-        localStorage.removeItem('bda_driver_token');
-        sessionStorage.removeItem('bda_client_user');
-        sessionStorage.removeItem('bda_driver_user');
-      }
+      setClientUser(null);
+      setDriverUser(null);
+      localStorage.removeItem('bda_client_user');
+      localStorage.removeItem('bda_client_token');
+      localStorage.removeItem('bda_driver_user');
+      localStorage.removeItem('bda_driver_token');
+      sessionStorage.removeItem('bda_client_user');
+      sessionStorage.removeItem('bda_driver_user');
     });
   }, []);
 
@@ -406,6 +407,7 @@ export default function App() {
       await apiClient.logout();
     } catch (e) {}
     localStorage.removeItem('bda_client_user');
+    localStorage.removeItem('bda_client_token');
     sessionStorage.removeItem('bda_client_user');
     setClientUser(null);
     setSelectedRole('user');
@@ -425,6 +427,7 @@ export default function App() {
       await apiClient.logout();
     } catch (e) {}
     localStorage.removeItem('bda_driver_user');
+    localStorage.removeItem('bda_driver_token');
     sessionStorage.removeItem('bda_driver_user');
     setDriverUser(null);
     setSelectedRole('driver');

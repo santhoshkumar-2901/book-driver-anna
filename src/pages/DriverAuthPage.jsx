@@ -138,14 +138,16 @@ export default function DriverAuthPage({
         return;
       }
       setIsLoading(false);
-      setErrorMessage('Invalid mobile number, DL number, or password.');
+      localStorage.removeItem('bda_driver_user');
+      localStorage.removeItem('bda_driver_token');
+      sessionStorage.removeItem('bda_driver_user');
+      setErrorMessage('Invalid email/phone or password.');
     } catch (apiErr) {
       setIsLoading(false);
-      let msg = apiErr?.message || 'Invalid mobile number, DL number, or password.';
-      if (msg.toLowerCase().includes('email')) {
-        msg = 'Invalid mobile number, DL number, or password.';
-      }
-      setErrorMessage(msg);
+      localStorage.removeItem('bda_driver_user');
+      localStorage.removeItem('bda_driver_token');
+      sessionStorage.removeItem('bda_driver_user');
+      setErrorMessage(apiErr?.message || 'Invalid email/phone or password.');
     }
   };
 

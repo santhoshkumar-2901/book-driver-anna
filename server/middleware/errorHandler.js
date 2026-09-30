@@ -28,9 +28,9 @@ export function errorHandler(err, req, res, next) {
     if (msg.includes('license') || msg.includes('dl') || msg.includes('license_number')) {
       err.message = 'This Driving License (DL) number is already registered. Please log in.';
     } else if (msg.includes('phone')) {
-      err.message = 'This mobile number is already registered. Please log in.';
+      err.message = 'An account already exists with this phone number.';
     } else if (msg.includes('email')) {
-      err.message = 'This email address is already registered. Please log in.';
+      err.message = 'An account already exists with this email.';
     } else {
       err.message = 'An account with these details is already registered. Please log in.';
     }
@@ -57,6 +57,7 @@ export function errorHandler(err, req, res, next) {
 
   res.status(statusCode).json({
     success: false,
+    message: clientMessage,
     error: {
       code: errorCode,
       message: clientMessage
