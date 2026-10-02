@@ -617,7 +617,7 @@ export default function DriverProfileSection({
           </div>
 
           {/* Card 3: Account & Verification Details */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-lg flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-lg md:col-span-2">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2.5">
@@ -626,18 +626,17 @@ export default function DriverProfileSection({
                   </div>
                   <div>
                     <h2 className="text-sm sm:text-base font-extrabold text-white font-['Outfit']">
-                      Account & Verification
+                      Account & Verification Details
                     </h2>
-                    <p className="text-[11px] text-slate-400">Security & partner status</p>
+                    <p className="text-[11px] text-slate-400">Security status & verified fleet credentials</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
-                  Protected
+                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-500/20">
+                  Verified Account
                 </span>
               </div>
 
-              <div className="mt-4 space-y-3.5">
-                
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-4">
                 {/* Driver Partner Public ID */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -670,7 +669,7 @@ export default function DriverProfileSection({
                   <div className="text-sm font-semibold text-white bg-slate-950/60 border border-slate-800/80 px-3.5 py-2.5 rounded-xl flex items-center justify-between">
                     <span className="capitalize">{profile?.role || 'driver'} Partner</span>
                     <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
-                      Portal Access Only
+                      Portal Access
                     </span>
                   </div>
                 </div>
@@ -685,116 +684,23 @@ export default function DriverProfileSection({
                     <span>{toDDMMYYYY(profile?.createdAt) || 'Recent Partner'}</span>
                   </div>
                 </div>
-
-                {/* Safety & Compliance Badge */}
-                <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex items-start gap-2.5 text-xs text-slate-300">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-slate-200">KYC & Document Verification Passed</div>
-                    <p className="text-[11px] text-slate-400">
-                      Your identity and driving credentials have been audited and authenticated by Book Driver Anna operations.
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            <div className="pt-3 mt-3 border-t border-slate-800/70 text-[10px] text-slate-500">
-              Account roles are managed exclusively by platform administrators.
-            </div>
-          </div>
-
-          {/* Card 4: Payout & Settlement Information */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
-                    <QrCode className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm sm:text-base font-extrabold text-white font-['Outfit']">
-                      Payout & Direct Settlement
-                    </h2>
-                    <p className="text-[11px] text-slate-400">Personal UPI handle for customer fare collection</p>
-                  </div>
-                </div>
-                {isEditing && (
-                  <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
-                    Editable
-                  </span>
-                )}
               </div>
 
-              <div className="mt-4 space-y-3.5">
-                
-                {/* Personal UPI ID Input / Display */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Personal UPI ID (GPay / PhonePe / Paytm / BHIM)
-                  </label>
-                  {isEditing ? (
-                    <div>
-                      <input
-                        id="driver-profile-upi-input"
-                        type="text"
-                        value={formUpi}
-                        onChange={(e) => setFormUpi(e.target.value)}
-                        placeholder="e.g. yourname@oksbi or 9845012345@paytm"
-                        className={`w-full bg-slate-950 border ${formErrors.upi ? 'border-rose-500' : 'border-slate-800 focus:border-amber-400'} rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-mono focus:outline-none transition-all`}
-                      />
-                      {formErrors.upi && (
-                        <p className="text-[11px] text-rose-400 mt-1">{formErrors.upi}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm font-bold text-white bg-slate-950/60 border border-slate-800/80 px-3.5 py-2.5 rounded-xl font-mono flex items-center justify-between">
-                      <span>{profile?.upiId || 'Not configured'}</span>
-                      {profile?.upiId && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(profile?.upiId, 'upiId')}
-                          className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer font-sans"
-                        >
-                          {copiedField === 'upiId' ? (
-                            <span className="text-emerald-400 font-bold text-[11px]">Copied!</span>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Direct Settlement Explanation */}
-                <div className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>100% Direct Customer Settle</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    When you complete trips for customers, they scan your verified UPI QR code on the payment screen to settle the full ride fare directly into your bank account.
+              {/* Safety & Compliance Badge */}
+              <div className="mt-3.5 p-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex items-start gap-2.5 text-xs text-slate-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-bold text-slate-200">KYC & Document Verification Passed</div>
+                  <p className="text-[11px] text-slate-400">
+                    Your identity and driving credentials have been audited and authenticated by Book Driver Anna operations.
                   </p>
                 </div>
-
-                {/* Live QR Link Note */}
-                <div className="text-[11px] text-slate-400 bg-purple-500/10 border border-purple-500/20 p-2.5 rounded-xl flex items-center gap-2">
-                  <QrCode className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span>
-                    Your dynamic settlement QR code is generated on-demand at trip end.
-                  </span>
-                </div>
-
               </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-slate-800/70 text-[10px] text-slate-500">
-              Zero commission deductions on customer tip payments.
+            <div className="pt-3 border-t border-slate-800/70 text-[10px] text-slate-500 flex items-center justify-between">
+              <span>Account roles are managed exclusively by platform administrators.</span>
+              <span className="text-amber-400/80">Support: +91 78991 20704</span>
             </div>
           </div>
 

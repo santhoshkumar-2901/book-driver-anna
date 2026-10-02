@@ -58,9 +58,9 @@ describe('Driver Profile Section — Frontend UI, Navigation & Security Verifica
     assert.match(content, /Account & Verification/, 'Must contain Account & Verification card');
     assert.match(content, /Public Driver Partner ID|DRV-ID/, 'Must display public driver identifier');
 
-    // Payout & Settlement Information
-    assert.match(content, /Payout & Direct Settlement/, 'Must contain Payout & Settlement card');
-    assert.match(content, /driver-profile-upi-input/, 'Must contain UPI handle input');
+    // Payout & Settlement Information (Removed as requested)
+    assert.doesNotMatch(content, /Payout & Direct Settlement/, 'Must NOT contain Payout & Settlement card');
+    assert.doesNotMatch(content, /driver-profile-upi-input/, 'Must NOT contain UPI handle input');
   });
 
   test('4. DriverPortalPage navigation includes Profile tab and preserves existing duties', () => {
