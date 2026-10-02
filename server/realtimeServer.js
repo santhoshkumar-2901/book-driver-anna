@@ -1,8 +1,7 @@
 import { RealtimeServer, setGlobalRealtimeServer } from './services/realtimeService.js';
 import { ENV } from './config/env.js';
 
-const port = ENV.REALTIME_PORT || 5001;
-const internalSecret = ENV.REALTIME_INTERNAL_SECRET || '';
+const port = ENV.PORT || ENV.REALTIME_PORT || 5001; const internalSecret = ENV.REALTIME_INTERNAL_SECRET || '';
 
 console.log(`[REALTIME BOOT] Initializing Book Driver Anna Realtime Server on port ${port}...`);
 
