@@ -636,6 +636,7 @@ export default function RidePaymentModal({
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-400">₹</span>
                       <input
                         type="number"
+                        inputMode="numeric"
                         min="10"
                         max="1000"
                         placeholder="Enter custom tip (e.g. 75)"

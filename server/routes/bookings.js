@@ -1,13 +1,144 @@
 import { Router } from 'express';
 import { createBooking, cancelBooking, getUserBookings } from '../services/bookingService.js';
+import { calculateAuthoritativeFare, getAllPricing } from '../services/pricingService.js';
+import { routingService } from '../services/routingService.js';
 import { bookingRateLimiter, lookupRateLimiter } from '../middleware/rateLimiter.js';
 import { validateBookingInput } from '../middleware/validate.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { checkBookingOwnership } from '../middleware/rbac.js';
 import { queryOne, execute } from '../db/database.js';
 import { logAuditEvent } from '../services/auditService.js';
+import { publishBookingAssignmentChange } from '../services/realtimeService.js';
 
 const router = Router();
+
+/**
+ * Handle estimate request for both POST and GET /api/bookings/estimate
+ */
+const handleEstimateRequest = async (req, res, next) => {
+  try {
+    const params = req.method === 'POST' ? req.body : req.query;
+
+    const pickupLat = params.pickupLat ?? params.pickupLatitude;
+    const pickupLng = params.pickupLng ?? params.pickupLongitude;
+    const destLat = params.destLat ?? params.destinationLatitude;
+    const destLng = params.destLng ?? params.destinationLongitude;
+
+    if (
+      pickupLat === undefined || pickupLng === undefined ||
+      destLat === undefined || destLng === undefined ||
+      String(pickupLat).trim() === '' || String(pickupLng).trim() === '' ||
+      String(destLat).trim() === '' || String(destLng).trim() === ''
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Both pickup and destination coordinates are required for route fare estimation.'
+        }
+      });
+    }
+
+    const pLat = parseFloat(pickupLat);
+    const pLng = parseFloat(pickupLng);
+    const dLat = parseFloat(destLat);
+    const dLng = parseFloat(destLng);
+
+    if (
+      isNaN(pLat) || isNaN(pLng) || isNaN(dLat) || isNaN(dLng) ||
+      !isFinite(pLat) || !isFinite(pLng) || !isFinite(dLat) || !isFinite(dLng)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Coordinates must be valid finite numbers.'
+        }
+      });
+    }
+
+    if (
+      pLat < -90 || pLat > 90 || dLat < -90 || dLat > 90 ||
+      pLng < -180 || pLng > 180 || dLng < -180 || dLng > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Coordinates must be within geographic bounds (-90..90 latitude, -180..180 longitude).'
+        }
+      });
+    }
+
+    const validCategories = ['driver', 'vehicle', 'class'];
+    if (params.bookingCategory && !validCategories.includes(params.bookingCategory)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'UNSUPPORTED_SERVICE',
+          message: `Unsupported booking service category '${params.bookingCategory}'.`
+        }
+      });
+    }
+
+    // 1. Authoritative Route Calculation
+    let routeData;
+    try {
+      routeData = await routingService.getRoute({
+        pickupLat: pLat,
+        pickupLng: pLng,
+        destLat: dLat,
+        destLng: dLng
+      });
+    } catch (routeErr) {
+      return res.status(routeErr.status || 500).json({
+        success: false,
+        error: {
+          code: routeErr.code || 'ROUTING_FAILED',
+          message: routeErr.message || 'Unable to calculate road route for fare estimation.'
+        }
+      });
+    }
+
+    // 2. Fetch live pricing tariffs
+    const pricingData = await getAllPricing().catch(() => null);
+
+    // 3. Authoritative Fare Calculation
+    const fareResult = calculateAuthoritativeFare({
+      bookingCategory: params.bookingCategory || 'driver',
+      selectedClassId: params.selectedClassId,
+      vehicleCategory: params.vehicleCategory,
+      driverTripOption: params.driverTripOption || 'one-way',
+      dropLocation: params.dropLocation || '',
+      roundTripDuration: params.roundTripDuration,
+      outstationTripType: params.outstationTripType,
+      outstationPackage: params.outstationPackage,
+      distanceKm: routeData.distanceKm,
+      durationMinutes: routeData.durationMinutes
+    }, pricingData?.map || null);
+
+    res.json({
+      success: true,
+      data: {
+        distanceKm: routeData.distanceKm,
+        durationMinutes: routeData.durationMinutes,
+        distanceMeters: routeData.distanceMeters,
+        durationSeconds: routeData.durationSeconds,
+        basePrice: fareResult.basePrice,
+        gst: fareResult.gst,
+        estimatedFare: fareResult.totalFare,
+        totalFare: fareResult.totalFare,
+        currency: fareResult.currency || 'INR'
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST & GET /api/bookings/estimate
+router.post('/estimate', bookingRateLimiter, handleEstimateRequest);
+router.get('/estimate', bookingRateLimiter, handleEstimateRequest);
 
 // POST /api/bookings (Create a booking)
 router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (req, res, next) => {
@@ -30,6 +161,10 @@ router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (
       outstationPackage: req.body.outstationPackage,
       outstationDestination: req.body.outstationDestination,
       pickupArea: req.body.pickupArea,
+      pickupLat: req.body.pickupLat ?? req.body.pickupLatitude ?? req.body.pickup_latitude,
+      pickupLng: req.body.pickupLng ?? req.body.pickupLongitude ?? req.body.pickup_longitude,
+      destLat: req.body.destLat ?? req.body.destinationLatitude ?? req.body.destination_latitude,
+      destLng: req.body.destLng ?? req.body.destinationLongitude ?? req.body.destination_longitude,
       date: req.body.date,
       time: req.body.time,
       paymentMode: req.body.paymentMode || 'cash',
@@ -54,7 +189,7 @@ router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (
 // GET /api/bookings/my (User's personal bookings list)
 router.get('/my', requireAuth, async (req, res, next) => {
   try {
-    const bookings = await getUserBookings(req.user.id, req.user.phone);
+    const bookings = await getUserBookings(req.user.id, req.user.phone, req.query.limit);
     res.json({
       success: true,
       data: { bookings }
@@ -86,12 +221,17 @@ router.post('/lookup', lookupRateLimiter, async (req, res, next) => {
              b.trip_type,
              b.pickup_area,
              b.drop_location,
+             b.pickup_latitude,
+             b.pickup_longitude,
+             b.destination_latitude,
+             b.destination_longitude,
              b.date,
              b.time,
              b.calculated_fare,
              b.payment_mode,
              b.status,
              b.created_at,
+             b.assigned_driver_id,
              COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
              COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
       FROM bookings b
@@ -188,7 +328,7 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     // State Machine Validation:
     // Only pre-completion states ('CONFIRMED', 'ASSIGNED', 'IN_PROGRESS') can be completed.
     // Explicitly reject PENDING, CANCELLED, and COMPLETED.
-    const COMPLETABLE_STATES = ['CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+    const COMPLETABLE_STATES = ['CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS'];
     if (!COMPLETABLE_STATES.includes(booking.status)) {
       return res.status(400).json({
         success: false,
@@ -202,7 +342,7 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     const result = await execute(`
       UPDATE bookings 
       SET status = 'COMPLETED', payment_mode = COALESCE(?, payment_mode), updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND status IN ('CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
+      WHERE id = ? AND status IN ('CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
     `, [paymentMode || null, bookingId]);
 
     if (result.affectedRows === 0) {
@@ -225,6 +365,16 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     });
 
     const updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+
+    try {
+      await publishBookingAssignmentChange({
+        bookingId,
+        assignedDriverId: updated?.assigned_driver_id || null,
+        assignedDriverName: updated?.assigned_driver_name || null,
+        status: 'COMPLETED'
+      });
+    } catch (e) {}
+
     res.json({ success: true, data: { booking: updated } });
   } catch (err) {
     next(err);

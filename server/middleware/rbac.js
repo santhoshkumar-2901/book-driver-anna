@@ -40,7 +40,14 @@ export async function checkBookingOwnership(req, res, next) {
       });
     }
 
-    const booking = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    const booking = await queryOne(`
+      SELECT b.*,
+             COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+             COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+      FROM bookings b
+      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+      WHERE b.id = ?
+    `, [bookingId]);
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -58,6 +65,14 @@ export async function checkBookingOwnership(req, res, next) {
     if (booking.user_id && booking.user_id === req.user.id) {
       req.booking = booking;
       return next();
+    }
+    if (req.user.phone && booking.customer_phone) {
+      const cleanReq = String(req.user.phone).replace(/[^0-9]/g, '').slice(-10);
+      const cleanBk = String(booking.customer_phone).replace(/[^0-9]/g, '').slice(-10);
+      if (cleanReq && cleanBk && cleanReq === cleanBk) {
+        req.booking = booking;
+        return next();
+      }
     }
 
     // 3. Assigned driver verification

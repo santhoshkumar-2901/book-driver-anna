@@ -1022,33 +1022,37 @@ export default function App() {
       />
 
       {/* Booking Success Confirmation Modal */}
-      <BookingSuccessModal 
-        booking={activeBookingPass}
-        onClose={() => setActiveBookingPass(null)}
-        onSimulateRidePayment={(booking) => {
-          const rideForPayment = {
-            id: booking.bookingId || booking.id,
-            driverName: booking.assignedAnna || "Driver Assigned",
-            driverPhone: booking.driverPhone || SUPPORT_HELPLINE,
-            driverRating: 5.0,
-            carModel: booking.vehicleCategory || "Customer Vehicle",
-            pickupArea: booking.pickupArea || "Pickup Location",
-            dropLocation: booking.dropLocation || "Drop Location",
-            distance: booking.distance || "City Route",
-            duration: booking.duration || "Scheduled Trip",
-            totalFare: booking.totalFare || booking.fare || 499,
-            initialStep: 'payment'
-          };
-          setPaymentRideData(rideForPayment);
-          setIsPaymentModalOpen(true);
-        }}
-      />
+      <ErrorBoundary fallback={null}>
+        <BookingSuccessModal
+          booking={activeBookingPass}
+          onClose={() => setActiveBookingPass(null)}
+          onSimulateRidePayment={(booking) => {
+            const rideForPayment = {
+              id: booking.bookingId || booking.id,
+              driverName: booking.assignedAnna || "Driver Assigned",
+              driverPhone: booking.driverPhone || SUPPORT_HELPLINE,
+              driverRating: 5.0,
+              carModel: booking.vehicleCategory || "Customer Vehicle",
+              pickupArea: booking.pickupArea || "Pickup Location",
+              dropLocation: booking.dropLocation || "Drop Location",
+              distance: booking.distance || "City Route",
+              duration: booking.duration || "Scheduled Trip",
+              totalFare: booking.totalFare || booking.fare || 499,
+              initialStep: 'payment'
+            };
+            setPaymentRideData(rideForPayment);
+            setIsPaymentModalOpen(true);
+          }}
+        />
+      </ErrorBoundary>
 
       {/* Global Cancel Booking / Enrollment Modal */}
-      <CancelBookingModal 
-        isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
-      />
+      <ErrorBoundary fallback={null}>
+        <CancelBookingModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+        />
+      </ErrorBoundary>
 
       {/* Driver Spotlight Profile Modal */}
       <DriverSpotlightModal 
@@ -1099,6 +1103,10 @@ export default function App() {
         onLogout={handleClientLogout}
         openBookingModal={openBookingModal}
         hasActiveBookingBadge={hasActiveBookingBadge}
+        onViewBooking={(bookingPass) => {
+          setIsProfileModalOpen(false);
+          setActiveBookingPass(bookingPass);
+        }}
       />
 
       {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}

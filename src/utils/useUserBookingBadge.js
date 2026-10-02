@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../services/apiClient.js';
 import { onBookingUpdate } from './broadcastSync.js';
 import { isDummyOrDemoUser } from './userValidation.js';
@@ -149,8 +149,9 @@ export function useUserBookingBadge(clientUser) {
   const [hasActiveBadge, setHasActiveBadge] = useState(() => {
     return checkUserHasPendingOrConfirmedBooking(clientUser);
   });
+  const lastBackendFetchRef = useRef(0);
 
-  const evaluateBadge = useCallback(async () => {
+  const evaluateBadge = useCallback(async ({ force = false } = {}) => {
     if (!clientUser || isDummyOrDemoUser(clientUser)) {
       setHasActiveBadge(false);
       return;
@@ -169,7 +170,14 @@ export function useUserBookingBadge(clientUser) {
     }
 
     // 2. Query authoritative backend /api/bookings/my if local check was negative
+    // Throttled to avoid flooding the backend with repetitive GET requests
+    const now = Date.now();
+    if (!force && (now - lastBackendFetchRef.current < 20000)) {
+      return;
+    }
+
     try {
+      lastBackendFetchRef.current = now;
       const res = await apiClient.getMyBookings();
       if (res && res.data && Array.isArray(res.data.bookings)) {
         const hasServerActive = res.data.bookings.some(b => isBookingPendingOrConfirmedUnpaid(b, paidSet));
@@ -184,22 +192,22 @@ export function useUserBookingBadge(clientUser) {
   }, [clientUser]);
 
   useEffect(() => {
-    evaluateBadge();
+    evaluateBadge({ force: true });
 
     // Re-evaluate on real-time broadcast events
     const unsubscribeSync = onBookingUpdate(() => {
-      evaluateBadge();
+      evaluateBadge({ force: true });
     });
 
-    const handleCustomEvent = () => evaluateBadge();
+    const handleCustomEvent = () => evaluateBadge({ force: true });
     window.addEventListener('bda_booking_updated', handleCustomEvent);
     window.addEventListener('bda_order_created', handleCustomEvent);
     window.addEventListener('bda_ride_completed', handleCustomEvent);
     window.addEventListener('bda_payment_completed', handleCustomEvent);
     window.addEventListener('storage', handleCustomEvent);
 
-    // Periodic heartbeat to stay in sync
-    const interval = setInterval(evaluateBadge, 3500);
+    // Periodic heartbeat to stay in sync (30s interval instead of 3.5s)
+    const interval = setInterval(() => evaluateBadge({ force: false }), 30000);
 
     return () => {
       unsubscribeSync();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2, Tag 
+  Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2, Tag, MapPin
 } from 'lucide-react';
 import { SteeringWheel } from '../../components/Icons';
 
@@ -76,6 +76,22 @@ export default function AdminSidebar({
               <span>Dashboard</span>
             </div>
             {activeTab === 'dashboard' && <ChevronRight className="w-4 h-4 shrink-0" />}
+          </button>
+
+          {/* Sidebar Item: Operations Map */}
+          <button
+            onClick={() => navigateToTab('map')}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'map'
+                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <MapPin className="w-4 h-4 shrink-0" />
+              <span>Operations Map</span>
+            </div>
+            {activeTab === 'map' && <ChevronRight className="w-4 h-4 shrink-0" />}
           </button>
 
           {/* Sidebar Item 2: For Driver */}
@@ -283,6 +299,18 @@ export default function AdminSidebar({
           </button>
 
           <button
+            onClick={() => navigateToTab('map')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activeTab === 'map'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Operations Map</span>
+          </button>
+
+          <button
             onClick={() => navigateToTab('for-driver')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
               activeTab === 'for-driver'
@@ -434,6 +462,21 @@ export default function AdminSidebar({
                   <span>Dashboard</span>
                 </div>
                 {activeTab === 'dashboard' && <ChevronRight className="w-4 h-4 shrink-0" />}
+              </button>
+
+              <button
+                onClick={() => navigateToTab('map')}
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'map'
+                    ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  <span>Operations Map</span>
+                </div>
+                {activeTab === 'map' && <ChevronRight className="w-4 h-4 shrink-0" />}
               </button>
 
               <button

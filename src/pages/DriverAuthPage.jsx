@@ -495,9 +495,10 @@ export default function DriverAuthPage({
                       <input
                         ref={signupPhoneRef}
                         type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
                         name="bda_drv_reg_phone"
                         required
-                        autoComplete="off"
                         placeholder="98765 43210"
                         value={signupPhone}
                         onChange={(e) => setSignupPhone(e.target.value)}

@@ -48,5 +48,20 @@ export const RATE_LIMITS = {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // 20 lookups per 15 minutes
     message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many booking lookup attempts. Please try again later.' } }
+  },
+  LOCATION: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // 30 requests per minute per IP
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Location search rate limit reached. Please wait a moment.' } }
+  },
+  LOCATION_ROUTE: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // 30 requests per minute per IP
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Routing rate limit reached. Please wait a moment.' } }
+  },
+  DRIVER_LOCATION: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 60, // 60 requests per minute per IP (1/sec max)
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Driver location update rate limit reached. Please slow down.' } }
   }
 };

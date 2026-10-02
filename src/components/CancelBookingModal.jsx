@@ -319,6 +319,8 @@ export default function CancelBookingModal({ isOpen, onClose }) {
                   <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     required
                     placeholder="10-digit mobile number"
                     value={phoneInput}

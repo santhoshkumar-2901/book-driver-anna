@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Clock, MapPin, Phone, User, ShieldCheck, Check, Sparkles, AlertCircle, Navigation, Compass, ArrowRight, Users, Snowflake, Sun, Banknote, Smartphone, Lock, Star, Briefcase, Car, GraduationCap, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Calendar, Clock, MapPin, Phone, User, ShieldCheck, Check, Sparkles, AlertCircle, Navigation, Compass, ArrowRight, Users, Snowflake, Sun, Banknote, Smartphone, Lock, Star, Briefcase, Car, GraduationCap, CheckCircle2, Loader2, Crosshair } from 'lucide-react';
 import { SteeringWheel } from './Icons';
 import { BANGALORE_AREAS, BOOK_DRIVER_TRIP_TYPES, DRIVING_CLASSES } from '../data/mockData';
 import DateInput from './DateInput';
@@ -8,6 +8,7 @@ import { useScrollLock } from '../utils/useScrollLock';
 import { apiClient } from '../services/apiClient';
 import { usePricing } from '../context/PricingContext';
 import { generateClientBookingIdempotencyKey } from '../utils/idempotency.js';
+import { MapView, LocationMarker, LocationSearch, PickupMarker, DestinationMarker, RoutePolyline, DriverLocationMarker, useCurrentLocation } from './map';
 
 export { generateClientBookingIdempotencyKey };
 
@@ -59,6 +60,289 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const idempotencyKeyRef = useRef(null);
+
+  // Customer Browser Geolocation (Phase 3 Foundation)
+  const {
+    location: customerLocation,
+    loading: locationLoading,
+    error: locationError,
+    requestLocation,
+    clearLocation
+  } = useCurrentLocation();
+
+  // Distinct Frontend Booking Location States (Phase 5)
+  const [pickupLocation, setPickupLocation] = useState(null);
+  const [destinationLocation, setDestinationLocation] = useState(null);
+  const [isEditingPickup, setIsEditingPickup] = useState(false);
+  const [isEditingDestination, setIsEditingDestination] = useState(false);
+
+  // OSRM Routing State (Phase 6 - Informational Road Route)
+  const [routeData, setRouteData] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState(null);
+  const routeAbortRef = useRef(null);
+
+  // Authoritative Fare Estimate State (Phase 7 - Pricing Integration)
+  const [fareEstimate, setFareEstimate] = useState(null);
+  const [fareLoading, setFareLoading] = useState(false);
+  const [fareError, setFareError] = useState(null);
+  const fareAbortRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      clearLocation();
+      setPickupLocation(null);
+      setDestinationLocation(null);
+      setIsEditingPickup(false);
+      setIsEditingDestination(false);
+      setRouteData(null);
+      setRouteLoading(false);
+      setRouteError(null);
+      if (routeAbortRef.current) routeAbortRef.current.abort();
+      setFareEstimate(null);
+      setFareLoading(false);
+      setFareError(null);
+      if (fareAbortRef.current) fareAbortRef.current.abort();
+    }
+  }, [isOpen, clearLocation]);
+
+  const handleSelectPickup = (item) => {
+    setPickupLocation(item);
+    setIsEditingPickup(false);
+    if (item?.displayName) {
+      setPickupArea(item.displayName.split(',')[0].trim());
+    }
+  };
+
+  const handleClearPickup = () => {
+    setPickupLocation(null);
+    setIsEditingPickup(false);
+    setRouteData(null);
+    setRouteLoading(false);
+    setRouteError(null);
+    if (routeAbortRef.current) routeAbortRef.current.abort();
+    setFareEstimate(null);
+    setFareLoading(false);
+    setFareError(null);
+    if (fareAbortRef.current) fareAbortRef.current.abort();
+  };
+
+  const handleSelectDestination = (item) => {
+    setDestinationLocation(item);
+    setIsEditingDestination(false);
+    if (item?.displayName) {
+      setDropLocation(item.displayName.split(',')[0].trim());
+    }
+  };
+
+  const handleClearDestination = () => {
+    setDestinationLocation(null);
+    setIsEditingDestination(false);
+    setRouteData(null);
+    setRouteLoading(false);
+    setRouteError(null);
+    if (routeAbortRef.current) routeAbortRef.current.abort();
+    setFareEstimate(null);
+    setFareLoading(false);
+    setFareError(null);
+    if (fareAbortRef.current) fareAbortRef.current.abort();
+  };
+
+  const handleUseCurrentLocationForPickup = () => {
+    if (customerLocation) {
+      setPickupLocation({
+        id: 'gps-current-location',
+        displayName: 'Current Location (GPS)',
+        latitude: customerLocation.latitude,
+        longitude: customerLocation.longitude,
+        type: 'current_location'
+      });
+      setIsEditingPickup(false);
+    } else {
+      requestLocation();
+    }
+  };
+
+  // Sync GPS to pickup if user requested location while setting pickup
+  useEffect(() => {
+    if (customerLocation && !pickupLocation && locationLoading === false) {
+      // If customer location arrives and no pickup is set yet, leave as optional or ready
+    }
+  }, [customerLocation, pickupLocation, locationLoading]);
+
+  // Phase 6: OSRM Routing between pickup and destination
+  useEffect(() => {
+    // 1. If either pickup or destination is missing or invalid, clear route
+    if (
+      !pickupLocation || typeof pickupLocation.latitude !== 'number' || typeof pickupLocation.longitude !== 'number' ||
+      !destinationLocation || typeof destinationLocation.latitude !== 'number' || typeof destinationLocation.longitude !== 'number'
+    ) {
+      if (routeAbortRef.current) routeAbortRef.current.abort();
+      setRouteData(null);
+      setRouteLoading(false);
+      setRouteError(null);
+      return;
+    }
+
+    // 2. Abort any previous in-flight route request to prevent race conditions
+    if (routeAbortRef.current) {
+      routeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    routeAbortRef.current = controller;
+
+    setRouteLoading(true);
+    setRouteError(null);
+
+    apiClient.getLocationRoute(
+      {
+        pickupLat: pickupLocation.latitude,
+        pickupLng: pickupLocation.longitude,
+        destLat: destinationLocation.latitude,
+        destLng: destinationLocation.longitude
+      },
+      { signal: controller.signal }
+    )
+      .then((res) => {
+        if (routeAbortRef.current === controller) {
+          if (res && res.success && res.data) {
+            setRouteData(res.data);
+            setRouteError(null);
+          } else {
+            setRouteData(null);
+            setRouteError('Unable to calculate road route.');
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        if (routeAbortRef.current === controller) {
+          setRouteData(null);
+          setRouteError(err.message || 'Unable to calculate road route.');
+        }
+      })
+      .finally(() => {
+        if (routeAbortRef.current === controller) {
+          setRouteLoading(false);
+        }
+      });
+
+    const cleanupRouteEffect = () => {
+      controller.abort();
+    };
+    return cleanupRouteEffect;
+  }, [pickupLocation, destinationLocation]);
+
+  // Phase 7: Authoritative Backend Fare Estimation based on Route & Service
+  useEffect(() => {
+    if (
+      !routeData ||
+      !pickupLocation || typeof pickupLocation.latitude !== 'number' || typeof pickupLocation.longitude !== 'number' ||
+      !destinationLocation || typeof destinationLocation.latitude !== 'number' || typeof destinationLocation.longitude !== 'number'
+    ) {
+      if (fareAbortRef.current) fareAbortRef.current.abort();
+      setFareEstimate(null);
+      setFareLoading(false);
+      setFareError(null);
+      return;
+    }
+
+    if (fareAbortRef.current) {
+      fareAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    fareAbortRef.current = controller;
+
+    setFareLoading(true);
+    setFareError(null);
+
+    apiClient.getBookingEstimate({
+      pickupLat: pickupLocation.latitude,
+      pickupLng: pickupLocation.longitude,
+      destLat: destinationLocation.latitude,
+      destLng: destinationLocation.longitude,
+      bookingCategory,
+      driverTripOption,
+      vehicleCategory,
+      selectedClassId,
+      dropLocation: destinationLocation.displayName || dropLocation,
+      pickupArea: pickupLocation.displayName || pickupArea
+    }, { signal: controller.signal })
+      .then((res) => {
+        if (fareAbortRef.current === controller) {
+          if (res?.success && res?.data) {
+            setFareEstimate(res.data);
+            setFareError(null);
+          } else {
+            setFareEstimate(null);
+            setFareError('Unable to calculate fare estimate.');
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        if (fareAbortRef.current === controller) {
+          setFareEstimate(null);
+          setFareError(err.message || 'Unable to calculate fare estimate.');
+        }
+      })
+      .finally(() => {
+        if (fareAbortRef.current === controller) {
+          setFareLoading(false);
+        }
+      });
+
+    const cleanupFareEffect = () => {
+      controller.abort();
+    };
+    return cleanupFareEffect;
+  }, [routeData, bookingCategory, driverTripOption, vehicleCategory, selectedClassId]);
+
+  // Map Bounds calculation considering full route geometry or pickup/destination points
+  const mapBounds = useMemo(() => {
+    if (routeData?.geometry?.coordinates && Array.isArray(routeData.geometry.coordinates) && routeData.geometry.coordinates.length >= 2) {
+      let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+      for (const [lng, lat] of routeData.geometry.coordinates) {
+        if (!isNaN(lat) && !isNaN(lng)) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+        }
+      }
+      if (minLat !== Infinity && maxLat !== -Infinity && minLng !== Infinity && maxLng !== -Infinity) {
+        return [[minLat, minLng], [maxLat, maxLng]];
+      }
+    }
+
+    if (
+      pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' &&
+      destinationLocation && typeof destinationLocation.latitude === 'number' && typeof destinationLocation.longitude === 'number'
+    ) {
+      return [
+        [pickupLocation.latitude, pickupLocation.longitude],
+        [destinationLocation.latitude, destinationLocation.longitude]
+      ];
+    }
+    return null;
+  }, [routeData, pickupLocation, destinationLocation]);
+
+  // Center on single location when bounds is null
+  const mapCenter = useMemo(() => {
+    if (mapBounds) return undefined;
+    if (pickupLocation?.latitude && pickupLocation?.longitude) {
+      return [pickupLocation.latitude, pickupLocation.longitude];
+    }
+    if (destinationLocation?.latitude && destinationLocation?.longitude) {
+      return [destinationLocation.latitude, destinationLocation.longitude];
+    }
+    if (customerLocation?.latitude && customerLocation?.longitude) {
+      return [customerLocation.latitude, customerLocation.longitude];
+    }
+    return undefined;
+  }, [mapBounds, pickupLocation, destinationLocation, customerLocation]);
+
+  const mapZoom = (mapBounds || pickupLocation || destinationLocation || customerLocation) ? 14 : undefined;
 
   useEffect(() => {
     if (initialType) {
@@ -173,6 +457,15 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   };
 
   const fareInfo = calculateTotalFare();
+  const effectiveBase = (fareEstimate && routeData && typeof fareEstimate.basePrice === 'number')
+    ? fareEstimate.basePrice
+    : fareInfo.base;
+  const effectiveGst = (fareEstimate && routeData && typeof fareEstimate.gst === 'number')
+    ? fareEstimate.gst
+    : fareInfo.gst;
+  const effectiveTotalFare = (fareEstimate && routeData && typeof fareEstimate.totalFare === 'number')
+    ? fareEstimate.totalFare
+    : fareInfo.total;
 
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
@@ -205,6 +498,10 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       outstationPackage,
       outstationDestination,
       pickupArea,
+      pickupLat: pickupLocation?.latitude,
+      pickupLng: pickupLocation?.longitude,
+      destLat: destinationLocation?.latitude,
+      destLng: destinationLocation?.longitude,
       date: toYYYYMMDD(bookingDate),
       time: bookingTime,
       paymentMode
@@ -267,7 +564,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       customerEmail,
       userId: clientUser?.id || null,
       paymentMode,
-      totalFare: fareInfo.total,
+      totalFare: effectiveTotalFare,
       rawPayload: payloadForApi,
       assignedAnna: null
     };
@@ -346,8 +643,8 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer shrink-0 ml-2"
-            aria-label="Close"
+            className="text-slate-400 hover:text-white p-2.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer shrink-0 ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+            aria-label="Close booking modal"
           >
             <X className="w-4 h-4" />
           </button>
@@ -473,42 +770,225 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           {/* DYNAMIC LOCATION FIELDS FOR DRIVER OPTIONS */}
           {bookingCategory === 'driver' && driverTripOption === 'one-way' && (
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
-              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Navigation className="w-3.5 h-3.5 text-amber-400" /> One Way Locations
+              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-amber-400" /> One Way Locations
+                </span>
+                {/* Current Location Quick Action */}
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocationForPickup}
+                  disabled={locationLoading}
+                  aria-label="Use current location for pickup"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors py-1 px-2 rounded-lg hover:bg-amber-400/10 min-h-[36px] touch-manipulation"
+                >
+                  {locationLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Crosshair className="w-3.5 h-3.5" />
+                  )}
+                  <span>Use current location as pickup</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 1. Pickup Location Dropdown */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Pickup Location *
-                  </label>
-                  <select
-                    value={pickupArea}
-                    onChange={(e) => setPickupArea(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+              {/* Geolocation Error Alert Banner if any */}
+              {locationError && (
+                <div
+                  role="alert"
+                  className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300 flex items-start justify-between gap-2"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span>{locationError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    className="px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 text-[11px] font-semibold rounded-md shrink-0 transition-colors"
                   >
-                    {BANGALORE_AREAS.map((a, i) => (
-                      <option key={i} value={a}>{a}</option>
-                    ))}
-                  </select>
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {/* Pickup & Destination Independent Controls */}
+              <div className="space-y-3">
+                {/* 1. Pickup Location */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-emerald-400" /> Pickup Location *
+                    </label>
+                    {pickupLocation && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingPickup(!isEditingPickup)}
+                          className="text-[11px] font-medium text-slate-400 hover:text-white"
+                        >
+                          {isEditingPickup ? 'Cancel' : 'Change'}
+                        </button>
+                        <span className="text-slate-700">•</span>
+                        <button
+                          type="button"
+                          onClick={handleClearPickup}
+                          className="text-[11px] font-medium text-red-400 hover:text-red-300"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {pickupLocation && !isEditingPickup ? (
+                    <div className="p-2.5 bg-slate-900 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></div>
+                        <p className="text-xs text-slate-100 font-medium truncate">
+                          {pickupLocation.displayName}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0 font-medium">
+                        Selected
+                      </span>
+                    </div>
+                  ) : (
+                    <LocationSearch
+                      id="pickup-location-search"
+                      placeholder="Search pickup area, street, or landmark..."
+                      onSelect={handleSelectPickup}
+                    />
+                  )}
                 </div>
 
-                {/* 2. Drop Location Dropdown */}
+                {/* 2. Destination Location */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Drop Location *
-                  </label>
-                  <select
-                    value={dropLocation}
-                    onChange={(e) => setDropLocation(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                  >
-                    {BANGALORE_AREAS.map((a, i) => (
-                      <option key={i} value={a}>{a}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-rose-400 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-rose-400" /> Destination Location *
+                    </label>
+                    {destinationLocation && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingDestination(!isEditingDestination)}
+                          className="text-[11px] font-medium text-slate-400 hover:text-white"
+                        >
+                          {isEditingDestination ? 'Cancel' : 'Change'}
+                        </button>
+                        <span className="text-slate-700">•</span>
+                        <button
+                          type="button"
+                          onClick={handleClearDestination}
+                          className="text-[11px] font-medium text-red-400 hover:text-red-300"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {destinationLocation && !isEditingDestination ? (
+                    <div className="p-2.5 bg-slate-900 border border-rose-500/30 rounded-xl flex items-center justify-between">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-rose-400 shrink-0"></div>
+                        <p className="text-xs text-slate-100 font-medium truncate">
+                          {destinationLocation.displayName}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-rose-400 bg-rose-950/60 border border-rose-500/30 px-2 py-0.5 rounded-full shrink-0 font-medium">
+                        Selected
+                      </span>
+                    </div>
+                  ) : (
+                    <LocationSearch
+                      id="destination-location-search"
+                      placeholder="Search destination area, street, or landmark..."
+                      onSelect={handleSelectDestination}
+                    />
+                  )}
                 </div>
+              </div>
+
+              {/* OSRM Route & Authoritative Fare Status & Metrics (Phase 7 Integration) */}
+              {routeLoading && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                  <span>Calculating road route...</span>
+                </div>
+              )}
+
+              {fareLoading && !routeLoading && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                  <span>Calculating authoritative fare...</span>
+                </div>
+              )}
+
+              {routeError && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{routeError}</span>
+                </div>
+              )}
+
+              {fareError && !routeError && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{fareError}</span>
+                </div>
+              )}
+
+              {routeData && !routeLoading && (
+                <div className="p-2.5 bg-slate-900 border border-slate-700/80 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-slate-200">
+                    <span className="font-bold text-amber-400">Road Route:</span>
+                    <span>{routeData.distanceKm} km</span>
+                    <span className="text-slate-600">•</span>
+                    <span>~{routeData.durationMinutes} min</span>
+                    {fareEstimate && (
+                      <>
+                        <span className="text-slate-600">•</span>
+                        <span className="font-bold text-emerald-400">
+                          Estimated Fare: ₹{fareEstimate.totalFare}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {fareLoading ? 'Calculating fare...' : 'Authoritative Tariff'}
+                  </span>
+                </div>
+              )}
+
+              {/* Interactive Route Map Preview */}
+              <div className="pt-1">
+                <div className="text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Trip Locations & Route Map</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">OpenStreetMap</span>
+                </div>
+
+                <MapView
+                  bounds={mapBounds}
+                  center={mapCenter}
+                  zoom={mapZoom}
+                  height="220px"
+                  className="border-slate-800"
+                >
+                  {customerLocation && <LocationMarker location={customerLocation} />}
+                  {pickupLocation && <PickupMarker location={pickupLocation} />}
+                  {destinationLocation && <DestinationMarker location={destinationLocation} />}
+                  {routeData?.geometry && <RoutePolyline geometry={routeData.geometry} />}
+                  {initialData?.driverLocation && (
+                    <DriverLocationMarker
+                      location={initialData.driverLocation}
+                      label={initialData?.assignedDriverName || 'Assigned Driver'}
+                    />
+                  )}
+                </MapView>
               </div>
             </div>
           )}
@@ -616,7 +1096,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
               {/* Package selector based on chosen mode */}
               <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
                   <span>
                     {outstationTripType === 'one-way' 
                       ? 'Select One Way Drop Package' 
@@ -884,6 +1364,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="1"
                     max="50"
                     required
@@ -901,6 +1382,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     max="50"
                     value={luggageCount}
@@ -1005,6 +1487,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 <input
                   type="text"
                   required
+                  autoComplete="name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Rahul Sharma"
@@ -1016,6 +1499,8 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">Mobile Number (WhatsApp) *</label>
                 <input
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   required
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
@@ -1043,11 +1528,11 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               <span className="text-xs font-bold text-slate-300">Payment Option</span>
               <div className="text-right">
                 <span className="text-sm font-extrabold text-amber-400 font-['Outfit']">
-                  Total ₹{fareInfo.total.toLocaleString('en-IN')}
+                  Total ₹{effectiveTotalFare.toLocaleString('en-IN')}
                 </span>
-                {fareInfo.gst > 0 ? (
+                {effectiveGst > 0 ? (
                   <span className="block text-[10px] text-slate-400 font-medium">
-                    (₹{fareInfo.base.toLocaleString('en-IN')} base + ₹{fareInfo.gst.toLocaleString('en-IN')} 5% GST)
+                    (₹{effectiveBase.toLocaleString('en-IN')} base + ₹{effectiveGst.toLocaleString('en-IN')} 5% GST)
                   </span>
                 ) : (
                   <span className="block text-[10px] text-emerald-400 font-medium">
@@ -1061,27 +1546,27 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               <button
                 type="button"
                 onClick={() => setPaymentMode('cash')}
-                className={`py-3 px-3 rounded-xl border text-center font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-3 px-2 sm:px-3 rounded-xl border text-center font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 min-h-[48px] touch-manipulation cursor-pointer ${
                   paymentMode === 'cash'
                     ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md'
                     : 'bg-slate-900 text-slate-400 border-slate-800'
                 }`}
               >
-                <Banknote className="w-4 h-4 text-emerald-500" />
-                <span>{bookingCategory === 'class' ? 'Pay to Instructor Anna' : 'Cash'}</span>
+                <Banknote className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="text-[11px] sm:text-xs text-center">{bookingCategory === 'class' ? 'Pay to Instructor' : 'Cash'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setPaymentMode('upi')}
-                className={`py-3 px-3 rounded-xl border text-center font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-3 px-2 sm:px-3 rounded-xl border text-center font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 min-h-[48px] touch-manipulation cursor-pointer ${
                   paymentMode === 'upi'
                     ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md'
                     : 'bg-slate-900 text-slate-400 border-slate-800'
                 }`}
               >
-                <Smartphone className="w-4 h-4 text-purple-400" />
-                <span>GPay / PhonePe / UPI</span>
+                <Smartphone className="w-4 h-4 text-purple-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs text-center">GPay / PhonePe / UPI</span>
               </button>
             </div>
           </div>
@@ -1090,7 +1575,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary w-full py-3.5 text-base justify-center disabled:opacity-50"
+            className="btn-primary w-full py-3.5 text-sm sm:text-base justify-center min-h-[48px] touch-manipulation disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -1099,8 +1584,8 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               </>
             ) : (
               <>
-                <ShieldCheck className="w-5 h-5" />
-                <span>Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{fareInfo.total.toLocaleString('en-IN')})</span>
+                <ShieldCheck className="w-5 h-5 shrink-0" />
+                <span className="truncate">Confirm {bookingCategory === 'class' ? 'Driving Class Enrollment' : (bookingCategory === 'vehicle' ? `${vehicleCategory} Booking` : 'Driver Booking')} (₹{effectiveTotalFare.toLocaleString('en-IN')})</span>
               </>
             )}
           </button>

@@ -1,14 +1,17 @@
 import crypto from 'crypto';
 import { queryOne, queryAll, execute, withTransaction, isTiDB } from '../db/database.js';
 import { calculateAuthoritativeFare, getAllPricing } from './pricingService.js';
+import { routingService } from './routingService.js';
 import { logAuditEvent } from './auditService.js';
 import { isValidCalendarDate, getTodayIST } from '../middleware/validate.js';
+import { publishBookingAssignmentChange } from './realtimeService.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
   'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
-  'CONFIRMED': ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED'],
-  'ASSIGNED': ['IN_PROGRESS', 'CONFIRMED', 'CANCELLED'],
+  'CONFIRMED': ['ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED'],
+  'ASSIGNED': ['ARRIVED', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'],
+  'ARRIVED': ['IN_PROGRESS', 'COMPLETED', 'CONFIRMED', 'CANCELLED'],
   'IN_PROGRESS': ['COMPLETED'],
   'COMPLETED': [], // Terminal
   'CANCELLED': []  // Terminal
@@ -29,6 +32,18 @@ export async function createBooking({
   outstationPackage = 'Round trip 24hr',
   outstationDestination = '',
   pickupArea = 'Indiranagar',
+  pickupLat = undefined,
+  pickupLng = undefined,
+  destLat = undefined,
+  destLng = undefined,
+  pickupLatitude = undefined,
+  pickupLongitude = undefined,
+  destinationLatitude = undefined,
+  destinationLongitude = undefined,
+  pickup_latitude = undefined,
+  pickup_longitude = undefined,
+  destination_latitude = undefined,
+  destination_longitude = undefined,
   date,
   time,
   paymentMode = 'cash',
@@ -36,7 +51,15 @@ export async function createBooking({
   idempotencyKey = null,
   ipAddress = null
 }) {
-  // 1. Validate Date: Must be a valid calendar date in YYYY-MM-DD format and cannot be in the past (IST)
+  // 1. Validate Mandatory Customer Details
+  if (!customerPhone || typeof customerPhone !== 'string' || !customerPhone.trim()) {
+    const err = new Error('Customer phone number is required.');
+    err.statusCode = 400;
+    err.code = 'INVALID_INPUT';
+    throw err;
+  }
+
+  // 2. Validate Date: Must be a valid calendar date in YYYY-MM-DD format and cannot be in the past (IST)
   if (!date || !isValidCalendarDate(date)) {
     const err = new Error('Booking date must be a valid calendar date in YYYY-MM-DD format.');
     err.statusCode = 400;
@@ -60,7 +83,83 @@ export async function createBooking({
     }
   }
 
-  // 3. Authoritative Fare Calculation on Backend using dynamic live pricing
+  // 3. Authoritative Route Calculation & Coordinate Validation (when coordinates are provided)
+  const pLat = pickupLat ?? pickupLatitude ?? pickup_latitude;
+  const pLng = pickupLng ?? pickupLongitude ?? pickup_longitude;
+  const dLat = destLat ?? destinationLatitude ?? destination_latitude;
+  const dLng = destLng ?? destinationLongitude ?? destination_longitude;
+
+  const isProvided = (v) => v !== undefined && v !== null && (typeof v !== 'string' || v.trim() !== '');
+  const hasAnyCoord = isProvided(pLat) || isProvided(pLng) || isProvided(dLat) || isProvided(dLng);
+  const hasAllCoords = isProvided(pLat) && isProvided(pLng) && isProvided(dLat) && isProvided(dLng);
+
+  let validatedPickupLat = null;
+  let validatedPickupLng = null;
+  let validatedDestLat = null;
+  let validatedDestLng = null;
+  let distanceKm = null;
+  let durationMinutes = null;
+
+  if (hasAnyCoord) {
+    if (!hasAllCoords) {
+      const err = new Error('Incomplete coordinate pair. If geographic coordinates are supplied, all 4 coordinates (pickupLat, pickupLng, destLat, destLng) must be provided.');
+      err.statusCode = 400;
+      err.code = 'INVALID_COORDINATES';
+      throw err;
+    }
+
+    const isNumeric = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)));
+    if (!isNumeric(pLat) || !isNumeric(pLng) || !isNumeric(dLat) || !isNumeric(dLng)) {
+      const err = new Error('Coordinates must be valid numeric values.');
+      err.statusCode = 400;
+      err.code = 'INVALID_COORDINATES';
+      throw err;
+    }
+
+    const parsedPLat = Number(pLat);
+    const parsedPLng = Number(pLng);
+    const parsedDLat = Number(dLat);
+    const parsedDLng = Number(dLng);
+
+    if (
+      isNaN(parsedPLat) || isNaN(parsedPLng) || isNaN(parsedDLat) || isNaN(parsedDLng) ||
+      !isFinite(parsedPLat) || !isFinite(parsedPLng) || !isFinite(parsedDLat) || !isFinite(parsedDLng) ||
+      parsedPLat < -90 || parsedPLat > 90 || parsedDLat < -90 || parsedDLat > 90 ||
+      parsedPLng < -180 || parsedPLng > 180 || parsedDLng < -180 || parsedDLng > 180
+    ) {
+      const err = new Error('Coordinates must be valid finite numbers within geographic bounds (-90 <= lat <= 90, -180 <= lng <= 180).');
+      err.statusCode = 400;
+      err.code = 'INVALID_COORDINATES';
+      throw err;
+    }
+
+    validatedPickupLat = parsedPLat;
+    validatedPickupLng = parsedPLng;
+    validatedDestLat = parsedDLat;
+    validatedDestLng = parsedDLng;
+
+    try {
+      const routeData = await routingService.getRoute({
+        pickupLat: validatedPickupLat,
+        pickupLng: validatedPickupLng,
+        destLat: validatedDestLat,
+        destLng: validatedDestLng
+      });
+      if (routeData) {
+        distanceKm = routeData.distanceKm;
+        durationMinutes = routeData.durationMinutes;
+      }
+    } catch (routeErr) {
+      if (routeErr.code === 'INVALID_COORDINATES' || routeErr.code === 'NO_ROUTE_FOUND') {
+        routeErr.statusCode = routeErr.status || 400;
+        throw routeErr;
+      }
+      // Graceful degradation: External route provider timeout or network error must not crash booking creation
+      console.warn('[BOOKING ROUTING] Route provider unavailable, degrading to standard tariff calculation:', routeErr.message);
+    }
+  }
+
+  // 4. Authoritative Fare Calculation on Backend using dynamic live pricing
   const pricingData = await getAllPricing().catch(() => null);
   const fareResult = calculateAuthoritativeFare({
     bookingCategory,
@@ -70,7 +169,9 @@ export async function createBooking({
     dropLocation,
     roundTripDuration,
     outstationTripType,
-    outstationPackage
+    outstationPackage,
+    distanceKm,
+    durationMinutes
   }, pricingData?.map || null);
 
   // 4. Generate Cryptographically Secure Booking ID
@@ -140,10 +241,11 @@ export async function createBooking({
       INSERT INTO bookings (
         id, user_id, customer_name, customer_phone, customer_email,
         booking_type, trip_type, service_name, pickup_area, drop_location,
+        pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
         date, time, calculated_fare, payment_mode, status,
         assigned_driver_id, idempotency_key
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
     `, [
       bookingId,
       userId,
@@ -155,6 +257,10 @@ export async function createBooking({
       serviceName,
       pickupArea,
       dropLocation,
+      validatedPickupLat,
+      validatedPickupLng,
+      validatedDestLat,
+      validatedDestLng,
       date,
       time,
       fareResult.totalFare,
@@ -225,7 +331,7 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
     return { booking, alreadyCancelled: true };
   }
 
-  const CANCELLABLE_STATES = ['PENDING', 'CONFIRMED', 'ASSIGNED'];
+  const CANCELLABLE_STATES = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED'];
   if (!CANCELLABLE_STATES.includes(booking.status)) {
     const err = new Error(`Cannot cancel booking with status '${booking.status}'.`);
     err.statusCode = 400;
@@ -237,7 +343,7 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   const result = await execute(`
     UPDATE bookings 
     SET status = 'CANCELLED', cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED')
+    WHERE id = ? AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED')
   `, [reason, bookingId]);
 
   if (result.affectedRows === 0) {
@@ -261,6 +367,16 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   });
 
   const updated = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+
+  try {
+    await publishBookingAssignmentChange({
+      bookingId,
+      assignedDriverId: null,
+      assignedDriverName: null,
+      status: 'CANCELLED'
+    });
+  } catch (e) {}
+
   return { booking: updated, alreadyCancelled: false };
 }
 
@@ -286,7 +402,9 @@ export async function updateBookingStatus({
   }
 
   let normalizedNewStatus = String(newStatus).toUpperCase().trim();
-  if (normalizedNewStatus.includes('ASSIGN')) {
+  if (normalizedNewStatus.includes('ARRIV')) {
+    normalizedNewStatus = 'ARRIVED';
+  } else if (normalizedNewStatus.includes('ASSIGN')) {
     normalizedNewStatus = 'ASSIGNED';
   } else if (normalizedNewStatus.includes('CONFIRM')) {
     normalizedNewStatus = 'CONFIRMED';
@@ -308,6 +426,37 @@ export async function updateBookingStatus({
     err.statusCode = 400;
     err.code = 'INVALID_STATE_TRANSITION';
     throw err;
+  }
+
+  // Defense-in-depth: Enforce role-based ownership authorization at service layer
+  if (requesterUser) {
+    if (requesterUser.role === 'driver') {
+      const requesterDriverId = requesterUser.driverId;
+      if (!booking.assigned_driver_id || (requesterDriverId && booking.assigned_driver_id !== requesterDriverId)) {
+        const err = new Error('Access denied: You are not authorized to modify this booking.');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN';
+        throw err;
+      }
+    } else if (requesterUser.role === 'customer') {
+      if (normalizedNewStatus === 'ARRIVED') {
+        const err = new Error('Access denied: Customers cannot mark driver arrival.');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN';
+        throw err;
+      }
+      if (booking.user_id && booking.user_id !== requesterUser.id) {
+        const err = new Error('Access denied: You do not have authorization to modify this booking.');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN';
+        throw err;
+      }
+    } else if (requesterUser.role !== 'admin') {
+      const err = new Error('Access denied: Unauthorized role.');
+      err.statusCode = 403;
+      err.code = 'FORBIDDEN';
+      throw err;
+    }
   }
 
   // Validate state machine transition (allow same status or permitted transition)
@@ -369,7 +518,7 @@ export async function updateBookingStatus({
     ipAddress
   });
 
-  return await qOne(`
+  const updated = await qOne(`
     SELECT b.*, 
            COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
            COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
@@ -377,10 +526,24 @@ export async function updateBookingStatus({
     LEFT JOIN drivers d ON b.assigned_driver_id = d.id
     WHERE b.id = ?
   `, [bookingId]);
+
+  if (assignedDriverId !== undefined || normalizedNewStatus !== currentStatus) {
+    try {
+      await publishBookingAssignmentChange({
+        bookingId,
+        assignedDriverId: updated.assigned_driver_id || null,
+        assignedDriverName: updated.assigned_driver_name || null,
+        status: updated.status
+      });
+    } catch (e) {}
+  }
+
+  return updated;
 }
 
-export async function getUserBookings(userId, phone = null) {
+export async function getUserBookings(userId, phone = null, limit = 50) {
   if (!userId && !phone) return [];
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
   const selectSql = `
     SELECT b.*, 
            COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
@@ -392,13 +555,13 @@ export async function getUserBookings(userId, phone = null) {
     const cleanPhone = String(phone).replace(/[^0-9]/g, '');
     const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
     return await queryAll(
-      `${selectSql} WHERE b.user_id = ? OR b.customer_phone = ? OR b.customer_phone LIKE ? ORDER BY b.created_at DESC`,
-      [userId, String(phone).trim(), `%${last10}`]
+      `${selectSql} WHERE (b.user_id = ? OR b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`,
+      [userId, String(phone).trim(), `%${last10}`, safeLimit]
     );
   } else if (userId) {
-    return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC`, [userId]);
+    return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ?`, [userId, safeLimit]);
   }
   const cleanPhone = String(phone).replace(/[^0-9]/g, '');
   const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
-  return await queryAll(`${selectSql} WHERE b.customer_phone = ? OR b.customer_phone LIKE ? ORDER BY b.created_at DESC`, [String(phone).trim(), `%${last10}`]);
+  return await queryAll(`${selectSql} WHERE (b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`, [String(phone).trim(), `%${last10}`, safeLimit]);
 }

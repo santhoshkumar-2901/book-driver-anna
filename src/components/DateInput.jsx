@@ -74,6 +74,7 @@ export default function DateInput({
     <div className="relative flex items-center w-full">
       <input
         type="text"
+        inputMode="numeric"
         id={id}
         required={required}
         disabled={disabled}
@@ -108,7 +109,8 @@ export default function DateInput({
         onClick={openCalendarPicker}
         disabled={disabled}
         title="Choose date from calendar"
-        className="absolute right-2 p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+        aria-label="Choose date from calendar"
+        className="absolute right-1 p-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center cursor-pointer"
       >
         <Calendar className="w-4 h-4" />
       </button>

@@ -43,7 +43,8 @@ export default function UserProfileModal({
   onProfileUpdate, 
   bookings = [], 
   onCancelBooking,
-  hasActiveBookingBadge: externalBadge
+  hasActiveBookingBadge: externalBadge,
+  onViewBooking
 }) {
   useScrollLock(isOpen);
   const internalBadge = useUserBookingBadge(clientUser);
@@ -73,6 +74,8 @@ export default function UserProfileModal({
 
   // Bookings list state
   const [userBookings, setUserBookings] = useState([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+  const [bookingsError, setBookingsError] = useState(null);
   const [paymentRideData, setPaymentRideData] = useState(null);
   const [paidBookingIds, setPaidBookingIds] = useState(() => {
     try {
@@ -209,6 +212,9 @@ export default function UserProfileModal({
       const matched = [];
       const seenIds = new Set();
 
+      setIsLoadingBookings(true);
+      setBookingsError(null);
+
       // First attempt: Query authoritative bookings from backend API
       try {
         const res = await apiClient.getMyBookings();
@@ -234,7 +240,9 @@ export default function UserProfileModal({
                 Boolean(b.isPaid)
               );
               matched.push({
+                ...b,
                 id: b.id,
+                bookingId: b.id,
                 serviceType: b.booking_type || 'driver',
                 title: b.service_name || 'Driver Anna Duty',
                 category: b.booking_type === 'vehicle' ? 'Car Rental' : (b.booking_type === 'class' ? 'Driving School' : 'Personal Driver'),
@@ -242,6 +250,8 @@ export default function UserProfileModal({
                 time: b.time || '',
                 pickup: b.pickup_area || 'Indiranagar',
                 drop: b.drop_location || '',
+                pickupArea: b.pickup_area || 'Indiranagar',
+                dropLocation: b.drop_location || '',
                 amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
                 status: displayStatus,
                 isPaid,
@@ -252,7 +262,10 @@ export default function UserProfileModal({
           });
         }
       } catch (err) {
-        // Backend lookup fallback
+        console.warn('[USER PROFILE] Failed to fetch authoritative bookings:', err.message);
+        if (!isCancelled) {
+          setBookingsError(err.message || 'Unable to load bookings from server.');
+        }
       }
 
       // Check local storage for any bookings created during the active browser session
@@ -468,6 +481,7 @@ export default function UserProfileModal({
 
       if (!isCancelled) {
         setUserBookings(matched);
+        setIsLoadingBookings(false);
       }
     };
 
@@ -821,7 +835,19 @@ export default function UserProfileModal({
                 </button>
               </div>
 
-              {userBookings.length === 0 ? (
+              {bookingsError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold flex items-center justify-between">
+                  <span>⚠️ {bookingsError}</span>
+                  <button onClick={fetchBookings} className="underline hover:text-white cursor-pointer ml-2">Retry</button>
+                </div>
+              )}
+
+              {isLoadingBookings && userBookings.length === 0 ? (
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin mx-auto" />
+                  <p className="text-xs text-slate-400">Loading your booking history...</p>
+                </div>
+              ) : userBookings.length === 0 ? (
                 <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
                   <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
                     <SteeringWheel className="w-6 h-6 stroke-[2]" />
@@ -1063,6 +1089,24 @@ export default function UserProfileModal({
                             </span>
                           </div>
                         )}
+
+                        {/* Footer with ID and Trip Details action */}
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                          <span className="text-[10px] text-slate-500 font-mono">ID: {b.id}</span>
+                          {onViewBooking && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onClose) onClose();
+                                onViewBooking(b);
+                              }}
+                              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Trip Details</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

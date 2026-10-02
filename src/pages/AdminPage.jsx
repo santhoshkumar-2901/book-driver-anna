@@ -15,6 +15,7 @@ import AdminVehicleTab from './admin/AdminVehicleTab';
 import AdminClassTab from './admin/AdminClassTab';
 import AdminUsersTab from './admin/AdminUsersTab';
 import AdminPricingTab from './admin/AdminPricingTab';
+import AdminOperationalMapTab from './admin/AdminOperationalMapTab';
 import AdminModals from './admin/AdminModals';
 
 // Initial state for bookings, rentals, academy enrollments, and clients (empty on clean boot)
@@ -36,6 +37,7 @@ export const sanitizeDrivers = (list) => {
 // SPA Route Paths for Admin Sections
 export const ADMIN_TAB_ROUTES = {
   'dashboard': '/admin/dashboard',
+  'map': '/admin/map',
   'for-driver': '/admin/driver',
   'for-vehicle': '/admin/vehicle',
   'for-class': '/admin/class',
@@ -48,6 +50,9 @@ export const parseTabFromPath = (path) => {
   const clean = path.toLowerCase().replace(/\/+$/, '');
   if (clean === '/admin' || clean === '/admin/dashboard' || clean === '/admin/overview') {
     return 'dashboard';
+  }
+  if (clean === '/admin/map' || clean === '/admin/operations-map' || clean === '/admin/live-map') {
+    return 'map';
   }
   if (clean === '/admin/driver' || clean === '/admin/drivers' || clean === '/admin/for-driver' || clean === '/admin/driver-bookings') {
     return 'for-driver';
@@ -1101,6 +1106,7 @@ export default function AdminPage({ onReturnToClient }) {
       broadcastBookingUpdate({
         bookingId,
         status: 'Assigned',
+        assignedDriverId: matchedDriver?.id,
         assignedDriver: finalName,
         assignedDriverPhone: finalPhone,
         assignedDriverUpi: finalUpi
@@ -1513,6 +1519,14 @@ export default function AdminPage({ onReturnToClient }) {
             registeredUsers={registeredUsers}
             registeredDrivers={registeredDrivers}
             sendWhatsAppToClientForDriver={sendWhatsAppToClientForDriver}
+          />
+        )}
+
+        {activeTab === 'map' && (
+          <AdminOperationalMapTab
+            onSelectBooking={() => {
+              navigateToTab('for-driver');
+            }}
           />
         )}
 

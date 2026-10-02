@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Car, ShieldCheck, CheckCircle2, MapPin, Phone, LogOut, ArrowUpRight, 
   DollarSign, TrendingUp, Calendar, Clock, Award, AlertCircle, Check, X, 
-  ChevronRight, RefreshCw, Power, QrCode, Smartphone, Sparkles, Save, Edit2, Copy
+  ChevronRight, RefreshCw, Power, QrCode, Smartphone, Sparkles, Save, Edit2, Copy,
+  Navigation, Radio
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import useScrollLock from '../utils/useScrollLock';
+import { useDriverLocation } from '../utils/useDriverLocation';
 import { broadcastBookingUpdate, onBookingUpdate } from '../utils/broadcastSync';
 import { 
   isDutyAssignedToDriver, 
@@ -42,7 +44,21 @@ export default function DriverPortalPage({
     } catch (e) {}
     return true;
   });
+
+  // Driver GPS Location Tracking Hook
+  const {
+    trackingStatus,
+    isTracking,
+    currentCoords,
+    lastSyncTime,
+    errorMessage: gpsError,
+    toggleTracking,
+    startTracking,
+    stopTracking
+  } = useDriverLocation();
   const [acceptedTrips, setAcceptedTrips] = useState([]);
+  const [pastTrips, setPastTrips] = useState([]);
+  const [dutiesTab, setDutiesTab] = useState('active'); // 'active' | 'history'
   const [isLoadingDuties, setIsLoadingDuties] = useState(true);
   const [dutiesError, setDutiesError] = useState(null);
   const [startingTripId, setStartingTripId] = useState(null);
@@ -225,7 +241,7 @@ export default function DriverPortalPage({
 
   const [availableDuties, setAvailableDuties] = useState([]);
 
-  // Authoritative fetch of driver duties from backend
+  // Authoritative fetch of driver duties & history from backend
   const fetchDuties = useCallback(async () => {
     if (!driverUser) return;
     setIsLoadingDuties(true);
@@ -238,8 +254,13 @@ export default function DriverPortalPage({
           const rawStatus = (b.status || '').toUpperCase();
           return !rawStatus.includes('COMPLET') && !rawStatus.includes('CANCEL');
         });
+        const historicalDuties = serverDuties.filter(b => {
+          const rawStatus = (b.status || '').toUpperCase();
+          return rawStatus.includes('COMPLET') || rawStatus.includes('CANCEL');
+        });
         const formatted = activeDuties.map(formatDuty);
         setAcceptedTrips(formatted);
+        setPastTrips(historicalDuties.map(formatDuty));
 
         // Update non-authoritative convenience cache with fresh backend data
         try {
@@ -247,6 +268,16 @@ export default function DriverPortalPage({
         } catch (e) {}
       } else {
         setAcceptedTrips([]);
+      }
+
+      // Query dedicated bounded history endpoint if available
+      try {
+        const historyRes = await apiClient.getDriverHistory();
+        if (historyRes && historyRes.data && Array.isArray(historyRes.data.history)) {
+          setPastTrips(historyRes.data.history.map(formatDuty));
+        }
+      } catch (hErr) {
+        // Fallback already assigned from serverDuties
       }
     } catch (err) {
       console.warn('[DRIVER PORTAL] Failed to fetch server duties:', err.message);
@@ -329,6 +360,45 @@ export default function DriverPortalPage({
     setAvailableDuties(prev => prev.filter(d => d.id !== duty.id));
     setToastMessage(`✓ Duty ${duty.id} accepted! Customer ${duty.customerName} notified that Anna is on the way.`);
     setTimeout(() => setToastMessage(null), 5000);
+  };
+
+  const [arrivingTripId, setArrivingTripId] = useState(null);
+
+  const handleMarkArrived = async (tripId) => {
+    if (arrivingTripId) return;
+    const targetBookingId = tripId;
+    setArrivingTripId(targetBookingId);
+
+    try {
+      await apiClient.updateDutyStatus(targetBookingId, 'ARRIVED');
+
+      setAcceptedTrips(prev => prev.map(t => {
+        if (t.id === targetBookingId || t.bookingId === targetBookingId) {
+          return {
+            ...t,
+            status: 'Arrived'
+          };
+        }
+        return t;
+      }));
+
+      try {
+        const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        const updated = savedBookings.map(b => (b.id === targetBookingId || b.bookingId === targetBookingId) ? { ...b, status: 'ARRIVED' } : b);
+        localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      } catch (e) {}
+
+      broadcastBookingUpdate({ bookingId: targetBookingId, status: 'ARRIVED' });
+      setToastMessage(`📍 Arrived at pickup for ${targetBookingId}! Customer notified.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      console.error('[DRIVER PORTAL] Failed to mark arrived:', err);
+      const msg = err.message || 'Failed to update arrival status. Please try again.';
+      setToastMessage(`⚠️ Error: ${msg}`);
+      setTimeout(() => setToastMessage(null), 6000);
+    } finally {
+      setArrivingTripId(null);
+    }
   };
 
   const handleStartTrip = async (tripId) => {
@@ -519,10 +589,34 @@ export default function DriverPortalPage({
           {/* Right Header Controls */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             
+            {/* Driver Live GPS Badge / Quick Toggle */}
+            <button
+              onClick={toggleTracking}
+              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm min-h-[40px] sm:min-h-[44px] touch-manipulation ${
+                isTracking
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25'
+                  : trackingStatus === 'denied' || trackingStatus === 'error'
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+              }`}
+              title={isTracking ? "GPS Tracking Active — Click to pause" : "Click to enable GPS Tracking"}
+            >
+              <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'text-cyan-400 animate-pulse' : 'text-slate-500'}`} />
+              <span className="hidden sm:inline">GPS:</span>
+              <span>
+                {trackingStatus === 'active' ? 'ACTIVE' :
+                 trackingStatus === 'requesting' ? 'LOCATING...' :
+                 trackingStatus === 'denied' ? 'DENIED' :
+                 trackingStatus === 'unavailable' ? 'NO GPS' :
+                 trackingStatus === 'timeout' ? 'TIMEOUT' :
+                 trackingStatus === 'error' ? 'ERROR' : 'OFF'}
+              </span>
+            </button>
+
             {/* Online/Offline Duty Toggle Button */}
             <button
               onClick={handleToggleOnline}
-              className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm ${
+              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm min-h-[40px] sm:min-h-[44px] touch-manipulation ${
                 isOnline
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
@@ -536,8 +630,9 @@ export default function DriverPortalPage({
             {/* Logout Button */}
             <button
               onClick={onLogout}
-              className="p-1.5 sm:p-2 rounded-xl text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shrink-0"
+              className="p-2 sm:p-2.5 rounded-xl text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 min-h-[40px] sm:min-h-[44px] min-w-[40px] sm:min-w-[44px] touch-manipulation"
               title="Driver Sign Out"
+              aria-label="Driver Sign Out"
             >
               <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden md:inline">Sign Out</span>
@@ -598,6 +693,125 @@ export default function DriverPortalPage({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Driver GPS Live Tracking Section */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-7 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+                isTracking
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 shadow-lg shadow-cyan-500/10'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}>
+                <Navigation className={`w-5 h-5 ${isTracking ? 'animate-pulse text-cyan-400' : ''}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-black text-white font-['Outfit']">
+                    Driver GPS Live Tracking
+                  </h2>
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 sm:px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${
+                    trackingStatus === 'active'
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      : trackingStatus === 'requesting'
+                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'
+                      : trackingStatus === 'denied' || trackingStatus === 'unavailable' || trackingStatus === 'error'
+                      ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      trackingStatus === 'active' ? 'bg-emerald-400 animate-pulse' :
+                      trackingStatus === 'requesting' ? 'bg-amber-400' :
+                      trackingStatus === 'denied' || trackingStatus === 'error' ? 'bg-rose-400' : 'bg-slate-500'
+                    }`} />
+                    <span>
+                      Location tracking: {
+                        trackingStatus === 'idle' ? 'Not enabled' :
+                        trackingStatus === 'requesting' ? 'Requesting permission' :
+                        trackingStatus === 'active' ? 'Active' :
+                        trackingStatus === 'denied' ? 'Permission denied' :
+                        trackingStatus === 'unavailable' ? 'Location unavailable' :
+                        trackingStatus === 'timeout' ? 'Timeout' : 'Error'
+                      }
+                    </span>
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Continuous GPS positioning updates your location with dispatch and ensures fast pickup allocations.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={toggleTracking}
+              className={`px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 border shadow-md ${
+                isTracking
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black border-transparent hover:opacity-95 shadow-emerald-500/20'
+              }`}
+            >
+              {isTracking ? (
+                <>
+                  <X className="w-4 h-4" />
+                  <span>Disable GPS Tracking</span>
+                </>
+              ) : (
+                <>
+                  <Navigation className="w-4 h-4" />
+                  <span>Enable GPS Tracking</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Telemetry / Coordinate Details when active */}
+          {currentCoords && (
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Coordinates</div>
+                  <div className="text-slate-200 font-mono font-bold">
+                    {currentCoords.latitude.toFixed(6)}°, {currentCoords.longitude.toFixed(6)}°
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">GPS Accuracy</div>
+                  <div className="text-emerald-400 font-mono font-bold">
+                    ±{Math.round(currentCoords.accuracy || 0)}m (High Accuracy)
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Last Server Sync</div>
+                  <div className="text-slate-300 font-mono">
+                    {lastSyncTime ? lastSyncTime.toLocaleTimeString() : 'Syncing...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error / Denial Warning Banner */}
+          {gpsError && (
+            <div className="bg-rose-500/10 border border-rose-500/25 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="font-bold">{gpsError}</div>
+                {trackingStatus === 'denied' && (
+                  <div className="text-[11px] text-rose-400/80">
+                    To enable live tracking, click the permissions/lock icon in your browser URL bar, change Location to "Allow", and click Enable GPS Tracking again.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Driver Payment UPI & Scannable QR Section */}
@@ -701,20 +915,45 @@ export default function DriverPortalPage({
           </div>
         </div>
 
-        {/* Active Assigned Trips (Duties assigned to this driver by admin or accepted) */}
+        {/* Assigned Trips & Past Trip Records */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${acceptedTrips.length > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-              <h2 className="text-base sm:text-lg font-extrabold text-white font-['Outfit']">Your Active Assigned Trips</h2>
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                dutiesTab === 'active'
+                  ? (acceptedTrips.length > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600')
+                  : (pastTrips.length > 0 ? 'bg-amber-400' : 'bg-slate-600')
+              }`} />
+              <h2 className="text-base sm:text-lg font-extrabold text-white font-['Outfit']">
+                {dutiesTab === 'active' ? 'Your Active Assigned Trips' : 'Your Past Trips History'}
+              </h2>
             </div>
-            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-              acceptedTrips.length > 0
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-extrabold'
-                : 'bg-slate-900 text-slate-400 border-slate-800'
-            }`}>
-              {acceptedTrips.length} Assigned
-            </span>
+
+            {/* View Mode Toggle: Active vs Past Trips */}
+            <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold shrink-0">
+              <button
+                type="button"
+                onClick={() => setDutiesTab('active')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  dutiesTab === 'active'
+                    ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Active Duties ({acceptedTrips.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDutiesTab('history')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  dutiesTab === 'history'
+                    ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Past Trips History ({pastTrips.length})
+              </button>
+            </div>
           </div>
 
           {dutiesError && (
@@ -724,7 +963,90 @@ export default function DriverPortalPage({
             </div>
           )}
 
-          {isLoadingDuties && acceptedTrips.length === 0 ? (
+          {dutiesTab === 'history' ? (
+            isLoadingDuties && pastTrips.length === 0 ? (
+              <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
+                <RefreshCw className="w-6 h-6 text-amber-400 mx-auto animate-spin" />
+                <p className="text-xs text-slate-400">Loading your past trip records...</p>
+              </div>
+            ) : pastTrips.length === 0 ? (
+              <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-6 text-center space-y-1.5">
+                <Car className="w-7 h-7 text-slate-600 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-300">No Past Trips Found</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Completed and cancelled trip assignments for {driverUser?.name || 'Driver'} will appear here for historical reference.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pastTrips.map(trip => {
+                  const isTripCancelled = String(trip.status || '').toLowerCase().includes('cancel');
+                  return (
+                    <div
+                      key={trip.id}
+                      className={`border-2 rounded-3xl p-4 sm:p-5 space-y-3 shadow-lg ${
+                        isTripCancelled
+                          ? 'bg-red-950/20 border-red-500/30'
+                          : 'bg-emerald-950/20 border-emerald-500/30'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                              {trip.id}
+                            </span>
+                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              isTripCancelled
+                                ? 'bg-red-400/20 text-red-300 border border-red-400/30'
+                                : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
+                            }`}>
+                              {isTripCancelled ? (
+                                <>
+                                  <X className="w-3 h-3 text-red-400" />
+                                  <span>Trip Cancelled</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>Trip Completed</span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+                          <h3 className="text-base font-black text-white font-['Outfit'] mt-1">{trip.tripType}</h3>
+                        </div>
+                        <div className="text-lg font-black text-emerald-400 font-mono">{trip.payout}</div>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="truncate"><strong className="text-slate-400 font-normal">Pickup:</strong> {trip.pickup}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate"><strong className="text-slate-400 font-normal">Drop:</strong> {trip.destination}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <span>{trip.scheduledTime}</span>
+                        </div>
+                      </div>
+
+                      {/* Customer Info (Authorized for driver) */}
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80 text-slate-400">
+                        <span className="truncate">Customer: <strong className="text-slate-200">{trip.customerName}</strong></span>
+                        <span className="font-mono text-[11px] text-slate-400">{trip.customerPhone}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            <>
+              {isLoadingDuties && acceptedTrips.length === 0 ? (
             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
               <RefreshCw className="w-6 h-6 text-amber-400 mx-auto animate-spin" />
               <p className="text-xs text-slate-400">Loading your assigned duties...</p>
@@ -748,11 +1070,17 @@ export default function DriverPortalPage({
                           {trip.id}
                         </span>
                         <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                          trip.status === 'In Progress'
+                          String(trip.status || '').toLowerCase() === 'in progress'
                             ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                            : String(trip.status || '').toLowerCase() === 'arrived'
+                            ? 'bg-blue-400/20 text-blue-300 border border-blue-400/30'
                             : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
                         }`}>
-                          {trip.status === 'In Progress' ? 'Ride In Progress' : 'Assigned to You'}
+                          {String(trip.status || '').toLowerCase() === 'in progress'
+                            ? 'Ride In Progress'
+                            : String(trip.status || '').toLowerCase() === 'arrived'
+                            ? 'Arrived at Pickup'
+                            : 'Assigned to You'}
                         </span>
                       </div>
                       <h3 className="text-base font-black text-white font-['Outfit'] mt-1">{trip.tripType}</h3>
@@ -777,34 +1105,53 @@ export default function DriverPortalPage({
                   <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                     <a 
                       href={`tel:${trip.customerPhone || SUPPORT_HELPLINE}`}
-                      className="w-full sm:w-auto py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
+                      className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700 min-h-[44px] touch-manipulation"
                       title="Call Customer"
                     >
                       <Phone className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Call Customer</span>
                     </a>
 
-                    {trip.status !== 'In Progress' ? (
-                      <button
-                        onClick={() => handleStartTrip(trip.bookingId || trip.id)}
-                        disabled={startingTripId === (trip.bookingId || trip.id)}
-                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip (Run Meter)'}
-                      </button>
-                    ) : (
+                    {String(trip.status || '').toLowerCase() === 'in progress' ? (
                       <button
                         onClick={() => handleOpenSettlement(trip)}
-                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] cursor-pointer text-center flex items-center justify-center gap-1.5"
+                        className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] cursor-pointer text-center flex items-center justify-center gap-1.5 min-h-[44px] touch-manipulation"
                       >
                         <Check className="w-4 h-4" />
                         <span>End Ride & Settle Fare</span>
                       </button>
+                    ) : String(trip.status || '').toLowerCase() === 'arrived' ? (
+                      <button
+                        onClick={() => handleStartTrip(trip.bookingId || trip.id)}
+                        disabled={startingTripId === (trip.bookingId || trip.id)}
+                        className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+                      >
+                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip (Run Meter)'}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:flex-1">
+                        <button
+                          onClick={() => handleMarkArrived(trip.bookingId || trip.id)}
+                          disabled={arrivingTripId === (trip.bookingId || trip.id)}
+                          className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all cursor-pointer text-center disabled:opacity-50 min-h-[44px] touch-manipulation"
+                        >
+                          {arrivingTripId === (trip.bookingId || trip.id) ? 'Marking...' : 'Mark Arrived'}
+                        </button>
+                        <button
+                          onClick={() => handleStartTrip(trip.bookingId || trip.id)}
+                          disabled={startingTripId === (trip.bookingId || trip.id)}
+                          className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+                        >
+                          {startingTripId === (trip.bookingId || trip.id) ? 'Starting...' : 'Start Trip'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
               ))}
             </div>
+          )}
+            </>
           )}
         </div>
 
@@ -885,7 +1232,7 @@ export default function DriverPortalPage({
                   {/* Accept Button */}
                   <button
                     onClick={() => handleAcceptDuty(duty)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2 min-h-[44px] touch-manipulation"
                   >
                     <SteeringWheel className="w-4 h-4 stroke-[2.2]" />
                     <span>Accept Duty (Anna)</span>
@@ -1167,7 +1514,7 @@ export default function DriverPortalPage({
                   <button
                     type="button"
                     onClick={() => setSettlementTrip(null)}
-                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center"
                   >
                     Cancel
                   </button>
@@ -1175,7 +1522,7 @@ export default function DriverPortalPage({
                     type="button"
                     id="confirm-settlement-btn"
                     onClick={handleConfirmSettlement}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] touch-manipulation"
                   >
                     <Check className="w-4 h-4" />
                     <span>

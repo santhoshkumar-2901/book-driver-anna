@@ -71,3 +71,29 @@ export const lookupRateLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']
 });
 
+export const locationRateLimiter = rateLimit({
+  windowMs: RATE_LIMITS.LOCATION?.windowMs || 60 * 1000,
+  max: RATE_LIMITS.LOCATION?.max || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: RATE_LIMITS.LOCATION?.message || { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Location search rate limit reached. Please wait a moment.' } },
+  skip: (req) => process.env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']
+});
+
+export const routeRateLimiter = rateLimit({
+  windowMs: RATE_LIMITS.LOCATION_ROUTE?.windowMs || 60 * 1000,
+  max: RATE_LIMITS.LOCATION_ROUTE?.max || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: RATE_LIMITS.LOCATION_ROUTE?.message || { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Routing rate limit reached. Please wait a moment.' } },
+  skip: (req) => process.env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']
+});
+
+export const driverLocationRateLimiter = rateLimit({
+  windowMs: RATE_LIMITS.DRIVER_LOCATION?.windowMs || 60 * 1000,
+  max: RATE_LIMITS.DRIVER_LOCATION?.max || 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: RATE_LIMITS.DRIVER_LOCATION?.message || { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Driver location update rate limit reached. Please slow down.' } },
+  skip: (req) => process.env.NODE_ENV === 'test' && !req.headers['x-test-rate-limit']
+});

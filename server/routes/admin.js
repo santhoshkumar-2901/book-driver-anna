@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { logAuditEvent } from '../services/auditService.js';
 import { updateBookingStatus } from '../services/bookingService.js';
+import { publishBookingAssignmentChange } from '../services/realtimeService.js';
 import { normalizeExperienceYears } from '../services/authService.js';
 import { getAllPricing, updateServicePricing, resetServicePricing } from '../services/pricingService.js';
 import { ENV } from '../config/env.js';
@@ -18,12 +19,21 @@ router.use(requireAuth, requireRole('admin'));
 // GET /api/admin/metrics
 router.get('/metrics', async (req, res, next) => {
   try {
-    const totalBookingsRow = await queryOne('SELECT COUNT(*) as count FROM bookings');
-    const pendingBookingsRow = await queryOne("SELECT COUNT(*) as count FROM bookings WHERE status = 'PENDING'");
-    const completedBookingsRow = await queryOne("SELECT COUNT(*) as count FROM bookings WHERE status = 'COMPLETED'");
-    const totalRevenueRow = await queryOne("SELECT COALESCE(SUM(calculated_fare), 0) as total FROM bookings WHERE status = 'COMPLETED'");
-    const totalCustomersRow = await queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'customer'");
-    const totalDriversRow = await queryOne('SELECT COUNT(*) as count FROM drivers');
+    const [
+      totalBookingsRow,
+      pendingBookingsRow,
+      completedBookingsRow,
+      totalRevenueRow,
+      totalCustomersRow,
+      totalDriversRow
+    ] = await Promise.all([
+      queryOne('SELECT COUNT(*) as count FROM bookings'),
+      queryOne("SELECT COUNT(*) as count FROM bookings WHERE status = 'PENDING'"),
+      queryOne("SELECT COUNT(*) as count FROM bookings WHERE status = 'COMPLETED'"),
+      queryOne("SELECT COALESCE(SUM(calculated_fare), 0) as total FROM bookings WHERE status = 'COMPLETED'"),
+      queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'customer'"),
+      queryOne('SELECT COUNT(*) as count FROM drivers')
+    ]);
 
     const totalBookings = Number(totalBookingsRow?.count || 0);
     const pendingBookings = Number(pendingBookingsRow?.count || 0);
@@ -88,6 +98,7 @@ router.patch('/bookings/:id', async (req, res, next) => {
   try {
     const bookingId = req.params.id;
     const { status, assignedDriverId, assignedDriverName, assignedDriverPhone, driverName, driverPhone } = req.body;
+    const isUnassignment = assignedDriverId === null || (assignedDriverId === '' && assignedDriverId !== undefined);
 
     const updated = await withTransaction(async (tx) => {
       const lockBookingSql = isTiDB
@@ -109,7 +120,19 @@ router.patch('/bookings/:id', async (req, res, next) => {
         throw err;
       }
 
-      if (assignedDriverId) {
+      let targetDriverId = assignedDriverId;
+      let targetDriverName = assignedDriverName || driverName;
+      let targetDriverPhone = assignedDriverPhone || driverPhone;
+      let targetStatus = status;
+
+      if (isUnassignment) {
+        targetDriverId = null;
+        targetDriverName = null;
+        targetDriverPhone = null;
+        if (!targetStatus) {
+          targetStatus = existing.status === 'ASSIGNED' ? 'CONFIRMED' : existing.status;
+        }
+      } else if (assignedDriverId) {
         const lockDriverSql = isTiDB
           ? 'SELECT id, status FROM drivers WHERE id = ? FOR UPDATE'
           : 'SELECT id, status FROM drivers WHERE id = ?';
@@ -139,20 +162,39 @@ router.patch('/bookings/:id', async (req, res, next) => {
           err.code = 'SLOT_UNAVAILABLE';
           throw err;
         }
+
+        if (!targetStatus) {
+          targetStatus = (existing.status === 'PENDING' || existing.status === 'CONFIRMED') ? 'ASSIGNED' : existing.status;
+        }
+      } else {
+        if (!targetStatus) {
+          targetStatus = existing.status;
+        }
       }
 
-      const targetStatus = status || (existing.status === 'PENDING' || existing.status === 'CONFIRMED' ? 'ASSIGNED' : existing.status);
       return await updateBookingStatus({
         bookingId,
         newStatus: targetStatus,
-        assignedDriverId,
-        assignedDriverName: assignedDriverName || driverName,
-        assignedDriverPhone: assignedDriverPhone || driverPhone,
+        assignedDriverId: (assignedDriverId !== undefined) ? targetDriverId : undefined,
+        assignedDriverName: (assignedDriverId !== undefined || targetDriverName !== undefined) ? targetDriverName : undefined,
+        assignedDriverPhone: (assignedDriverId !== undefined || targetDriverPhone !== undefined) ? targetDriverPhone : undefined,
         requesterUser: req.user,
         ipAddress: req.ip,
         tx
       });
     });
+
+    // Notify realtime subscribers about the assignment change
+    try {
+      await publishBookingAssignmentChange({
+        bookingId,
+        assignedDriverId: updated.assigned_driver_id || null,
+        assignedDriverName: updated.assigned_driver_name || null,
+        status: updated.status
+      });
+    } catch (realtimeErr) {
+      // Non-blocking
+    }
 
     res.json({
       success: true,
@@ -512,10 +554,12 @@ router.post('/pricing/reset', async (req, res, next) => {
 // GET /api/admin/diagnostics (Protected admin system diagnostics)
 router.get('/diagnostics', async (req, res, next) => {
   try {
-    const driversRow = await queryOne('SELECT COUNT(*) as count FROM drivers');
-    const adminsRow = await queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
-    const usersRow = await queryOne('SELECT COUNT(*) as count FROM users');
-    const bookingsRow = await queryOne('SELECT COUNT(*) as count FROM bookings');
+    const [driversRow, adminsRow, usersRow, bookingsRow] = await Promise.all([
+      queryOne('SELECT COUNT(*) as count FROM drivers'),
+      queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'admin'"),
+      queryOne('SELECT COUNT(*) as count FROM users'),
+      queryOne('SELECT COUNT(*) as count FROM bookings')
+    ]);
 
     res.json({
       success: true,

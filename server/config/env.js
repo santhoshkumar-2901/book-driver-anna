@@ -68,4 +68,8 @@ export const ENV = {
   SMTP_PASS: process.env.SMTP_PASS || process.env.RESEND_API_KEY || '',
   SMTP_FROM: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'Book Driver Anna <onboarding@resend.dev>',
   EMAIL_FROM: process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Book Driver Anna <onboarding@resend.dev>',
+  OSRM_BASE_URL: (process.env.OSRM_BASE_URL || 'https://router.project-osrm.org').replace(/\/+$/, ''),
+  REALTIME_PORT: parseInt(process.env.REALTIME_PORT || '5001', 10),
+  REALTIME_SERVICE_URL: (process.env.REALTIME_SERVICE_URL || '').replace(/\/+$/, ''),
+  REALTIME_INTERNAL_SECRET: process.env.REALTIME_INTERNAL_SECRET || '',
 };

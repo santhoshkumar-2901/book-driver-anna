@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS drivers (
   trips_completed INTEGER DEFAULT 0,
   upi_id TEXT DEFAULT NULL,
   status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive', 'On Duty', 'Off Duty', 'Suspended')),
+  current_latitude REAL,
+  current_longitude REAL,
+  last_location_update DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -48,11 +51,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   service_name TEXT NOT NULL,
   pickup_area TEXT NOT NULL,
   drop_location TEXT,
+  pickup_latitude REAL,
+  pickup_longitude REAL,
+  destination_latitude REAL,
+  destination_longitude REAL,
   date TEXT NOT NULL,
   time TEXT NOT NULL,
   calculated_fare REAL NOT NULL,
   payment_mode TEXT DEFAULT 'cash',
-  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   cancellation_reason TEXT,
   assigned_driver_id TEXT REFERENCES drivers(id) ON DELETE SET NULL,
   assigned_driver_name TEXT,
@@ -99,6 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id);
 CREATE INDEX IF NOT EXISTS idx_drivers_license ON drivers(license_number);
 CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_phone ON bookings(customer_phone);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON bookings(date, status);
 CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings(assigned_driver_id, date, time);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);

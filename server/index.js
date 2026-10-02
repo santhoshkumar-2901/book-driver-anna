@@ -23,6 +23,7 @@ import driversRouter from './routes/drivers.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import pricingRouter from './routes/pricing.js';
+import locationRouter from './routes/location.js';
 import { ensureServicePricing } from './services/pricingService.js';
 
 export const app = express();
@@ -47,8 +48,8 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app"]
+      imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", "https://*.tile.openstreetmap.org"],
+      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "ws://localhost:*", "ws://127.0.0.1:*", "wss://*.vercel.app"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -90,7 +91,7 @@ app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
 // 4. Global API Rate Limiter (enforced on both /api and alias mount paths)
-app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing'], generalRateLimiter);
+app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing', '/location'], generalRateLimiter);
 
 // 5. Minimal Public Healthcheck Endpoint (Zero internal metrics, counts, or configuration disclosure)
 app.get(['/api/health', '/health'], async (req, res) => {
@@ -122,6 +123,8 @@ app.use('/api/chat', chatRouter);
 app.use('/chat', chatRouter);
 app.use('/api/pricing', pricingRouter);
 app.use('/pricing', pricingRouter);
+app.use('/api/location', locationRouter);
+app.use('/location', locationRouter);
 
 // 7. Serve Production Frontend Static Assets (if dist exists)
 if (fs.existsSync(distDir)) {
@@ -134,7 +137,8 @@ if (fs.existsSync(distDir)) {
       req.path.startsWith('/drivers') || 
       req.path.startsWith('/admin') || 
       req.path.startsWith('/chat') ||
-      req.path.startsWith('/pricing');
+      req.path.startsWith('/pricing') ||
+      req.path.startsWith('/location');
 
     if (req.method === 'GET' && !isApiRequest) {
       return res.sendFile(path.join(distDir, 'index.html'));
@@ -161,4 +165,17 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(ENV.PORT, '0.0.0.0', () => {
     console.log(`[SERVER] Book Driver Anna API running on http://0.0.0.0:${ENV.PORT} (PID: ${process.pid})`);
   });
+
+  if (process.env.DISABLE_EMBEDDED_REALTIME !== 'true') {
+    import('./services/realtimeService.js').then(({ RealtimeServer, setGlobalRealtimeServer }) => {
+      const realtimeServer = new RealtimeServer({
+        port: ENV.REALTIME_PORT || 5001,
+        internalSecret: ENV.REALTIME_INTERNAL_SECRET || ''
+      });
+      realtimeServer.start().then(() => {
+        setGlobalRealtimeServer(realtimeServer);
+        console.log(`[REALTIME] WebSocket Server running on ws://0.0.0.0:${ENV.REALTIME_PORT || 5001}/realtime`);
+      }).catch(err => console.error('[REALTIME] Failed to start embedded realtime server:', err.message));
+    });
+  }
 }

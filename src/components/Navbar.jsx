@@ -132,7 +132,7 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={onOpenProfile}
-                  className="flex items-center gap-1.5 sm:gap-2 py-1 sm:py-1.5 px-2 sm:px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer min-h-[38px] sm:min-h-[40px]"
+                  className="flex items-center gap-1.5 sm:gap-2 py-1.5 px-2 sm:px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer min-h-[44px]"
                   title={`Account: ${clientUser.name} (${clientUser.phone})`}
                   aria-label={`Open account profile for ${clientUser.name}`}
                 >
@@ -156,10 +156,10 @@ export default function Navbar({
                 <button
                   onClick={onLogout}
                   title="Logout"
-                  className="p-2 sm:p-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center"
+                  className="p-2 sm:p-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                   aria-label="Logout"
                 >
-                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             ) : (
@@ -169,7 +169,7 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={() => onOpenAuth && onOpenAuth('login')}
-                  className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[38px] sm:min-h-[40px]"
+                  className="flex items-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-lg text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[44px]"
                 >
                   <LogIn className="w-3.5 h-3.5 text-amber-500" />
                   <span className="inline">Login</span>
@@ -177,7 +177,7 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={() => onOpenAuth && onOpenAuth('signup')}
-                  className="hidden sm:inline-flex btn-primary py-1.5 px-3 sm:px-3.5 text-xs items-center gap-1.5 min-h-[38px] sm:min-h-[40px]"
+                  className="hidden sm:inline-flex btn-primary py-2 px-3 sm:px-3.5 text-xs items-center gap-1.5 min-h-[44px]"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Signup</span>
@@ -190,7 +190,7 @@ export default function Navbar({
               type="button"
               id="navbar-theme-toggle-btn"
               onClick={toggleTheme}
-              className="p-2 sm:p-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center justify-center shadow-sm shrink-0 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] hover:scale-105 active:scale-95"
+              className="p-2 sm:p-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center justify-center shadow-sm shrink-0 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] hover:scale-105 active:scale-95 touch-manipulation"
               title="Toggle Theme"
               aria-label="Toggle Theme"
             >
@@ -205,7 +205,7 @@ export default function Navbar({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 sm:p-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 lg:hidden cursor-pointer shrink-0 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center transition-colors"
+              className="p-2 sm:p-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 lg:hidden cursor-pointer shrink-0 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center transition-colors touch-manipulation"
               aria-label="Toggle Navigation Menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav-drawer"
@@ -321,7 +321,7 @@ export default function Navbar({
                     if (onOpenAuth) onOpenAuth('login');
                     setMobileMenuOpen(false);
                   }}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer min-h-[44px] touch-manipulation"
                 >
                   <LogIn className="w-4 h-4 text-amber-500" />
                   <span>Log In</span>
@@ -332,7 +332,7 @@ export default function Navbar({
                     if (onOpenAuth) onOpenAuth('signup');
                     setMobileMenuOpen(false);
                   }}
-                  className="btn-primary py-2.5 px-3 text-xs flex items-center justify-center gap-2"
+                  className="btn-primary py-2.5 px-3 text-xs flex items-center justify-center gap-2 min-h-[44px] touch-manipulation"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>Sign Up</span>
@@ -348,7 +348,7 @@ export default function Navbar({
                   handleNavClick('home');
                   if (openBookingModal) openBookingModal('driver');
                 }}
-                className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-2"
+                className="btn-primary w-full py-3 text-xs flex items-center justify-center gap-2 min-h-[44px] touch-manipulation"
               >
                 <SteeringWheel className="w-4 h-4 stroke-[2.2]" />
                 <span>Book a Professional Driver</span>

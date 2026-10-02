@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS drivers (
   trips_completed INTEGER DEFAULT 0,
   upi_id TEXT DEFAULT NULL,
   status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive', 'On Duty', 'Off Duty', 'Suspended')),
+  current_latitude REAL,
+  current_longitude REAL,
+  last_location_update DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,11 +43,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   service_name TEXT NOT NULL,
   pickup_area TEXT NOT NULL,
   drop_location TEXT,
+  pickup_latitude REAL,
+  pickup_longitude REAL,
+  destination_latitude REAL,
+  destination_longitude REAL,
   date TEXT NOT NULL,
   time TEXT NOT NULL,
   calculated_fare REAL NOT NULL,
   payment_mode TEXT DEFAULT 'cash',
-  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   cancellation_reason TEXT,
   assigned_driver_id TEXT REFERENCES drivers(id) ON DELETE SET NULL,
   assigned_driver_name TEXT,

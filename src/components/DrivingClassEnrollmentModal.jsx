@@ -612,6 +612,8 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
                   </label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     maxLength="10"
                     value={mobileNumber}
                     onChange={(e) => {

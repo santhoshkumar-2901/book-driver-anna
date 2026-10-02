@@ -52,6 +52,9 @@ if (isTiDB) {
         trips_completed INT DEFAULT 0,
         upi_id VARCHAR(255) DEFAULT NULL,
         status VARCHAR(32) DEFAULT 'Active',
+        current_latitude DECIMAL(10, 7) NULL,
+        current_longitude DECIMAL(10, 7) NULL,
+        last_location_update DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_drivers_phone (phone),
         INDEX idx_drivers_license (license_number)
@@ -59,6 +62,11 @@ if (isTiDB) {
     `).catch(err => {
       console.warn('[DATABASE] TiDB drivers auto-init note:', err.message);
     });
+
+    // Idempotent driver column migrations for existing TiDB databases
+    tidbConn.execute('ALTER TABLE drivers ADD COLUMN current_latitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE drivers ADD COLUMN current_longitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE drivers ADD COLUMN last_location_update DATETIME NULL;').catch(() => {});
 
     tidbConn.execute(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
@@ -102,6 +110,10 @@ if (isTiDB) {
         service_name VARCHAR(255) NOT NULL,
         pickup_area VARCHAR(255) NOT NULL,
         drop_location TEXT NULL,
+        pickup_latitude DECIMAL(10, 7) NULL,
+        pickup_longitude DECIMAL(10, 7) NULL,
+        destination_latitude DECIMAL(10, 7) NULL,
+        destination_longitude DECIMAL(10, 7) NULL,
         date VARCHAR(64) NOT NULL,
         time VARCHAR(64) NOT NULL,
         calculated_fare DECIMAL(10,2) NOT NULL,
@@ -122,6 +134,12 @@ if (isTiDB) {
     `).catch(err => {
       console.warn('[DATABASE] TiDB bookings auto-init note:', err.message);
     });
+
+    // Idempotent column migrations for existing TiDB databases
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;').catch(() => {});
 
     tidbConn.execute(`
       CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings (assigned_driver_id, date, time);
@@ -205,6 +223,90 @@ if (isTiDB) {
   try {
     sqliteDb.exec("ALTER TABLE drivers ADD COLUMN upi_id TEXT DEFAULT NULL;");
   } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN pickup_latitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN pickup_longitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN destination_latitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE bookings ADD COLUMN destination_longitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE drivers ADD COLUMN current_latitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE drivers ADD COLUMN current_longitude REAL;');
+  } catch (e) {}
+  try {
+    sqliteDb.exec('ALTER TABLE drivers ADD COLUMN last_location_update DATETIME;');
+  } catch (e) {}
+
+  try {
+    const tableSqlRow = sqliteDb.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bookings'").get();
+    if (tableSqlRow && tableSqlRow.sql && !tableSqlRow.sql.includes('ARRIVED')) {
+      sqliteDb.exec(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS bookings_migrated;
+        CREATE TABLE bookings_migrated (
+          id TEXT PRIMARY KEY,
+          user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          customer_name TEXT NOT NULL,
+          customer_phone TEXT NOT NULL,
+          customer_email TEXT,
+          booking_type TEXT NOT NULL CHECK(booking_type IN ('driver', 'vehicle', 'class')),
+          trip_type TEXT NOT NULL,
+          service_name TEXT NOT NULL,
+          pickup_area TEXT NOT NULL,
+          drop_location TEXT,
+          pickup_latitude REAL,
+          pickup_longitude REAL,
+          destination_latitude REAL,
+          destination_longitude REAL,
+          date TEXT NOT NULL,
+          time TEXT NOT NULL,
+          calculated_fare REAL NOT NULL,
+          payment_mode TEXT DEFAULT 'cash',
+          status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+          cancellation_reason TEXT,
+          assigned_driver_id TEXT REFERENCES drivers(id) ON DELETE SET NULL,
+          assigned_driver_name TEXT,
+          assigned_driver_phone TEXT,
+          idempotency_key TEXT UNIQUE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO bookings_migrated (
+          id, user_id, customer_name, customer_phone, customer_email,
+          booking_type, trip_type, service_name, pickup_area, drop_location,
+          pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
+          date, time, calculated_fare, payment_mode, status, cancellation_reason,
+          assigned_driver_id, assigned_driver_name, assigned_driver_phone, idempotency_key,
+          created_at, updated_at
+        ) SELECT
+          id, user_id, customer_name, customer_phone, customer_email,
+          booking_type, trip_type, service_name, pickup_area, drop_location,
+          pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
+          date, time, calculated_fare, payment_mode, status, cancellation_reason,
+          assigned_driver_id, assigned_driver_name, assigned_driver_phone, idempotency_key,
+          created_at, updated_at
+        FROM bookings;
+        DROP TABLE bookings;
+        ALTER TABLE bookings_migrated RENAME TO bookings;
+        CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
+        CREATE INDEX IF NOT EXISTS idx_bookings_phone ON bookings(customer_phone);
+        CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+        CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON bookings(date, status);
+        CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings(assigned_driver_id, date, time);
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (migErr) {
+    console.warn('[DATABASE] SQLite ARRIVED constraint migration note:', migErr.message);
+  }
 
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
@@ -219,6 +321,15 @@ export function normalizeRow(row) {
     const lower = key.toLowerCase();
     if (lower !== key && !(lower in normalized)) {
       normalized[lower] = val;
+    }
+  }
+  const coordCols = [
+    'pickup_latitude', 'pickup_longitude', 'destination_latitude', 'destination_longitude',
+    'current_latitude', 'current_longitude'
+  ];
+  for (const col of coordCols) {
+    if (normalized[col] !== undefined && normalized[col] !== null) {
+      normalized[col] = Number(normalized[col]);
     }
   }
   return normalized;

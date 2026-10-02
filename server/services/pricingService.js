@@ -447,9 +447,14 @@ export async function resetServicePricing(userId = null, ipAddress = null) {
 
 /**
  * Authoritative Fare Calculation Engine
- * Optionally accepts live pricing map from database, with fallback to hardcoded defaults
+ * Optionally accepts live pricing map from database, with fallback to hardcoded defaults.
+ * Integrates road distance (distanceKm) and duration (durationMinutes) authoritatively.
  */
 export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
+  if (!bookingDetails || typeof bookingDetails !== 'object') {
+    throw Object.assign(new Error('Booking details must be an object.'), { statusCode: 400, code: 'INVALID_INPUT' });
+  }
+
   const {
     bookingCategory = 'driver',
     selectedClassId = 'class-beginner',
@@ -458,15 +463,45 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     dropLocation = '',
     roundTripDuration = '4hr',
     outstationTripType = 'round-trip',
-    outstationPackage = 'Round trip 24hr'
+    outstationPackage = 'Round trip 24hr',
+    distanceKm = null,
+    durationMinutes = null
   } = bookingDetails;
 
+  // Validate distanceKm if supplied
+  if (distanceKm !== null && distanceKm !== undefined) {
+    const numDist = Number(distanceKm);
+    if (!Number.isFinite(numDist) || isNaN(numDist) || numDist < 0) {
+      const err = new Error('Invalid route distance provided for pricing.');
+      err.code = 'INVALID_ROUTE_DATA';
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   const p = (id, fallback) => {
-    if (pricingMap && pricingMap[id] && typeof pricingMap[id].price === 'number') {
-      return pricingMap[id].price;
+    if (pricingMap) {
+      if (pricingMap[id] && typeof pricingMap[id].price === 'number') {
+        return pricingMap[id].price;
+      }
+      if (pricingMap[id] === null || pricingMap[id] === false) {
+        const err = new Error(`Missing pricing configuration for tariff '${id}'.`);
+        err.code = 'MISSING_PRICING_CONFIG';
+        err.statusCode = 500;
+        throw err;
+      }
     }
     const def = DEFAULT_MAP[id];
-    return def ? def.price : fallback;
+    if (def && typeof def.price === 'number') {
+      return def.price;
+    }
+    if (typeof fallback === 'number') {
+      return fallback;
+    }
+    const err = new Error(`Missing pricing configuration for tariff '${id}'.`);
+    err.code = 'MISSING_PRICING_CONFIG';
+    err.statusCode = 500;
+    throw err;
   };
 
   let basePrice = 299;
@@ -483,7 +518,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
       basePrice,
       gst: 0,
       totalFare: basePrice,
-      currency: 'INR'
+      currency: 'INR',
+      distanceKm: distanceKm !== null && distanceKm !== undefined ? Number(distanceKm) : null,
+      durationMinutes: durationMinutes !== null && durationMinutes !== undefined ? Number(durationMinutes) : null
     };
   }
 
@@ -501,7 +538,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
       basePrice,
       gst,
       totalFare: basePrice + gst,
-      currency: 'INR'
+      currency: 'INR',
+      distanceKm: distanceKm !== null && distanceKm !== undefined ? Number(distanceKm) : null,
+      durationMinutes: durationMinutes !== null && durationMinutes !== undefined ? Number(durationMinutes) : null
     };
   }
 
@@ -519,10 +558,17 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     else basePrice = p('driver_hourly_4hr', 349);
   } else if (driverTripOption === 'outstation') {
     if (outstationTripType === 'one-way') {
-      if (outstationPackage.includes('150 km')) basePrice = p('driver_outstation_150km', 1199);
-      else if (outstationPackage.includes('300 km')) basePrice = p('driver_outstation_300km', 1799);
-      else if (outstationPackage.includes('500 km')) basePrice = p('driver_outstation_500km', 2399);
-      else basePrice = p('driver_outstation_150km', 1499);
+      if (distanceKm !== null && distanceKm !== undefined && Number(distanceKm) > 0) {
+        const dist = Number(distanceKm);
+        if (dist <= 150) basePrice = p('driver_outstation_150km', 1199);
+        else if (dist <= 300) basePrice = p('driver_outstation_300km', 1799);
+        else basePrice = p('driver_outstation_500km', 2399);
+      } else {
+        if (outstationPackage.includes('150 km')) basePrice = p('driver_outstation_150km', 1199);
+        else if (outstationPackage.includes('300 km')) basePrice = p('driver_outstation_300km', 1799);
+        else if (outstationPackage.includes('500 km')) basePrice = p('driver_outstation_500km', 2399);
+        else basePrice = p('driver_outstation_150km', 1499);
+      }
     } else {
       if (outstationPackage.includes('12hr')) basePrice = p('driver_outstation_12hr', 1199);
       else if (outstationPackage.includes('24hr')) basePrice = p('driver_outstation_24hr', 1999);
@@ -539,6 +585,8 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     basePrice,
     gst,
     totalFare,
-    currency: 'INR'
+    currency: 'INR',
+    distanceKm: distanceKm !== null && distanceKm !== undefined ? Number(distanceKm) : null,
+    durationMinutes: durationMinutes !== null && durationMinutes !== undefined ? Number(durationMinutes) : null
   };
 }

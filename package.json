@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
+    "realtime": "node server/realtimeServer.js",
     "start": "node server/index.js",
     "bootstrap:admin": "node server/scripts/bootstrapAdmin.js",
     "db:clean": "node server/scripts/cleanDatabase.js",
@@ -27,11 +28,14 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.469.0",
     "nodemailer": "^10.0.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "resend": "^6.28.1"
+    "react-leaflet": "^4.2.1",
+    "resend": "^6.28.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

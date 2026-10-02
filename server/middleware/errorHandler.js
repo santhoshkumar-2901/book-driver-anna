@@ -45,14 +45,22 @@ export function errorHandler(err, req, res, next) {
     console.error(err.stack);
   }
 
-  // Sanitize message for client
-  const clientMessage = (statusCode >= 500 && ENV.IS_PRODUCTION)
-    ? 'An unexpected error occurred. Our engineering team has been notified.'
-    : (err.message || 'An error occurred processing your request.');
+  // Sanitize message for client (strip sensitive SQL keywords, table schemas, and server filesystem paths)
+  const SENSITIVE_PATTERNS = /(\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bFROM\b|\bWHERE\b|sqlite|tidb|syntax error|check constraint|\/home\/|[a-zA-Z]:\\)/i;
+
+  let clientMessage = err.message || 'An error occurred processing your request.';
+  if (statusCode >= 500 && ENV.IS_PRODUCTION) {
+    clientMessage = 'An unexpected error occurred. Our engineering team has been notified.';
+  } else if (SENSITIVE_PATTERNS.test(clientMessage) && (statusCode >= 500 || ENV.IS_PRODUCTION)) {
+    clientMessage = 'A database error occurred processing your request.';
+  }
 
   // Set diagnostic header ONLY in development/test environments (strictly prohibited in production)
   if (!ENV.IS_PRODUCTION && process.env.NODE_ENV !== 'production' && err.message) {
-    res.setHeader('X-Debug-Error-Msg', String(err.message).replace(/[\r\n]+/g, ' ').substring(0, 200));
+    const safeDebug = SENSITIVE_PATTERNS.test(err.message)
+      ? 'Database operation error'
+      : String(err.message).replace(/[\r\n]+/g, ' ').substring(0, 200);
+    res.setHeader('X-Debug-Error-Msg', safeDebug);
   }
 
   res.status(statusCode).json({

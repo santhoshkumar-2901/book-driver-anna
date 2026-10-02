@@ -170,12 +170,33 @@ export const apiClient = {
   completeBooking: (bookingId, paymentMode = 'cash') =>
     request(`/bookings/${bookingId}/complete`, { method: 'POST', body: { paymentMode } }),
   getBookingById: (bookingId) => request(`/bookings/${bookingId}`, { method: 'GET' }),
+  getBookingEstimate: (estimateData, { signal } = {}) =>
+    request('/bookings/estimate', { method: 'POST', body: estimateData, signal }),
+  estimateBookingFare: (estimateData, { signal } = {}) =>
+    request('/bookings/estimate', { method: 'POST', body: estimateData, signal }),
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),
   getDriverDuties: () => request('/drivers/duties', { method: 'GET' }),
+  getDriverHistory: (limit = 50) => request(`/drivers/history?limit=${limit}`, { method: 'GET' }),
   updateDutyStatus: (bookingId, status) => 
     request(`/drivers/duties/${bookingId}/status`, { method: 'PATCH', body: { status } }),
+  updateDriverLocation: (coords) =>
+    request('/drivers/location', { method: 'PUT', body: coords }),
+  getDriverLocation: () =>
+    request('/drivers/location', { method: 'GET' }),
+  getRealtimeUrl: () => {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REALTIME_URL) {
+      return import.meta.env.VITE_REALTIME_URL;
+    }
+    if (typeof window !== 'undefined') {
+      const isSecure = window.location.protocol === 'https:';
+      const protocol = isSecure ? 'wss:' : 'ws:';
+      const hostname = window.location.hostname || 'localhost';
+      return `${protocol}//${hostname}:5001/realtime`;
+    }
+    return 'ws://localhost:5001/realtime';
+  },
 
   // 4. Admin Endpoints
   getAdminMetrics: () => request('/admin/metrics', { method: 'GET' }),
@@ -203,5 +224,27 @@ export const apiClient = {
 
   // 6. Chatbot Endpoint
   sendChatMessage: (message, history = []) => 
-    request('/chat', { method: 'POST', body: { message, history } })
+    request('/chat', { method: 'POST', body: { message, history } }),
+
+  // 7. Location Endpoints (Backend Proxy)
+  searchLocations: (query, { signal } = {}) => {
+    const params = new URLSearchParams({ q: query }).toString();
+    return request(`/location/search?${params}`, { method: 'GET', signal });
+  },
+  getLocationRoute: ({ pickupLat, pickupLng, destLat, destLng, pickupLatitude, pickupLongitude, destinationLatitude, destinationLongitude } = {}, { signal } = {}) => {
+    const pLat = pickupLat ?? pickupLatitude;
+    const pLng = pickupLng ?? pickupLongitude;
+    const dLat = destLat ?? destinationLatitude;
+    const dLng = destLng ?? destinationLongitude;
+    const params = new URLSearchParams({
+      pickupLat: String(pLat),
+      pickupLng: String(pLng),
+      destLat: String(dLat),
+      destLng: String(dLng)
+    }).toString();
+    return request(`/location/route?${params}`, { method: 'GET', signal });
+  },
+  getRoute: function(coords, options) {
+    return this.getLocationRoute(coords, options);
+  }
 };

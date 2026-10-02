@@ -16,7 +16,8 @@ import {
   validateLoginInput,
   validateChangePasswordInput,
   validateForgotPasswordInput,
-  validateResetPasswordInput
+  validateResetPasswordInput,
+  sanitizeString
 } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AUTH_COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from '../config/security.js';
@@ -102,6 +103,19 @@ router.post('/driver-register', authRateLimiter, async (req, res, next) => {
       });
     }
 
+    const cleanName = sanitizeString(name);
+    const cleanPhone = String(phone).trim();
+    const cleanDl = String(dlNumber).trim().toUpperCase();
+    const cleanEmail = email ? sanitizeString(email) : null;
+    const cleanArea = area ? sanitizeString(area) : 'Indiranagar';
+
+    if (!cleanName || cleanName.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Driver name must be at least 2 characters.' }
+      });
+    }
+
     if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
@@ -110,13 +124,13 @@ router.post('/driver-register', authRateLimiter, async (req, res, next) => {
     }
 
     const { user, token } = await registerDriver({
-      name,
-      phone,
-      dlNumber,
+      name: cleanName,
+      phone: cleanPhone,
+      dlNumber: cleanDl,
       password,
-      email,
+      email: cleanEmail,
       upiId,
-      area: area || 'Indiranagar',
+      area: cleanArea,
       vehicleType: vehicleType || 'Manual & Automatic Cars',
       experienceYears: experienceYears || '3-5 Years',
       ipAddress
