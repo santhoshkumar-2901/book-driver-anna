@@ -63,7 +63,7 @@ router.get('/bookings', async (req, res, next) => {
   try {
     const { type, status } = req.query;
     let sql = `
-      SELECT b.*, 
+      SELECT b.*,
              COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
              COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
       FROM bookings b
@@ -82,7 +82,19 @@ router.get('/bookings', async (req, res, next) => {
     }
 
     sql += ' ORDER BY b.created_at DESC';
-    const bookings = await queryAll(sql, params);
+    let bookings;
+    try {
+      bookings = await queryAll(sql, params);
+    } catch (queryErr) {
+      if (queryErr.message && (queryErr.message.includes('assigned_driver_name') || queryErr.message.includes('1054'))) {
+        const fallbackSql = sql
+          .replace(/COALESCE\(b\.assigned_driver_name,\s*d\.name\)\s*as\s*assigned_driver_name/gi, 'd.name as assigned_driver_name')
+          .replace(/COALESCE\(b\.assigned_driver_phone,\s*d\.phone\)\s*as\s*assigned_driver_phone/gi, 'd.phone as assigned_driver_phone');
+        bookings = await queryAll(fallbackSql, params);
+      } else {
+        throw queryErr;
+      }
+    }
 
     res.json({
       success: true,
@@ -241,8 +253,8 @@ router.delete('/bookings/:id', async (req, res, next) => {
 router.get('/users', async (req, res, next) => {
   try {
     const users = await queryAll(`
-      SELECT id, name, email, phone, role, area, status, created_at 
-      FROM users 
+      SELECT id, name, email, phone, role, area, status, created_at
+      FROM users
       WHERE role = 'customer'
       ORDER BY created_at DESC
     `);
@@ -348,7 +360,7 @@ router.delete('/users/:id', async (req, res, next) => {
 router.get('/drivers', async (req, res, next) => {
   try {
     const drivers = await queryAll(`
-      SELECT d.*, u.email 
+      SELECT d.*, u.email
       FROM drivers d
       JOIN users u ON d.user_id = u.id
       ORDER BY d.rating DESC

@@ -212,32 +212,66 @@ router.post('/lookup', lookupRateLimiter, async (req, res, next) => {
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
-    const booking = await queryOne(`
-      SELECT b.id,
-             b.customer_name,
-             b.customer_phone,
-             b.service_name,
-             b.booking_type,
-             b.trip_type,
-             b.pickup_area,
-             b.drop_location,
-             b.pickup_latitude,
-             b.pickup_longitude,
-             b.destination_latitude,
-             b.destination_longitude,
-             b.date,
-             b.time,
-             b.calculated_fare,
-             b.payment_mode,
-             b.status,
-             b.created_at,
-             b.assigned_driver_id,
-             COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
-             COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
-      FROM bookings b
-      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
-      WHERE b.id = ?
-    `, [bookingId.trim()]);
+    let booking;
+    try {
+      booking = await queryOne(`
+        SELECT b.id,
+               b.customer_name,
+               b.customer_phone,
+               b.service_name,
+               b.booking_type,
+               b.trip_type,
+               b.pickup_area,
+               b.drop_location,
+               b.pickup_latitude,
+               b.pickup_longitude,
+               b.destination_latitude,
+               b.destination_longitude,
+               b.date,
+               b.time,
+               b.calculated_fare,
+               b.payment_mode,
+               b.status,
+               b.created_at,
+               b.assigned_driver_id,
+               COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+               COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+        FROM bookings b
+        LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+        WHERE b.id = ?
+      `, [bookingId.trim()]);
+    } catch (queryErr) {
+      if (queryErr.message && (queryErr.message.includes('assigned_driver_name') || queryErr.message.includes('1054') || queryErr.message.includes('42S22'))) {
+        booking = await queryOne(`
+          SELECT b.id,
+                 b.customer_name,
+                 b.customer_phone,
+                 b.service_name,
+                 b.booking_type,
+                 b.trip_type,
+                 b.pickup_area,
+                 b.drop_location,
+                 b.pickup_latitude,
+                 b.pickup_longitude,
+                 b.destination_latitude,
+                 b.destination_longitude,
+                 b.date,
+                 b.time,
+                 b.calculated_fare,
+                 b.payment_mode,
+                 b.status,
+                 b.created_at,
+                 b.assigned_driver_id,
+                 d.name as assigned_driver_name,
+                 d.phone as assigned_driver_phone
+          FROM bookings b
+          LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+          WHERE b.id = ?
+        `, [bookingId.trim()]);
+      } else {
+        throw queryErr;
+      }
+    }
 
     if (!booking) {
       return res.status(404).json({
@@ -340,7 +374,7 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     }
 
     const result = await execute(`
-      UPDATE bookings 
+      UPDATE bookings
       SET status = 'COMPLETED', payment_mode = COALESCE(?, payment_mode), updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND status IN ('CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
     `, [paymentMode || null, bookingId]);

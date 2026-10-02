@@ -221,10 +221,10 @@ export async function createBooking({
 
       // 2. Check if driver is already booked for this slot
       const conflict = await tx.queryOne(`
-        SELECT id FROM bookings 
-        WHERE assigned_driver_id = ? 
-          AND date = ? 
-          AND time = ? 
+        SELECT id FROM bookings
+        WHERE assigned_driver_id = ?
+          AND date = ?
+          AND time = ?
           AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
       `, [preferredDriverId, date, time]);
 
@@ -341,7 +341,7 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
 
   // Atomic conditional update
   const result = await execute(`
-    UPDATE bookings 
+    UPDATE bookings
     SET status = 'CANCELLED', cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED')
   `, [reason, bookingId]);
@@ -380,13 +380,13 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   return { booking: updated, alreadyCancelled: false };
 }
 
-export async function updateBookingStatus({ 
-  bookingId, 
-  newStatus, 
-  assignedDriverId = undefined, 
+export async function updateBookingStatus({
+  bookingId,
+  newStatus,
+  assignedDriverId = undefined,
   assignedDriverName = undefined,
   assignedDriverPhone = undefined,
-  requesterUser, 
+  requesterUser,
   ipAddress = null,
   tx = null
 }) {
@@ -487,7 +487,24 @@ export async function updateBookingStatus({
   updateSql += ` WHERE id = ? AND status = ?`;
   params.push(bookingId, booking.status);
 
-  const result = await exec(updateSql, params);
+  let result;
+  try {
+    result = await exec(updateSql, params);
+  } catch (updateErr) {
+    if (updateErr.message && (updateErr.message.includes('assigned_driver_name') || updateErr.message.includes('1054') || updateErr.message.includes('42S22'))) {
+      let fallbackSql = `UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP`;
+      const fallbackParams = [normalizedNewStatus];
+      if (assignedDriverId !== undefined) {
+        fallbackSql += `, assigned_driver_id = ?`;
+        fallbackParams.push(assignedDriverId);
+      }
+      fallbackSql += ` WHERE id = ? AND status = ?`;
+      fallbackParams.push(bookingId, booking.status);
+      result = await exec(fallbackSql, fallbackParams);
+    } else {
+      throw updateErr;
+    }
+  }
 
   if (result.affectedRows === 0) {
     const current = await qOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
@@ -518,22 +535,38 @@ export async function updateBookingStatus({
     ipAddress
   });
 
-  const updated = await qOne(`
-    SELECT b.*, 
-           COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
-           COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
-    FROM bookings b
-    LEFT JOIN drivers d ON b.assigned_driver_id = d.id
-    WHERE b.id = ?
-  `, [bookingId]);
+  let updated;
+  try {
+    updated = await qOne(`
+      SELECT b.*,
+             COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+             COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+      FROM bookings b
+      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+      WHERE b.id = ?
+    `, [bookingId]);
+  } catch (err) {
+    if (err.message && (err.message.includes('assigned_driver_name') || err.message.includes('1054') || err.message.includes('42S22'))) {
+      updated = await qOne(`
+        SELECT b.*,
+               d.name as assigned_driver_name,
+               d.phone as assigned_driver_phone
+        FROM bookings b
+        LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+        WHERE b.id = ?
+      `, [bookingId]);
+    } else {
+      throw err;
+    }
+  }
 
   if (assignedDriverId !== undefined || normalizedNewStatus !== currentStatus) {
     try {
       await publishBookingAssignmentChange({
         bookingId,
-        assignedDriverId: updated.assigned_driver_id || null,
-        assignedDriverName: updated.assigned_driver_name || null,
-        status: updated.status
+        assignedDriverId: updated?.assigned_driver_id || null,
+        assignedDriverName: updated?.assigned_driver_name || null,
+        status: updated?.status
       });
     } catch (e) {}
   }
@@ -544,24 +577,36 @@ export async function updateBookingStatus({
 export async function getUserBookings(userId, phone = null, limit = 50) {
   if (!userId && !phone) return [];
   const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
-  const selectSql = `
-    SELECT b.*, 
-           COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
-           COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
-    FROM bookings b
-    LEFT JOIN drivers d ON b.assigned_driver_id = d.id
-  `;
-  if (userId && phone) {
+
+  const runQuery = async (includeAssignedCols = true) => {
+    const selectSql = `
+      SELECT b.*,
+             ${includeAssignedCols ? 'COALESCE(b.assigned_driver_name, d.name)' : 'd.name'} as assigned_driver_name,
+             ${includeAssignedCols ? 'COALESCE(b.assigned_driver_phone, d.phone)' : 'd.phone'} as assigned_driver_phone
+      FROM bookings b
+      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+    `;
+    if (userId && phone) {
+      const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+      const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+      return await queryAll(
+        `${selectSql} WHERE (b.user_id = ? OR b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`,
+        [userId, String(phone).trim(), `%${last10}`, safeLimit]
+      );
+    } else if (userId) {
+      return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ?`, [userId, safeLimit]);
+    }
     const cleanPhone = String(phone).replace(/[^0-9]/g, '');
     const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
-    return await queryAll(
-      `${selectSql} WHERE (b.user_id = ? OR b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`,
-      [userId, String(phone).trim(), `%${last10}`, safeLimit]
-    );
-  } else if (userId) {
-    return await queryAll(`${selectSql} WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ?`, [userId, safeLimit]);
+    return await queryAll(`${selectSql} WHERE (b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`, [String(phone).trim(), `%${last10}`, safeLimit]);
+  };
+
+  try {
+    return await runQuery(true);
+  } catch (err) {
+    if (err.message && (err.message.includes('assigned_driver_name') || err.message.includes('1054') || err.message.includes('42S22'))) {
+      return await runQuery(false);
+    }
+    throw err;
   }
-  const cleanPhone = String(phone).replace(/[^0-9]/g, '');
-  const last10 = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
-  return await queryAll(`${selectSql} WHERE (b.customer_phone = ? OR b.customer_phone LIKE ?) ORDER BY b.created_at DESC LIMIT ?`, [String(phone).trim(), `%${last10}`, safeLimit]);
 }

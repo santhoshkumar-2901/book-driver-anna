@@ -40,14 +40,30 @@ export async function checkBookingOwnership(req, res, next) {
       });
     }
 
-    const booking = await queryOne(`
-      SELECT b.*,
-             COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
-             COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
-      FROM bookings b
-      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
-      WHERE b.id = ?
-    `, [bookingId]);
+    let booking;
+    try {
+      booking = await queryOne(`
+        SELECT b.*,
+               COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+               COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+        FROM bookings b
+        LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+        WHERE b.id = ?
+      `, [bookingId]);
+    } catch (queryErr) {
+      if (queryErr.message && (queryErr.message.includes('assigned_driver_name') || queryErr.message.includes('1054') || queryErr.message.includes('42S22'))) {
+        booking = await queryOne(`
+          SELECT b.*,
+                 d.name as assigned_driver_name,
+                 d.phone as assigned_driver_phone
+          FROM bookings b
+          LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+          WHERE b.id = ?
+        `, [bookingId]);
+      } else {
+        throw queryErr;
+      }
+    }
     if (!booking) {
       return res.status(404).json({
         success: false,

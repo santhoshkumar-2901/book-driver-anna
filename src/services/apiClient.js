@@ -1,14 +1,14 @@
 /**
  * Production-Grade API Client for Book Driver Anna
- * 
+ *
  * - Communicates with backend /api endpoints
  * - Handles HttpOnly credentials automatically (credentials: 'include')
  * - Normalizes responses and standard errors
  * - Graceful fallback handling
  */
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
-  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api` 
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
+  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api`
   : '/api';
 
 async function request(endpoint, options = {}) {
@@ -53,7 +53,7 @@ async function request(endpoint, options = {}) {
   try {
     const res = await fetch(url, config);
     const contentType = res.headers.get('content-type') || '';
-    
+
     let data = {};
     let rawText = '';
     if (contentType.includes('application/json')) {
@@ -76,7 +76,7 @@ async function request(endpoint, options = {}) {
 
     if (!res.ok) {
       // Check if this is a static host 405/404, Vite proxy failure (ECONNREFUSED 500), or gateway 502/503/504
-      const isProxyOrGatewayError = 
+      const isProxyOrGatewayError =
         (res.status === 404 || res.status === 405 || res.status === 502 || res.status === 503 || res.status === 504) ||
         isHtmlResponse ||
         (res.status === 500 && (!data.error || rawText.includes('ECONNREFUSED') || rawText.includes('proxy error') || rawText.includes('FUNCTION_INVOCATION') || rawText.includes('Fatal:')));
@@ -145,6 +145,16 @@ export const apiClient = {
     if (res?.data?.token) localStorage.setItem('bda_admin_token', res.data.token);
     return res;
   },
+  getToken: (role = 'client') => {
+    if (typeof localStorage === 'undefined') return null;
+    if (role === 'admin') {
+      return localStorage.getItem('bda_admin_token') || localStorage.getItem('bda_jwt_token') || null;
+    }
+    if (role === 'driver') {
+      return localStorage.getItem('bda_driver_token') || localStorage.getItem('bda_jwt_token') || null;
+    }
+    return localStorage.getItem('bda_client_token') || localStorage.getItem('bda_jwt_token') || null;
+  },
   logout: () => {
     localStorage.removeItem('bda_client_token');
     localStorage.removeItem('bda_admin_token');
@@ -163,9 +173,9 @@ export const apiClient = {
     return request('/bookings', { method: 'POST', body: bookingData, idempotencyKey: key });
   },
   getMyBookings: () => request('/bookings/my', { method: 'GET' }),
-  lookupBooking: (bookingId, phone) => 
+  lookupBooking: (bookingId, phone) =>
     request('/bookings/lookup', { method: 'POST', body: { bookingId, phone } }),
-  cancelBooking: (bookingId, phone, reason) => 
+  cancelBooking: (bookingId, phone, reason) =>
     request(`/bookings/${bookingId}/cancel`, { method: 'POST', body: { phone, reason } }),
   completeBooking: (bookingId, paymentMode = 'cash') =>
     request(`/bookings/${bookingId}/complete`, { method: 'POST', body: { paymentMode } }),
@@ -179,7 +189,7 @@ export const apiClient = {
   getDrivers: () => request('/drivers', { method: 'GET' }),
   getDriverDuties: () => request('/drivers/duties', { method: 'GET' }),
   getDriverHistory: (limit = 50) => request(`/drivers/history?limit=${limit}`, { method: 'GET' }),
-  updateDutyStatus: (bookingId, status) => 
+  updateDutyStatus: (bookingId, status) =>
     request(`/drivers/duties/${bookingId}/status`, { method: 'PATCH', body: { status } }),
   updateDriverLocation: (coords) =>
     request('/drivers/location', { method: 'PUT', body: coords }),
@@ -204,9 +214,9 @@ export const apiClient = {
     const params = new URLSearchParams(filters).toString();
     return request(`/admin/bookings${params ? `?${params}` : ''}`, { method: 'GET' });
   },
-  updateAdminBooking: (bookingId, updates) => 
+  updateAdminBooking: (bookingId, updates) =>
     request(`/admin/bookings/${bookingId}`, { method: 'PATCH', body: updates }),
-  deleteAdminBooking: (bookingId) => 
+  deleteAdminBooking: (bookingId) =>
     request(`/admin/bookings/${bookingId}`, { method: 'DELETE' }),
   getAdminUsers: () => request('/admin/users', { method: 'GET' }),
   createAdminUser: (userData) => request('/admin/users', { method: 'POST', body: userData }),
@@ -223,7 +233,7 @@ export const apiClient = {
   getPublicPricing: () => request('/pricing', { method: 'GET' }),
 
   // 6. Chatbot Endpoint
-  sendChatMessage: (message, history = []) => 
+  sendChatMessage: (message, history = []) =>
     request('/chat', { method: 'POST', body: { message, history } }),
 
   // 7. Location Endpoints (Backend Proxy)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { 
-  Car, MapPin, Navigation, Maximize2, RotateCw, Filter, 
-  Layers, Radio, UserCheck, Clock, AlertCircle, CheckCircle2, 
+import {
+  Car, MapPin, Navigation, Maximize2, RotateCw, Filter,
+  Layers, Radio, UserCheck, Clock, AlertCircle, CheckCircle2,
   ChevronRight, RefreshCw, X, Eye, Phone, Calendar
 } from 'lucide-react';
 import MapView, { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../../components/map/MapView';
@@ -56,14 +56,14 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
   const [drivers, setDrivers] = useState({}); // { [id]: driverObj }
   const [bookings, setBookings] = useState({}); // { [id]: bookingObj }
   const [routes, setRoutes] = useState({}); // { [bookingId]: { geometry, distance, duration, type, driverId } }
-  
+
   // 2. UI & Filter State
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'online' | 'assigned' | 'active_trips' | 'unassigned'
   const [selectedEntity, setSelectedEntity] = useState(null); // { type: 'driver' | 'booking', id }
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [realtimeStatus, setRealtimeStatus] = useState('connecting'); // 'connected' | 'reconnecting' | 'disconnected'
-  
+
   // 3. Map Viewport State
   const [mapBounds, setMapBounds] = useState(null);
   const [manualCenter, setManualCenter] = useState(null);
@@ -333,7 +333,8 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
    */
   useEffect(() => {
     isUnmountedRef.current = false;
-    const token = apiClient.getToken();
+    const token = (typeof apiClient.getToken === 'function' ? apiClient.getToken('admin') : null) ||
+      (typeof localStorage !== 'undefined' ? (localStorage.getItem('bda_admin_token') || localStorage.getItem('bda_jwt_token')) : null);
 
     if (!token) {
       setRealtimeStatus('disconnected');
@@ -611,7 +612,7 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
 
   return (
     <div className="space-y-4 animate-fade-in text-slate-100" data-testid="admin-operational-map">
-      
+
       {/* --------------------------------------------------------------------- */}
       {/* 1. HEADER & METRICS BAR */}
       {/* --------------------------------------------------------------------- */}
@@ -623,7 +624,7 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
               Live Fleet Dispatch
             </span>
             <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-              realtimeStatus === 'connected' 
+              realtimeStatus === 'connected'
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                 : realtimeStatus === 'reconnecting'
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -775,10 +776,10 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
       {/* 3. MAIN INTERACTIVE MAP CONTAINER */}
       {/* --------------------------------------------------------------------- */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        
+
         {/* Map Viewport Area (Takes 3 columns on large screens) */}
         <div className="lg:col-span-3 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-950 flex flex-col">
-          
+
           <MapView
             center={manualCenter || DEFAULT_MAP_CENTER}
             zoom={DEFAULT_MAP_ZOOM}
@@ -857,7 +858,7 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
             {/* Section 5: ASSIGNED: Driver -> Pickup; IN_PROGRESS: Driver -> Destination */}
             {Object.entries(routes).map(([bookingId, routeData]) => {
               if (!routeData?.geometry) return null;
-              
+
               // Do not show route if booking is filtered out
               if (!displayedBookings.some(b => String(b.id) === String(bookingId))) {
                 return null;
@@ -908,7 +909,7 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
         {/* Sidebar: Operational Entities List & Quick Inspector */}
         {/* ------------------------------------------------------------------- */}
         <div className="lg:col-span-1 flex flex-col h-[380px] sm:h-[450px] lg:h-[620px] bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
-          
+
           <div className="p-3.5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-amber-400" />
@@ -950,7 +951,7 @@ export default function AdminOperationalMapTab({ onSelectBooking }) {
                         #{b.id}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        b.status === 'IN_PROGRESS' 
+                        b.status === 'IN_PROGRESS'
                           ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                           : b.status === 'ARRIVED'
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'

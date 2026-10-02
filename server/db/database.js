@@ -136,10 +136,13 @@ if (isTiDB) {
     });
 
     // Idempotent column migrations for existing TiDB databases
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN assigned_driver_name VARCHAR(255) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE bookings ADD COLUMN assigned_driver_phone VARCHAR(64) NULL;').catch(() => {});
     tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;').catch(() => {});
     tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;').catch(() => {});
     tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;').catch(() => {});
     tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;').catch(() => {});
+    tidbConn.execute('ALTER TABLE drivers ADD COLUMN upi_id VARCHAR(255) DEFAULT NULL;').catch(() => {});
 
     tidbConn.execute(`
       CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings (assigned_driver_id, date, time);
@@ -183,8 +186,8 @@ if (isTiDB) {
   if (isServerless) {
     dbFilePath = '/tmp/bda_database.sqlite';
   } else {
-    dbFilePath = path.isAbsolute(ENV.DB_PATH) 
-      ? ENV.DB_PATH 
+    dbFilePath = path.isAbsolute(ENV.DB_PATH)
+      ? ENV.DB_PATH
       : path.resolve(__dirname, '../../', ENV.DB_PATH);
   }
 
@@ -340,11 +343,49 @@ export function normalizeRows(rows) {
   return rows.map(normalizeRow);
 }
 
+let tidbInitPromise = null;
+
+export async function ensureDatabaseReady() {
+  if (!isTiDB || !tidbConn) return;
+  if (!tidbInitPromise) {
+    tidbInitPromise = (async () => {
+      const migrations = [
+        'ALTER TABLE bookings ADD COLUMN assigned_driver_name VARCHAR(255) NULL;',
+        'ALTER TABLE bookings ADD COLUMN assigned_driver_phone VARCHAR(64) NULL;',
+        'ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE drivers ADD COLUMN current_latitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE drivers ADD COLUMN current_longitude DECIMAL(10, 7) NULL;',
+        'ALTER TABLE drivers ADD COLUMN last_location_update DATETIME NULL;',
+        'ALTER TABLE drivers ADD COLUMN upi_id VARCHAR(255) DEFAULT NULL;'
+      ];
+      for (const m of migrations) {
+        try {
+          await tidbConn.execute(m);
+        } catch (e) {
+          // Column already exists or duplicate column name
+        }
+      }
+    })().catch((err) => {
+      console.warn('[DATABASE] TiDB schema ensure error:', err.message);
+    });
+  }
+  return tidbInitPromise;
+}
+
+// Trigger initial ensure for TiDB Cloud
+if (isTiDB) {
+  ensureDatabaseReady().catch(() => {});
+}
+
 /**
  * Execute a query returning a single row (or null if not found)
  */
 export async function queryOne(sql, params = []) {
   if (isTiDB) {
+    await ensureDatabaseReady();
     const rows = await tidbConn.execute(sql, params);
     return Array.isArray(rows) && rows.length > 0 ? normalizeRow(rows[0]) : null;
   } else {
@@ -358,6 +399,7 @@ export async function queryOne(sql, params = []) {
  */
 export async function queryAll(sql, params = []) {
   if (isTiDB) {
+    await ensureDatabaseReady();
     const rows = await tidbConn.execute(sql, params);
     return Array.isArray(rows) ? normalizeRows(rows) : [];
   } else {
@@ -371,6 +413,7 @@ export async function queryAll(sql, params = []) {
  */
 export async function execute(sql, params = []) {
   if (isTiDB) {
+    await ensureDatabaseReady();
     const res = await tidbConn.execute(sql, params);
     return {
       affectedRows: res?.rowsAffected ?? 0,
@@ -392,6 +435,7 @@ export async function execute(sql, params = []) {
  */
 export async function exec(sql) {
   if (isTiDB) {
+    await ensureDatabaseReady();
     return await tidbConn.execute(sql);
   } else {
     return sqliteDb.exec(sql);
@@ -405,6 +449,7 @@ let sqliteTxMutex = Promise.resolve();
  */
 export async function withTransaction(callback) {
   if (isTiDB) {
+    await ensureDatabaseReady();
     const tx = await tidbConn.begin();
     try {
       const txExecutor = {
