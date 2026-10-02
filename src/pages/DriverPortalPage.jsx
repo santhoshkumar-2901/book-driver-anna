@@ -619,112 +619,92 @@ export default function DriverPortalPage({
       )}
 
       {/* Top Navigation Bar */}
-      <header className="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md max-w-full overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+      <header className="bg-slate-950/85 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-xl max-w-full overflow-x-hidden shadow-md shadow-black/20">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
           
-          {/* Brand */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 shrink-0">
-              <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          {/* Brand & Duties Navigation */}
+          <button
+            id="driver-nav-duties-btn"
+            type="button"
+            onClick={() => setPortalTab('duties')}
+            className="flex items-center gap-2 sm:gap-3 min-w-0 text-left cursor-pointer group focus:outline-none"
+            title="Book Driver Anna — Return to Duties"
+            aria-label="Duties and Trips"
+          >
+            <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 font-bold shadow-inner shrink-0 group-hover:border-emerald-400/60 transition-colors">
+              <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
             </div>
-            <div className="min-w-0">
-              <div className="font-extrabold text-sm sm:text-lg text-white font-['Outfit'] leading-none truncate">
-                Book Driver <span className="text-emerald-400">Anna</span>
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5 truncate">
-                <Award className="w-2.5 h-2.5 inline shrink-0" /> Driver Portal
-              </div>
-            </div>
-          </div>
-
-          {/* Center Navigation Tabs: Duties vs Profile */}
-          <nav className="flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs font-bold shrink-0">
-            <button
-              id="driver-nav-duties-btn"
-              type="button"
-              onClick={() => setPortalTab('duties')}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                portalTab === 'duties'
-                  ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <SteeringWheel className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span className="hidden sm:inline">Duties & Trips</span>
-              <span className="sm:hidden">Duties</span>
-              {acceptedTrips.length > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  portalTab === 'duties' ? 'bg-slate-950 text-amber-400' : 'bg-amber-400 text-slate-950'
-                }`}>
-                  {acceptedTrips.length}
+            <div className="hidden sm:block min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="font-extrabold text-xs sm:text-base text-white font-['Outfit'] tracking-tight leading-none truncate">
+                  Book Driver <span className="text-emerald-400">Anna</span>
                 </span>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1">
+                <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1 sm:gap-1.5 truncate">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-slate-500'}`} />
+                  <span className="truncate max-w-[85px] xs:max-w-[120px] sm:max-w-[160px] text-slate-300 font-semibold">
+                    {activeDriver?.name || 'Driver Partner'}
+                  </span>
+                  {activeDriver?.area && (
+                    <span className="hidden lg:inline text-slate-500">• {activeDriver.area}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* Right Header Controls: Online, Profile, and Logout */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            
+            {/* 1. Online/Offline Duty Toggle Button */}
+            <button
+              onClick={handleToggleOnline}
+              className={`min-h-[40px] sm:min-h-[44px] px-2.5 sm:px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm touch-manipulation ${
+                isOnline
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+              title={isOnline ? "Duty Status: Online. Click to go offline." : "Duty Status: Offline. Click to go online."}
+              aria-label={isOnline ? "Duty Status: Online" : "Duty Status: Offline"}
+            >
+              {isOnline ? (
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
               )}
+              <span className="font-mono tracking-tight">{isOnline ? 'Online' : 'Offline'}</span>
             </button>
+
+            {/* 2. Profile Button */}
             <button
               id="driver-nav-profile-btn"
               type="button"
-              onClick={() => setPortalTab('profile')}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+              onClick={() => setPortalTab(prev => prev === 'profile' ? 'duties' : 'profile')}
+              className={`min-h-[40px] sm:min-h-[44px] px-2.5 sm:px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm touch-manipulation ${
                 portalTab === 'profile'
-                  ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold border-amber-400 shadow-md shadow-amber-500/20'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white hover:border-slate-700'
               }`}
+              title={portalTab === 'profile' ? "Return to Duties" : "View Driver Profile"}
+              aria-label="Driver Profile"
             >
-              <User className="w-3.5 h-3.5" />
+              <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span>Profile</span>
             </button>
-          </nav>
 
-          {/* Right Header Controls */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            
-            {/* Driver Live GPS Badge / Quick Toggle */}
-            <button
-              onClick={toggleTracking}
-              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm min-h-[40px] sm:min-h-[44px] touch-manipulation ${
-                isTracking
-                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25'
-                  : trackingStatus === 'denied' || trackingStatus === 'error'
-                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-              }`}
-              title={isTracking ? "GPS Tracking Active — Click to pause" : "Click to enable GPS Tracking"}
-            >
-              <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'text-cyan-400 animate-pulse' : 'text-slate-500'}`} />
-              <span className="hidden sm:inline">GPS:</span>
-              <span>
-                {trackingStatus === 'active' ? 'ACTIVE' :
-                 trackingStatus === 'requesting' ? 'LOCATING...' :
-                 trackingStatus === 'denied' ? 'DENIED' :
-                 trackingStatus === 'unavailable' ? 'NO GPS' :
-                 trackingStatus === 'timeout' ? 'TIMEOUT' :
-                 trackingStatus === 'error' ? 'ERROR' : 'OFF'}
-              </span>
-            </button>
-
-            {/* Online/Offline Duty Toggle Button */}
-            <button
-              onClick={handleToggleOnline}
-              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer border shadow-sm min-h-[40px] sm:min-h-[44px] touch-manipulation ${
-                isOnline
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-              }`}
-              title={isOnline ? "Click to go Offline" : "Click to go Online"}
-            >
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-              <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-            </button>
-
-            {/* Logout Button */}
+            {/* 3. Logout Button */}
             <button
               onClick={onLogout}
-              className="p-2 sm:p-2.5 rounded-xl text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 min-h-[40px] sm:min-h-[44px] min-w-[40px] sm:min-w-[44px] touch-manipulation"
+              className="min-h-[40px] sm:min-h-[44px] min-w-[40px] sm:min-w-[44px] px-2.5 sm:px-3 rounded-xl text-slate-400 hover:text-rose-300 bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-semibold shrink-0 touch-manipulation"
               title="Driver Sign Out"
               aria-label="Driver Sign Out"
             >
-              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden md:inline">Sign Out</span>
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
 
           </div>
@@ -769,17 +749,6 @@ export default function DriverPortalPage({
                     <span>Hub: <strong className="text-amber-400">{activeDriver?.area || 'Bengaluru Fleet'}</strong></span>
                     <span className="hidden xs:inline">•</span>
                     <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {activeDriver?.rating || '5.0'}</strong></span>
-                  </div>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      id="driver-banner-profile-link"
-                      onClick={() => setPortalTab('profile')}
-                      className="text-xs text-amber-400 hover:text-amber-300 font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <User className="w-3.5 h-3.5" />
-                      <span>View & Edit Complete Profile →</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -857,7 +826,7 @@ export default function DriverPortalPage({
 
             <button
               onClick={toggleTracking}
-              className={`px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 border shadow-md ${
+              className={`min-h-[40px] sm:min-h-[44px] px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 border shadow-md touch-manipulation ${
                 isTracking
                   ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
                   : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black border-transparent hover:opacity-95 shadow-emerald-500/20'
