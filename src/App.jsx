@@ -64,6 +64,9 @@ export function resolveRoute(pathname = '') {
   if (clean === '/driver/portal' || clean === '/driver-portal') {
     return { role: 'driver', page: 'driver-portal', authRole: 'driver', resetAuth: false };
   }
+  if (clean === '/driver/profile') {
+    return { role: 'driver', page: 'driver-portal', authRole: 'driver', resetAuth: false };
+  }
   if (clean === '/driver') {
     return { role: 'driver', page: 'driver-login', authRole: 'driver', resetAuth: true };
   }
@@ -863,11 +866,13 @@ export default function App() {
 
   // 2. Dedicated layout for Driver Portal (for logged in drivers or /driver/portal)
   if (driverUser && (activePage === 'driver-portal' || activePage === 'driver')) {
+    const isProfileRoute = typeof window !== 'undefined' && window.location.pathname.includes('/driver/profile');
     return (
       <Suspense fallback={<RouteLoadingFallback />}>
         <DriverPortalPage 
           driverUser={driverUser}
           onLogout={handleDriverLogout}
+          initialTab={isProfileRoute ? 'profile' : 'duties'}
         />
       </Suspense>
     );

@@ -71,3 +71,18 @@ export function isValidUpi(vpa) {
   const trimmed = vpa.trim();
   return /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9]{2,64}$/.test(trimmed);
 }
+
+export function isValidIndianPhone(phone) {
+  if (!phone || typeof phone !== 'string') return false;
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (digits.length === 10) {
+    return /^[6-9]\d{9}$/.test(digits);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return /^[6-9]\d{9}$/.test(digits.slice(1));
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return /^[6-9]\d{9}$/.test(digits.slice(2));
+  }
+  return false;
+}

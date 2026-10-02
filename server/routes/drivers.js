@@ -5,8 +5,45 @@ import { requireRole } from '../middleware/rbac.js';
 import { driverLocationRateLimiter } from '../middleware/rateLimiter.js';
 import { updateBookingStatus, getAvailableDriverDuties, acceptDriverDuty } from '../services/bookingService.js';
 import { publishDriverLocation } from '../services/realtimeService.js';
+import { getDriverProfile, updateDriverProfile } from '../services/driverProfileService.js';
 
 const router = Router();
+
+// GET /api/drivers/me (Driver portal: fetch authenticated driver's profile)
+router.get('/me', requireAuth, requireRole('driver'), async (req, res, next) => {
+  try {
+    const profile = await getDriverProfile(req.user.id);
+    res.json({
+      success: true,
+      data: { profile }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/drivers/me (Driver portal: update authenticated driver's profile)
+router.put('/me', requireAuth, requireRole('driver'), async (req, res, next) => {
+  try {
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+    const result = await updateDriverProfile({
+      userId: req.user.id,
+      updates: req.body,
+      ipAddress
+    });
+
+    res.json({
+      success: true,
+      message: 'Driver profile updated successfully.',
+      data: {
+        profile: result.profile,
+        token: result.token
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /api/drivers (Public active driver roster)
 router.get('/', async (req, res, next) => {

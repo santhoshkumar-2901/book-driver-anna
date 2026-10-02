@@ -187,6 +187,9 @@ export const apiClient = {
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),
+  getDriverProfile: () => request('/drivers/me', { method: 'GET' }),
+  updateDriverProfile: (profileData) =>
+    request('/drivers/me', { method: 'PUT', body: profileData }),
   getDriverDuties: () => request('/drivers/duties', { method: 'GET' }),
   getAvailableDuties: (limit = 50) => request(`/drivers/available-duties?limit=${limit}`, { method: 'GET' }),
   acceptDuty: (bookingId) =>

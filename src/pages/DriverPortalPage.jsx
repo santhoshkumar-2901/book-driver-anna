@@ -3,7 +3,7 @@ import {
   Car, ShieldCheck, CheckCircle2, MapPin, Phone, LogOut, ArrowUpRight, 
   DollarSign, TrendingUp, Calendar, Clock, Award, AlertCircle, Check, X, 
   ChevronRight, RefreshCw, Power, QrCode, Smartphone, Sparkles, Save, Edit2, Copy,
-  Navigation, Radio
+  Navigation, Radio, User
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import useScrollLock from '../utils/useScrollLock';
@@ -19,15 +19,29 @@ import { SUPPORT_HELPLINE } from '../data/mockData';
 import SOSButton from '../components/SOSButton';
 import { isDummyOrDemoUser, isValidUpi } from '../utils/userValidation';
 import { apiClient } from '../services/apiClient';
+import DriverProfileSection from '../components/DriverProfileSection';
 
 export { isDutyAssignedToDriver, isDutyAssignedToOtherDriver, formatDuty, getDriverDuties };
 
 export default function DriverPortalPage({ 
   driverUser, 
-  onLogout 
+  onLogout,
+  initialTab = 'duties'
 }) {
+  const [currentDriverUser, setCurrentDriverUser] = useState(driverUser);
+  const [portalTab, setPortalTab] = useState(initialTab); // 'duties' | 'profile'
+
+  useEffect(() => {
+    if (driverUser) {
+      setCurrentDriverUser(driverUser);
+    }
+  }, [driverUser]);
+
+  const activeDriver = currentDriverUser || driverUser;
+
   // Automatically reject and logout any dummy driver profiles
   useEffect(() => {
+
     if (!driverUser || isDummyOrDemoUser(driverUser)) {
       if (onLogout) onLogout();
     }
@@ -623,6 +637,44 @@ export default function DriverPortalPage({
             </div>
           </div>
 
+          {/* Center Navigation Tabs: Duties vs Profile */}
+          <nav className="flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs font-bold shrink-0">
+            <button
+              id="driver-nav-duties-btn"
+              type="button"
+              onClick={() => setPortalTab('duties')}
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                portalTab === 'duties'
+                  ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <SteeringWheel className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span className="hidden sm:inline">Duties & Trips</span>
+              <span className="sm:hidden">Duties</span>
+              {acceptedTrips.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  portalTab === 'duties' ? 'bg-slate-950 text-amber-400' : 'bg-amber-400 text-slate-950'
+                }`}>
+                  {acceptedTrips.length}
+                </span>
+              )}
+            </button>
+            <button
+              id="driver-nav-profile-btn"
+              type="button"
+              onClick={() => setPortalTab('profile')}
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                portalTab === 'profile'
+                  ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Profile</span>
+            </button>
+          </nav>
+
           {/* Right Header Controls */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             
@@ -683,31 +735,54 @@ export default function DriverPortalPage({
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         
-        {/* Welcome Driver Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden shadow-xl">
-          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-lg sm:text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
-              {driverUser?.name ? driverUser.name.charAt(0).toUpperCase() : 'M'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0">
-                <h1 className="text-lg sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
-                  Namaskara, Anna {driverUser?.name || 'Partner'}!
-                </h1>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 sm:px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-                  <span>Verified Fleet Anna</span>
-                </span>
+        {portalTab === 'profile' ? (
+          <DriverProfileSection
+            driverUser={activeDriver}
+            onProfileUpdated={(updatedProfile, token) => {
+              setCurrentDriverUser(prev => ({ ...(prev || {}), ...updatedProfile }));
+              setToastMessage('Driver profile updated successfully!');
+              setTimeout(() => setToastMessage(null), 4000);
+            }}
+            onReturnToDuties={() => setPortalTab('duties')}
+          />
+        ) : (
+          <>
+            {/* Welcome Driver Banner */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden shadow-xl">
+              <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-lg sm:text-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+                  {activeDriver?.name ? activeDriver.name.charAt(0).toUpperCase() : 'M'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0">
+                    <h1 className="text-lg sm:text-2xl font-black text-white font-['Outfit'] tracking-tight truncate">
+                      Namaskara, Anna {activeDriver?.name || 'Partner'}!
+                    </h1>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 sm:px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span>Verified Fleet Anna</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1">
+                    <span>DL: <strong className="text-slate-200 font-mono">{activeDriver?.dlNumber || 'Verified ID'}</strong></span>
+                    <span className="hidden xs:inline">•</span>
+                    <span>Hub: <strong className="text-amber-400">{activeDriver?.area || 'Bengaluru Fleet'}</strong></span>
+                    <span className="hidden xs:inline">•</span>
+                    <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {activeDriver?.rating || '5.0'}</strong></span>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      id="driver-banner-profile-link"
+                      onClick={() => setPortalTab('profile')}
+                      className="text-xs text-amber-400 hover:text-amber-300 font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>View & Edit Complete Profile →</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1">
-                <span>DL: <strong className="text-slate-200 font-mono">{driverUser?.dlNumber || 'Verified ID'}</strong></span>
-                <span className="hidden xs:inline">•</span>
-                <span>Hub: <strong className="text-amber-400">{driverUser?.area || 'Bengaluru Fleet'}</strong></span>
-                <span className="hidden xs:inline">•</span>
-                <span>Rating: <strong className="text-emerald-400 font-extrabold">★ {driverUser?.rating || '5.0'}</strong></span>
-              </div>
-            </div>
-          </div>
 
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
@@ -1342,6 +1417,8 @@ export default function DriverPortalPage({
           </div>
 
         </div>
+          </>
+        )}
 
         {/* Driver Ride Settlement Modal with Customer UPI QR Code */}
         {settlementTrip && (() => {
