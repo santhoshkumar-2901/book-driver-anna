@@ -610,3 +610,194 @@ export async function getUserBookings(userId, phone = null, limit = 50) {
     throw err;
   }
 }
+
+/**
+ * Fetch open, unassigned customer bookings for driver portal pool
+ */
+export async function getAvailableDriverDuties(limit = 50) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+
+  const runQuery = async (includeAssignedCols = true) => {
+    const selectSql = `
+      SELECT b.*,
+             ${includeAssignedCols ? 'COALESCE(b.assigned_driver_name, d.name)' : 'd.name'} as assigned_driver_name,
+             ${includeAssignedCols ? 'COALESCE(b.assigned_driver_phone, d.phone)' : 'd.phone'} as assigned_driver_phone
+      FROM bookings b
+      LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+      WHERE (b.booking_type = 'driver' OR b.booking_type IS NULL OR b.booking_type = '')
+        AND (b.status = 'PENDING' OR b.status = 'CONFIRMED')
+        AND b.assigned_driver_id IS NULL
+      ORDER BY b.created_at DESC
+      LIMIT ?
+    `;
+    return await queryAll(selectSql, [safeLimit]);
+  };
+
+  try {
+    return await runQuery(true);
+  } catch (err) {
+    if (err.message && (err.message.includes('assigned_driver_name') || err.message.includes('1054') || err.message.includes('42S22'))) {
+      return await runQuery(false);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Accept / claim an open customer booking by driver partner with race-condition protection
+ */
+export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = null }) {
+  if (!requesterUser) {
+    const err = new Error('Authentication required.');
+    err.statusCode = 401;
+    err.code = 'UNAUTHORIZED';
+    throw err;
+  }
+
+  // Find driver record
+  let driver;
+  if (requesterUser.role === 'admin') {
+    driver = await queryOne('SELECT id, name, phone, status FROM drivers WHERE status = "Active" LIMIT 1');
+  } else {
+    driver = await queryOne('SELECT id, name, phone, status FROM drivers WHERE user_id = ?', [requesterUser.id]);
+    if (!driver && requesterUser.driverId) {
+      driver = await queryOne('SELECT id, name, phone, status FROM drivers WHERE id = ?', [requesterUser.driverId]);
+    }
+  }
+
+  if (!driver) {
+    const err = new Error('No driver profile linked to this account.');
+    err.statusCode = 403;
+    err.code = 'NOT_A_DRIVER';
+    throw err;
+  }
+
+  if (driver.status !== 'Active') {
+    const err = new Error(`Driver account is ${driver.status.toLowerCase()}. Only active drivers can accept duties.`);
+    err.statusCode = 403;
+    err.code = 'DRIVER_INACTIVE';
+    throw err;
+  }
+
+  return await withTransaction(async (tx) => {
+    // Pessimistic / row lock on booking
+    const lockSql = isTiDB
+      ? 'SELECT * FROM bookings WHERE id = ? FOR UPDATE'
+      : 'SELECT * FROM bookings WHERE id = ?';
+    const booking = await tx.queryOne(lockSql, [bookingId]);
+
+    if (!booking) {
+      const err = new Error('Booking not found.');
+      err.statusCode = 404;
+      err.code = 'BOOKING_NOT_FOUND';
+      throw err;
+    }
+
+    if (booking.assigned_driver_id) {
+      const err = new Error('This duty has already been accepted by another driver.');
+      err.statusCode = 409;
+      err.code = 'DUTY_ALREADY_CLAIMED';
+      throw err;
+    }
+
+    const currentStatus = String(booking.status).toUpperCase();
+    if (currentStatus !== 'PENDING' && currentStatus !== 'CONFIRMED') {
+      const err = new Error(`Duty cannot be accepted in '${booking.status}' status.`);
+      err.statusCode = 400;
+      err.code = 'INVALID_STATE_TRANSITION';
+      throw err;
+    }
+
+    // Check for slot conflict for this driver
+    const conflict = await tx.queryOne(`
+      SELECT id
+      FROM bookings
+      WHERE assigned_driver_id = ?
+        AND date = ?
+        AND time = ?
+        AND id != ?
+        AND status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS')
+      LIMIT 1
+    `, [driver.id, booking.date, booking.time, bookingId]);
+
+    if (conflict) {
+      const err = new Error('You already have another assigned duty for this date and time slot.');
+      err.statusCode = 409;
+      err.code = 'SLOT_UNAVAILABLE';
+      throw err;
+    }
+
+    // Update booking with driver assignment
+    try {
+      await tx.execute(`
+        UPDATE bookings
+        SET status = 'ASSIGNED',
+            assigned_driver_id = ?,
+            assigned_driver_name = ?,
+            assigned_driver_phone = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND assigned_driver_id IS NULL
+      `, [driver.id, driver.name, driver.phone, bookingId]);
+    } catch (updateErr) {
+      if (updateErr.message && (updateErr.message.includes('assigned_driver_name') || updateErr.message.includes('1054') || updateErr.message.includes('42S22'))) {
+        await tx.execute(`
+          UPDATE bookings
+          SET status = 'ASSIGNED',
+              assigned_driver_id = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND assigned_driver_id IS NULL
+        `, [driver.id, bookingId]);
+      } else {
+        throw updateErr;
+      }
+    }
+
+    let updated;
+    try {
+      updated = await tx.queryOne(`
+        SELECT b.*,
+               COALESCE(b.assigned_driver_name, d.name) as assigned_driver_name,
+               COALESCE(b.assigned_driver_phone, d.phone) as assigned_driver_phone
+        FROM bookings b
+        LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+        WHERE b.id = ?
+      `, [bookingId]);
+    } catch (err) {
+      if (err.message && (err.message.includes('assigned_driver_name') || err.message.includes('1054') || err.message.includes('42S22'))) {
+        updated = await tx.queryOne(`
+          SELECT b.*,
+                 d.name as assigned_driver_name,
+                 d.phone as assigned_driver_phone
+          FROM bookings b
+          LEFT JOIN drivers d ON b.assigned_driver_id = d.id
+          WHERE b.id = ?
+        `, [bookingId]);
+      } else {
+        throw err;
+      }
+    }
+
+    await logAuditEvent({
+      userId: requesterUser.id,
+      action: 'DRIVER_ACCEPTED_DUTY',
+      resourceType: 'booking',
+      resourceId: bookingId,
+      details: { driverId: driver.id, driverName: driver.name, customer: booking.customer_name },
+      ipAddress
+    });
+
+    try {
+      await publishBookingAssignmentChange({
+        bookingId,
+        assignedDriverId: driver.id,
+        assignedDriverName: driver.name,
+        assignedDriverPhone: driver.phone,
+        status: 'ASSIGNED'
+      });
+    } catch (realtimeErr) {
+      // Non-blocking
+    }
+
+    return updated;
+  });
+}

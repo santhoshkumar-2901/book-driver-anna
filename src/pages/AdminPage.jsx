@@ -524,9 +524,17 @@ export default function AdminPage({ onReturnToClient }) {
         setDriverBookings(prev => {
           const updated = prev.map(b => {
             if (b.id === bookingId) {
+              let targetStatus = b.status;
+              if (status) {
+                const sUpper = status.toUpperCase();
+                if (sUpper === 'ASSIGNED') targetStatus = 'Assigned';
+                else if (sUpper === 'CANCELLED') targetStatus = 'Cancelled';
+                else if (sUpper === 'COMPLETED') targetStatus = 'Completed';
+                else targetStatus = status;
+              }
               return {
                 ...b,
-                status: status || b.status,
+                status: targetStatus,
                 assignedDriver: validDriverName !== undefined ? validDriverName : (b.assignedDriver === 'Pending Admin Acceptance' ? '' : b.assignedDriver),
                 assignedDriverPhone: assignedDriverPhone !== undefined ? assignedDriverPhone : b.assignedDriverPhone
               };

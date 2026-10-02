@@ -247,6 +247,7 @@ export default function DriverPortalPage({
     setIsLoadingDuties(true);
     setDutiesError(null);
     try {
+      // 1. Fetch duties assigned to this driver
       const res = await apiClient.getDriverDuties();
       if (res && res.data && Array.isArray(res.data.duties)) {
         const serverDuties = res.data.duties;
@@ -268,6 +269,25 @@ export default function DriverPortalPage({
         } catch (e) {}
       } else {
         setAcceptedTrips([]);
+      }
+
+      // 2. Fetch available unclaimed customer bookings waiting for an Anna
+      try {
+        const availRes = await apiClient.getAvailableDuties();
+        if (availRes && availRes.data && Array.isArray(availRes.data.duties)) {
+          const formattedAvail = availRes.data.duties.map(d => {
+            const formatted = formatDuty(d);
+            return {
+              ...formatted,
+              urgency: 'Open Duty'
+            };
+          });
+          setAvailableDuties(formattedAvail);
+        } else {
+          setAvailableDuties([]);
+        }
+      } catch (aErr) {
+        console.warn('[DRIVER PORTAL] Failed to fetch available duties:', aErr.message);
       }
 
       // Query dedicated bounded history endpoint if available
@@ -319,7 +339,7 @@ export default function DriverPortalPage({
     };
   }, [driverUser, fetchDuties]);
 
-  const handleAcceptDuty = (duty) => {
+  const handleAcceptDuty = async (duty) => {
     if (!isOnline) {
       setToastMessage("Please switch your duty status to ONLINE to accept trips.");
       setTimeout(() => setToastMessage(null), 4000);
@@ -327,39 +347,56 @@ export default function DriverPortalPage({
     }
 
     const currentDriver = driverUser || (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('bda_driver_user') || 'null') : null) || {};
-    const acceptedDuty = { 
-      ...duty, 
-      status: 'Assigned',
-      assignedDriver: currentDriver.name || 'Driver Assigned',
-      assignedDriverPhone: currentDriver.phone || '',
-      assignedDriverUpi: driverUpi || currentDriver.upiId || ''
-    };
 
-    // Update persistent bda_driver_bookings
     try {
-      const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
-      const updated = savedBookings.map(b => (b.id === duty.id || b.bookingId === duty.id) ? {
-        ...b,
+      // 1. Authoritative Backend Acceptance
+      const targetId = duty.id || duty.bookingId;
+      const res = await apiClient.acceptDuty(targetId);
+      const serverBooking = res?.data?.booking;
+
+      const assignedDriverName = currentDriver.name || serverBooking?.assigned_driver_name || 'Driver Assigned';
+      const assignedDriverPhone = currentDriver.phone || serverBooking?.assigned_driver_phone || '';
+
+      const acceptedDuty = {
+        ...duty,
         status: 'Assigned',
-        assignedDriver: currentDriver.name || 'Driver Assigned',
-        assignedDriverPhone: currentDriver.phone || '',
+        assignedDriver: assignedDriverName,
+        assignedDriverPhone: assignedDriverPhone,
         assignedDriverUpi: driverUpi || currentDriver.upiId || ''
-      } : b);
-      localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
-    } catch (e) {}
+      };
 
-    broadcastBookingUpdate({
-      bookingId: duty.id,
-      status: 'Assigned',
-      assignedDriver: currentDriver.name,
-      assignedDriverPhone: currentDriver.phone,
-      assignedDriverUpi: driverUpi || currentDriver.upiId
-    });
+      // 2. Update persistent bda_driver_bookings
+      try {
+        const savedBookings = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
+        const updated = savedBookings.map(b => (b.id === targetId || b.bookingId === targetId) ? {
+          ...b,
+          status: 'Assigned',
+          assignedDriver: assignedDriverName,
+          assignedDriverPhone: assignedDriverPhone,
+          assignedDriverUpi: driverUpi || currentDriver.upiId || ''
+        } : b);
+        localStorage.setItem('bda_driver_bookings', JSON.stringify(updated));
+      } catch (e) {}
 
-    setAcceptedTrips(prev => [acceptedDuty, ...prev.filter(d => d.id !== duty.id)]);
-    setAvailableDuties(prev => prev.filter(d => d.id !== duty.id));
-    setToastMessage(`✓ Duty ${duty.id} accepted! Customer ${duty.customerName} notified that Anna is on the way.`);
-    setTimeout(() => setToastMessage(null), 5000);
+      // 3. Real-time broadcast for Admin Page and other connected sessions
+      broadcastBookingUpdate({
+        bookingId: targetId,
+        status: 'Assigned',
+        assignedDriver: assignedDriverName,
+        assignedDriverPhone: assignedDriverPhone,
+        assignedDriverUpi: driverUpi || currentDriver.upiId
+      });
+
+      setAcceptedTrips(prev => [acceptedDuty, ...prev.filter(d => (d.id !== targetId && d.bookingId !== targetId))]);
+      setAvailableDuties(prev => prev.filter(d => (d.id !== targetId && d.bookingId !== targetId)));
+      setToastMessage(`✓ Duty ${targetId} accepted! Customer ${duty.customerName} notified that Anna is on the way.`);
+      setTimeout(() => setToastMessage(null), 5000);
+    } catch (err) {
+      console.error('[DRIVER ACCEPT DUTY ERROR]', err);
+      setToastMessage(`⚠️ Could not accept duty: ${err.message || 'Please try again.'}`);
+      setTimeout(() => setToastMessage(null), 5000);
+      fetchDuties();
+    }
   };
 
   const [arrivingTripId, setArrivingTripId] = useState(null);

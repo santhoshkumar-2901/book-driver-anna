@@ -3,7 +3,7 @@ import { queryOne, queryAll, execute } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { driverLocationRateLimiter } from '../middleware/rateLimiter.js';
-import { updateBookingStatus } from '../services/bookingService.js';
+import { updateBookingStatus, getAvailableDriverDuties, acceptDriverDuty } from '../services/bookingService.js';
 import { publishDriverLocation } from '../services/realtimeService.js';
 
 const router = Router();
@@ -21,6 +21,39 @@ router.get('/', async (req, res, next) => {
     res.json({
       success: true,
       data: { drivers }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/drivers/available-duties (Driver portal: fetch open customer duties waiting for an Anna to claim)
+router.get('/available-duties', requireAuth, requireRole('driver', 'admin'), async (req, res, next) => {
+  try {
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 50, 100));
+    const duties = await getAvailableDriverDuties(limit);
+    res.json({
+      success: true,
+      data: { duties }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/drivers/duties/:id/accept (Driver claims / accepts an open customer booking)
+router.post('/duties/:id/accept', requireAuth, requireRole('driver', 'admin'), async (req, res, next) => {
+  try {
+    const bookingId = req.params.id;
+    const updated = await acceptDriverDuty({
+      bookingId,
+      requesterUser: req.user,
+      ipAddress: req.ip
+    });
+
+    res.json({
+      success: true,
+      data: { booking: updated }
     });
   } catch (err) {
     next(err);
