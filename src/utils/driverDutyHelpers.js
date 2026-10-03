@@ -149,3 +149,44 @@ export function getDriverDuties(driverUser, customBookings = null) {
     return { myAssigned: [], openPool: [] };
   }
 }
+
+/**
+ * Normalizes any booking object (from raw SQL or camelCase localStorage)
+ * into a standard driver booking card format for admin and driver views.
+ */
+export function normalizeDriverBooking(b) {
+  if (!b) return b;
+  const rawStatus = (b.status || 'Pending').toUpperCase();
+  const formattedStatus = 
+    rawStatus === 'ASSIGNED' ? 'Assigned' :
+    rawStatus === 'CONFIRMED' ? 'Confirmed' :
+    rawStatus === 'CANCELLED' ? 'Cancelled' :
+    rawStatus === 'COMPLETED' ? 'Completed' : 'Pending';
+
+  const cleanDriverName = (b.assigned_driver_name && b.assigned_driver_name !== 'Driver Assigned on Dispatch' && b.assigned_driver_name !== 'Driver Assigned' && b.assigned_driver_name !== 'Pending Admin Acceptance')
+    ? b.assigned_driver_name
+    : ((b.assignedDriver && b.assignedDriver !== 'Driver Assigned on Dispatch' && b.assignedDriver !== 'Driver Assigned' && b.assignedDriver !== 'Pending Admin Acceptance') ? b.assignedDriver : '');
+
+  const cleanDriverPhone = (b.assigned_driver_phone && b.assigned_driver_phone !== '+91 80 2555 0199')
+    ? b.assigned_driver_phone
+    : ((b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') ? b.assignedDriverPhone : '');
+
+  return {
+    ...b,
+    id: b.id || b.bookingId,
+    customerName: b.customerName || b.customer_name || b.name || 'Customer',
+    phone: b.phone || b.customer_phone || b.customerPhone || '',
+    email: b.email || b.customer_email || b.customerEmail || '',
+    tripType: b.tripType || b.trip_type || 'one-way',
+    tripTitle: b.tripTitle || b.service_name || (b.tripType ? `${b.tripType} Driver` : 'Driver Service'),
+    pickupArea: b.pickupArea || b.pickup_area || b.pickup || 'Pickup Location',
+    dropLocation: b.dropLocation || b.drop_location || b.destination || 'Drop Location',
+    date: b.date || b.bookingDate || '',
+    time: b.time || b.bookingTime || '',
+    fare: b.fare !== undefined ? b.fare : (b.calculated_fare !== undefined ? b.calculated_fare : (b.totalFare || 0)),
+    paymentMode: b.paymentMode || b.payment_mode || 'cash',
+    status: b.status ? (b.status.charAt(0).toUpperCase() + b.status.slice(1).toLowerCase()) : formattedStatus,
+    assignedDriver: cleanDriverName,
+    assignedDriverPhone: cleanDriverPhone
+  };
+}

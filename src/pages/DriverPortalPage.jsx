@@ -279,7 +279,18 @@ export default function DriverPortalPage({
 
         // Update non-authoritative convenience cache with fresh backend data
         try {
-          localStorage.setItem('bda_driver_bookings', JSON.stringify(serverDuties));
+          const onlyDriverDuties = serverDuties
+            .filter(b => b.booking_type === 'driver' || (!b.booking_type && !b.id?.startsWith('BDA-VEH-') && !b.id?.startsWith('BDA-CLS-')))
+            .map(b => ({
+              ...b,
+              customerName: b.customer_name || b.customerName || 'Customer',
+              phone: b.customer_phone || b.customerPhone || b.phone || '',
+              pickupArea: b.pickup_area || b.pickupArea || 'Pickup Location',
+              dropLocation: b.drop_location || b.dropLocation || 'Drop Location',
+              fare: b.calculated_fare !== undefined ? b.calculated_fare : (b.fare !== undefined ? b.fare : 0),
+              tripTitle: b.service_name || b.tripTitle || 'Driver Service'
+            }));
+          localStorage.setItem('bda_driver_bookings', JSON.stringify(onlyDriverDuties));
         } catch (e) {}
       } else {
         setAcceptedTrips([]);

@@ -149,7 +149,7 @@ export default function AssignDriverModal({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Customer: <strong className="text-white">{booking.customerName}</strong> ({booking.phone})
+              Customer: <strong className="text-white">{booking.customerName || booking.customer_name || 'Customer'}</strong> ({booking.phone || booking.customer_phone || 'No phone'})
             </p>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function AssignDriverModal({
               
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                 <span className="text-slate-400">Customer:</span>
-                <span className="font-bold text-white">{booking.customerName} ({booking.phone})</span>
+                <span className="font-bold text-white">{(booking.customerName || booking.customer_name || 'Customer')} ({(booking.phone || booking.customer_phone || 'No phone')})</span>
               </div>
 
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">

@@ -165,16 +165,18 @@ export default function AdminDashboardTab({
               <div key={b.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 overflow-hidden">
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className="font-extrabold text-sm text-white truncate min-w-0">{b.customerName}</span>
+                    <span className="font-extrabold text-sm text-white truncate min-w-0">
+                      {b.customerName || b.customer_name || b.name || 'Customer'}
+                    </span>
                     <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded font-mono shrink-0">
                       {b.id}
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 flex items-center gap-1.5 min-w-0">
-                    <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea} to {b.dropLocation}</span>
+                    <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea || b.pickup_area || 'Pickup'} to {b.dropLocation || b.drop_location || 'Drop'}</span>
                   </div>
                   <div className="text-[11px] text-slate-400 font-medium truncate min-w-0">
-                    {b.tripTitle} • <strong className="text-white">₹{b.fare}</strong>
+                    {b.tripTitle || b.service_name || 'Driver Service'} • <strong className="text-white">₹{b.fare !== undefined ? b.fare : (b.calculated_fare !== undefined ? b.calculated_fare : 0)}</strong>
                   </div>
                 </div>
 

@@ -101,7 +101,7 @@ router.post('/duties/:id/accept', requireAuth, requireRole('driver', 'admin'), a
 router.get('/duties', requireAuth, requireRole('driver', 'admin'), async (req, res, next) => {
   try {
     if (req.user.role === 'admin') {
-      const duties = await queryAll('SELECT * FROM bookings ORDER BY date ASC, time ASC');
+      const duties = await queryAll("SELECT * FROM bookings WHERE booking_type = 'driver' ORDER BY date ASC, time ASC");
       return res.json({ success: true, data: { duties } });
     }
 

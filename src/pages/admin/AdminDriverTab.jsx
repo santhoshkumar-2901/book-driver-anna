@@ -115,13 +115,22 @@ export default function AdminDriverTab({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className="font-extrabold text-base text-white truncate min-w-0">{b.customerName}</span>
+                    <span className="font-extrabold text-base text-white truncate min-w-0">
+                      {b.customerName || b.customer_name || b.name || 'Customer'}
+                    </span>
                     <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20 font-mono shrink-0">
                       {b.id}
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 min-w-0">
-                    <Phone className="w-3 h-3 text-slate-400 shrink-0" /> <a href={`tel:${b.phone}`} className="hover:text-amber-400 font-mono truncate">{b.phone}</a>
+                    <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                    {(b.phone || b.customer_phone || b.customerPhone) ? (
+                      <a href={`tel:${b.phone || b.customer_phone || b.customerPhone}`} className="hover:text-amber-400 font-mono truncate">
+                        {b.phone || b.customer_phone || b.customerPhone}
+                      </a>
+                    ) : (
+                      <span className="text-slate-500 font-mono truncate">No Phone</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -138,7 +147,9 @@ export default function AdminDriverTab({
                 }`}>
                   ● {b.status}
                 </span>
-                <div className="text-sm sm:text-base font-extrabold text-white font-['Outfit'] shrink-0">₹{b.fare}</div>
+                <div className="text-sm sm:text-base font-extrabold text-white font-['Outfit'] shrink-0">
+                  ₹{b.fare !== undefined ? b.fare : (b.calculated_fare !== undefined ? b.calculated_fare : (b.totalFare || 0))}
+                </div>
               </div>
             </div>
 
@@ -158,16 +169,18 @@ export default function AdminDriverTab({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs min-w-0">
               <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                 <div className="text-slate-400 font-bold uppercase text-[10px]">Trip Type & Package</div>
-                <div className="font-extrabold text-white truncate min-w-0">{b.tripTitle}</div>
+                <div className="font-extrabold text-white truncate min-w-0">
+                  {b.tripTitle || b.service_name || (b.tripType ? `${b.tripType} Driver` : 'Driver Service')}
+                </div>
                 <div className="text-slate-400 truncate min-w-0">{toDDMMYYYY(b.date)} • {b.time}</div>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                 <div className="text-slate-400 font-bold uppercase text-[10px]">Pickup & Drop Route</div>
                 <div className="font-semibold text-slate-200 flex items-center gap-1 min-w-0">
-                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea}</span>
+                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea || b.pickup_area || b.pickup || 'Pickup Location'}</span>
                 </div>
-                <div className="text-slate-400 truncate min-w-0" title={b.dropLocation}>Drop: {b.dropLocation}</div>
+                <div className="text-slate-400 truncate min-w-0" title={b.dropLocation || b.drop_location || b.destination}>Drop: {b.dropLocation || b.drop_location || b.destination || 'Drop Location'}</div>
               </div>
 
               {b.passengers ? (

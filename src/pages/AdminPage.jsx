@@ -34,6 +34,43 @@ export const sanitizeDrivers = (list) => {
   return list.filter(d => Boolean(d && (d.id || d.phone || d.name)));
 };
 
+export const normalizeDriverBooking = (b) => {
+  if (!b) return b;
+  const rawStatus = (b.status || 'Pending').toUpperCase();
+  const formattedStatus = 
+    rawStatus === 'ASSIGNED' ? 'Assigned' :
+    rawStatus === 'CONFIRMED' ? 'Confirmed' :
+    rawStatus === 'CANCELLED' ? 'Cancelled' :
+    rawStatus === 'COMPLETED' ? 'Completed' : 'Pending';
+
+  const cleanDriverName = (b.assigned_driver_name && b.assigned_driver_name !== 'Driver Assigned on Dispatch' && b.assigned_driver_name !== 'Driver Assigned' && b.assigned_driver_name !== 'Pending Admin Acceptance')
+    ? b.assigned_driver_name
+    : ((b.assignedDriver && b.assignedDriver !== 'Driver Assigned on Dispatch' && b.assignedDriver !== 'Driver Assigned' && b.assignedDriver !== 'Pending Admin Acceptance') ? b.assignedDriver : '');
+
+  const cleanDriverPhone = (b.assigned_driver_phone && b.assigned_driver_phone !== '+91 80 2555 0199')
+    ? b.assigned_driver_phone
+    : ((b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') ? b.assignedDriverPhone : '');
+
+  return {
+    ...b,
+    id: b.id || b.bookingId,
+    customerName: b.customerName || b.customer_name || b.name || 'Customer',
+    phone: b.phone || b.customer_phone || b.customerPhone || '',
+    email: b.email || b.customer_email || b.customerEmail || '',
+    tripType: b.tripType || b.trip_type || 'one-way',
+    tripTitle: b.tripTitle || b.service_name || (b.tripType ? `${b.tripType} Driver` : 'Driver Service'),
+    pickupArea: b.pickupArea || b.pickup_area || b.pickup || 'Pickup Location',
+    dropLocation: b.dropLocation || b.drop_location || b.destination || 'Drop Location',
+    date: b.date || b.bookingDate || '',
+    time: b.time || b.bookingTime || '',
+    fare: b.fare !== undefined ? b.fare : (b.calculated_fare !== undefined ? b.calculated_fare : (b.totalFare || 0)),
+    paymentMode: b.paymentMode || b.payment_mode || 'cash',
+    status: b.status ? (b.status.charAt(0).toUpperCase() + b.status.slice(1).toLowerCase()) : formattedStatus,
+    assignedDriver: cleanDriverName,
+    assignedDriverPhone: cleanDriverPhone
+  };
+};
+
 // SPA Route Paths for Admin Sections
 export const ADMIN_TAB_ROUTES = {
   'dashboard': '/admin/dashboard',
@@ -235,14 +272,10 @@ export default function AdminPage({ onReturnToClient }) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Cleanse legacy fake placeholders and exclude driving classes from driver bookings
+          // Cleanse legacy fake placeholders, exclude driving classes and vehicle rentals, and normalize all fields
           const sanitized = parsed
-            .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-')))
-            .map(b => ({
-              ...b,
-              assignedDriver: (b.assignedDriver && b.assignedDriver !== 'Driver Assigned on Dispatch' && b.assignedDriver !== 'Driver Assigned' && b.assignedDriver !== 'Pending Admin Acceptance') ? b.assignedDriver : '',
-              assignedDriverPhone: (b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') ? b.assignedDriverPhone : ''
-            }));
+            .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
+            .map(normalizeDriverBooking);
           const hasCancelled = sanitized.some(b => b.status === 'Cancelled');
           if (!hasCancelled) {
             const cancelledExample = DEFAULT_DRIVER_BOOKINGS.find(b => b.status === 'Cancelled');
@@ -551,7 +584,11 @@ export default function AdminPage({ onReturnToClient }) {
       if (savedDriver) {
         try { 
           const list = JSON.parse(savedDriver);
-          setDriverBookings(Array.isArray(list) ? list.filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-'))) : []); 
+          setDriverBookings(Array.isArray(list) 
+            ? list
+                .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
+                .map(normalizeDriverBooking) 
+            : []); 
         } catch (e) {}
       }
       const savedVehicle = localStorage.getItem('bda_vehicle_bookings');
@@ -839,8 +876,10 @@ export default function AdminPage({ onReturnToClient }) {
                   status: finalStatus 
                 });
               });
-              // Filter out any class enrollments that might have lingered
-              const merged = Array.from(map.values()).filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && (!b.id || !b.id.startsWith('BDA-CLS-')));
+              // Filter out any class enrollments and vehicle rentals that might have lingered, and normalize all fields
+              const merged = Array.from(map.values())
+                .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
+                .map(normalizeDriverBooking);
               localStorage.setItem('bda_driver_bookings', JSON.stringify(merged));
               return merged;
             });
@@ -1143,11 +1182,16 @@ export default function AdminPage({ onReturnToClient }) {
       return;
     }
 
-    const cleanClientPhone = booking.phone.replace(/[^0-9]/g, '');
+    const rawPhone = booking.phone || booking.customer_phone || booking.customerPhone || '';
+    const cleanClientPhone = rawPhone.replace(/[^0-9]/g, '');
+    const clientName = booking.customerName || booking.customer_name || booking.name || 'Valued Customer';
+    const pickup = booking.pickupArea || booking.pickup_area || booking.pickup || 'Pickup Area';
+    const drop = booking.dropLocation || booking.drop_location || booking.destination || 'Drop Location';
+    const fare = booking.fare !== undefined ? booking.fare : (booking.calculated_fare !== undefined ? booking.calculated_fare : (booking.totalFare || 0));
 
     if (booking.status === 'Cancelled') {
       const cancelMsg = `🚖 *BOOK DRIVER ANNA - BOOKING CANCELLED* 🚖\n\n` +
-        `Namaskara *${booking.customerName}*,\n` +
+        `Namaskara *${clientName}*,\n` +
         `Your driver booking request (Ref: ${booking.id}) has been cancelled. Zero cancellation charges apply.\n\n` +
         `If this cancellation was unexpected or you need a replacement driver, please reach our 24x7 helpdesk at +91 80 2555 0199. Thank you!`;
       window.open(`https://api.whatsapp.com/send?phone=${cleanClientPhone}&text=${encodeURIComponent(cancelMsg)}`, '_blank');
@@ -1158,16 +1202,16 @@ export default function AdminPage({ onReturnToClient }) {
     const driverPhone = booking.assignedDriverPhone || "+91 80 2555 0199";
 
     const message = `🚖 *BOOK DRIVER ANNA - TRIP ACCEPTED* 🚖\n\n` +
-      `Namaskara *${booking.customerName}*,\n` +
+      `Namaskara *${clientName}*,\n` +
       `Your driver booking request has been accepted & assigned!\n\n` +
       `📌 *Booking Ref:* ${booking.id}\n` +
       `👨‍✈️ *Assigned Driver:* ${driverName}\n` +
       `📞 *Driver Contact:* ${driverPhone}\n` +
-      `📍 *Pickup Area:* ${booking.pickupArea}\n` +
-      `🏁 *Drop Location:* ${booking.dropLocation}\n` +
+      `📍 *Pickup Area:* ${pickup}\n` +
+      `🏁 *Drop Location:* ${drop}\n` +
       (booking.passengers ? `🚗 *Vehicle Specs:* ${booking.acPreference || 'AC'} (${booking.passengers}, ${booking.luggage || 'No Luggage'})\n` : '') +
       `📅 *Pickup Schedule:* ${toDDMMYYYY(booking.date)} at ${booking.time}\n` +
-      `💰 *Estimated Fare:* ₹${booking.fare}\n\n` +
+      `💰 *Estimated Fare:* ₹${fare}\n\n` +
       `Thank you for choosing Book Driver Anna! Safe Journey!`;
 
     window.open(`https://api.whatsapp.com/send?phone=${cleanClientPhone}&text=${encodeURIComponent(message)}`, '_blank');
@@ -1333,17 +1377,28 @@ export default function AdminPage({ onReturnToClient }) {
     window.open(`https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // Filtered driver bookings (Strictly personal driver duties, exclude driving class enrollments)
-  const filteredDriverBookings = driverBookings.filter(b => {
-    if (b.tripType === 'class' || b.booking_type === 'class' || (b.id && b.id.startsWith('BDA-CLS-'))) {
-      return false;
-    }
-    const matchesSearch = (b.customerName || '').toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
-                          (b.id || '').toLowerCase().includes(driverSearchQuery.toLowerCase()) ||
-                          (b.pickupArea || '').toLowerCase().includes(driverSearchQuery.toLowerCase());
-    const matchesStatus = driverStatusFilter === 'All' || b.status === driverStatusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Filtered driver bookings (Strictly personal driver duties, exclude driving class enrollments and vehicle rentals)
+  const filteredDriverBookings = driverBookings
+    .filter(b => {
+      if (
+        b.tripType === 'class' || 
+        b.booking_type === 'class' || 
+        b.tripType === 'vehicle' || 
+        b.booking_type === 'vehicle' || 
+        (b.id && (b.id.startsWith('BDA-CLS-') || b.id.startsWith('BDA-VEH-')))
+      ) {
+        return false;
+      }
+      const custName = (b.customerName || b.customer_name || '').toLowerCase();
+      const bId = (b.id || '').toLowerCase();
+      const pickup = (b.pickupArea || b.pickup_area || '').toLowerCase();
+      const matchesSearch = custName.includes(driverSearchQuery.toLowerCase()) ||
+                            bId.includes(driverSearchQuery.toLowerCase()) ||
+                            pickup.includes(driverSearchQuery.toLowerCase());
+      const matchesStatus = driverStatusFilter === 'All' || b.status === driverStatusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .map(normalizeDriverBooking);
 
   // Filtered vehicle bookings
   const filteredVehicleBookings = vehicleBookings.filter(b => {
