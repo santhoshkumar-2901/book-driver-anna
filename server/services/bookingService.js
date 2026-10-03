@@ -8,7 +8,7 @@ import { publishBookingAssignmentChange } from './realtimeService.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
-  'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
+  'PENDING': ['ASSIGNED', 'CONFIRMED', 'IN_PROGRESS', 'CANCELLED'],
   'CONFIRMED': ['ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED'],
   'ASSIGNED': ['ARRIVED', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'],
   'ARRIVED': ['IN_PROGRESS', 'COMPLETED', 'CONFIRMED', 'CANCELLED'],

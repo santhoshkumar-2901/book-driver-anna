@@ -46,12 +46,12 @@ export function errorHandler(err, req, res, next) {
   }
 
   // Sanitize message for client (strip sensitive SQL keywords, table schemas, and server filesystem paths)
-  const SENSITIVE_PATTERNS = /(\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bFROM\b|\bWHERE\b|sqlite|tidb|syntax error|check constraint|\/home\/|[a-zA-Z]:\\)/i;
+  const SENSITIVE_PATTERNS = /(\bSELECT\s+[\*\w\s,._`"-]+\s+FROM\b|\bINSERT\s+INTO\b|\bUPDATE\s+[\w`"-]+\s+SET\b|\bDELETE\s+FROM\b|sqlite|tidb|syntax error|check constraint|\/home\/|[a-zA-Z]:\\)/i;
 
   let clientMessage = err.message || 'An error occurred processing your request.';
   if (statusCode >= 500 && ENV.IS_PRODUCTION) {
     clientMessage = 'An unexpected error occurred. Our engineering team has been notified.';
-  } else if (SENSITIVE_PATTERNS.test(clientMessage) && (statusCode >= 500 || ENV.IS_PRODUCTION)) {
+  } else if (SENSITIVE_PATTERNS.test(clientMessage) && (statusCode >= 500 || SENSITIVE_PATTERNS.test(err.message || ''))) {
     clientMessage = 'A database error occurred processing your request.';
   }
 

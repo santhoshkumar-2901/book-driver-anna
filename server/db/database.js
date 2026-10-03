@@ -416,7 +416,7 @@ export async function execute(sql, params = []) {
     await ensureDatabaseReady();
     const res = await tidbConn.execute(sql, params);
     return {
-      affectedRows: res?.rowsAffected ?? 0,
+      affectedRows: res?.rowsAffected ?? res?.affectedRows ?? 0,
       insertId: res?.lastInsertId ?? null,
       raw: res
     };
