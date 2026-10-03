@@ -160,8 +160,8 @@ describe('Phase 21: Mobile UX Hardening Suite', () => {
     const content = fs.readFileSync(driverPortalPath, 'utf8');
     assert.match(content, /Call Customer[\s\S]*?min-h-\[44px\]/, 'Call Customer button must have min-h-[44px]');
     assert.match(content, /End Ride & Settle Fare[\s\S]*?min-h-\[44px\]/, 'End Ride button must have min-h-[44px]');
-    assert.match(content, /Start Trip \(Run Meter\)[\s\S]*?min-h-\[44px\]/, 'Start Trip button must have min-h-[44px]');
-    assert.match(content, /Mark Arrived[\s\S]*?min-h-\[44px\]/, 'Mark Arrived button must have min-h-[44px]');
+    assert.match(content, /Start Trip[\s\S]*?min-h-\[44px\]/, 'Start Trip button must have min-h-[44px]');
+    assert.doesNotMatch(content, /arrivingTripId === \(trip\.bookingId/, 'Mark Arrived button must be removed from duty card');
     assert.match(content, /Accept Duty \(Anna\)[\s\S]*?min-h-\[44px\]/, 'Accept Duty button must have min-h-[44px]');
   });
 

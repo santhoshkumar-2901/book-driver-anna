@@ -1212,31 +1212,14 @@ export default function DriverPortalPage({
                         <Check className="w-4 h-4" />
                         <span>End Ride & Settle Fare</span>
                       </button>
-                    ) : String(trip.status || '').toLowerCase() === 'arrived' ? (
+                    ) : (
                       <button
                         onClick={() => handleStartTrip(trip.bookingId || trip.id)}
                         disabled={startingTripId === (trip.bookingId || trip.id)}
                         className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
                       >
-                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip (Run Meter)'}
+                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip'}
                       </button>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:flex-1">
-                        <button
-                          onClick={() => handleMarkArrived(trip.bookingId || trip.id)}
-                          disabled={arrivingTripId === (trip.bookingId || trip.id)}
-                          className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all cursor-pointer text-center disabled:opacity-50 min-h-[44px] touch-manipulation"
-                        >
-                          {arrivingTripId === (trip.bookingId || trip.id) ? 'Marking...' : 'Mark Arrived'}
-                        </button>
-                        <button
-                          onClick={() => handleStartTrip(trip.bookingId || trip.id)}
-                          disabled={startingTripId === (trip.bookingId || trip.id)}
-                          className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
-                        >
-                          {startingTripId === (trip.bookingId || trip.id) ? 'Starting...' : 'Start Trip'}
-                        </button>
-                      </div>
                     )}
                   </div>
                 </div>
