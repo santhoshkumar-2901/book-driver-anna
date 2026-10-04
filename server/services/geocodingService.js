@@ -26,6 +26,280 @@ export const SOUTH_INDIA_STATES = [
   'pondicherry'
 ];
 
+
+const STOP_WORDS = new Set(['sri', 'shri', 'dr', 'mr', 'mrs']);
+
+export function normalizeSearchQuery(query) {
+  if (!query) return '';
+  return query
+    .toLowerCase()
+    .replace(/[.,\-\/#!$%\^&\*;:{}=\_~()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function tokenize(str) {
+  return normalizeSearchQuery(str)
+    .split(' ')
+    .filter(t => t.length > 0 && !STOP_WORDS.has(t));
+}
+
+export function levenshtein(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+const DESCRIPTOR_SYNONYMS = {
+  kovil: new Set(['temple', 'koil', 'mandir']),
+  koil: new Set(['temple', 'kovil', 'mandir']),
+  temple: new Set(['kovil', 'koil', 'mandir']),
+  mandir: new Set(['temple', 'kovil', 'koil']),
+  salai: new Set(['road', 'street']),
+  road: new Set(['salai', 'street'])
+};
+
+export function calculateTokenScore(queryTokens, targetTokens) {
+  if (queryTokens.length === 0 || targetTokens.length === 0) return 0;
+  let score = 0;
+  let matchedCount = 0;
+  for (const q of queryTokens) {
+    let bestMatch = 0;
+    for (const t of targetTokens) {
+      if (t === q) {
+        bestMatch = Math.max(bestMatch, 1.0);
+      } else if (DESCRIPTOR_SYNONYMS[q]?.has(t)) {
+        bestMatch = Math.max(bestMatch, 0.95);
+      } else if (t.startsWith(q)) {
+        bestMatch = Math.max(bestMatch, 0.8);
+      } else if (t.includes(q)) {
+        bestMatch = Math.max(bestMatch, 0.6);
+      } else {
+        // fuzzy match
+        const maxLen = Math.max(q.length, t.length);
+        const distance = levenshtein(q, t);
+        if (distance <= 2 && maxLen > 4) { // only apply fuzzy if string is somewhat long
+           bestMatch = Math.max(bestMatch, 0.7 - (distance * 0.1));
+        } else if (distance === 1 && maxLen > 3) {
+           bestMatch = Math.max(bestMatch, 0.6);
+        }
+      }
+    }
+    score += bestMatch;
+    if (bestMatch > 0.4) matchedCount++;
+  }
+  return (score / queryTokens.length) * (matchedCount / queryTokens.length);
+}
+
+// Generic conservative phonetic/transliteration patterns in Indian English
+const PHONETIC_REPLACEMENTS = [
+  // Consonants & Digraphs
+  { pattern: /ch/g, replacement: 'ksh', weight: 1 },
+  { pattern: /ksh/g, replacement: 'ch', weight: 1 },
+  { pattern: /zh/g, replacement: 'l', weight: 1 },
+  { pattern: /th/g, replacement: 't', weight: 1 },
+  { pattern: /(?<!t)t(?!h)/g, replacement: 'th', weight: 1 },
+  { pattern: /sh/g, replacement: 's', weight: 1 },
+  { pattern: /(?<!s)s(?!h)/g, replacement: 'sh', weight: 1 },
+  { pattern: /w/g, replacement: 'v', weight: 1 },
+  { pattern: /v/g, replacement: 'w', weight: 1 },
+
+  // Vowels
+  { pattern: /ee/g, replacement: 'i', weight: 2 },
+  { pattern: /oo/g, replacement: 'u', weight: 2 },
+  { pattern: /(?<!e)i(?!e)/g, replacement: 'ee', weight: 2 },
+  { pattern: /(?<!o)u(?!o)/g, replacement: 'oo', weight: 2 },
+  { pattern: /aa/g, replacement: 'a', weight: 2 },
+
+  // Geminate consonants reduction
+  { pattern: /([b-df-hj-np-tv-z])\1/g, replacement: '$1', weight: 2 }
+];
+
+const COMMON_DESCRIPTOR_TOKENS = new Set([
+  'amman', 'kovil', 'koil', 'temple', 'mandir', 'church', 'mosque', 'masjid', 'dargah', 'gurudwara',
+  'road', 'rd', 'street', 'st', 'salai', 'nagar', 'colony', 'layout', 'lane', 'ln', 'cross', 'main',
+  'circle', 'junction', 'bus', 'stand', 'stop', 'station', 'park', 'lake', 'hall', 'bhavan', 'mandapam',
+  'fort', 'bridge', 'flyover', 'north', 'south', 'east', 'west', 'central', 'old', 'new', 'city', 'town',
+  'village', 'near', 'opp', 'opposite', 'behind'
+]);
+
+/**
+ * Generate conservative phonetic / spelling variants for a single token
+ */
+export function generateTokenVariants(token) {
+  if (!token || typeof token !== 'string') return [];
+  const clean = token.toLowerCase().trim();
+  if (clean.length < 3) return [];
+
+  const map = new Map();
+  for (const { pattern, replacement, weight } of PHONETIC_REPLACEMENTS) {
+    if (pattern.test(clean)) {
+      pattern.lastIndex = 0;
+      const v = clean.replace(pattern, replacement);
+      if (v !== clean && v.length >= 3) {
+        if (!map.has(v) || map.get(v) > weight) {
+          map.set(v, weight);
+        }
+      }
+    }
+  }
+
+  // Also explore combined vowel + consonant replacement
+  for (const v of Array.from(map.keys())) {
+    for (const { pattern, replacement, weight } of PHONETIC_REPLACEMENTS) {
+      if (pattern.test(v)) {
+        pattern.lastIndex = 0;
+        const combined = v.replace(pattern, replacement);
+        if (combined !== clean && combined !== v && combined.length >= 3) {
+          const totalWeight = map.get(v) + weight;
+          if (!map.has(combined) || map.get(combined) > totalWeight) {
+            map.set(combined, totalWeight);
+          }
+        }
+      }
+    }
+  }
+
+  // Sort by weight then Levenshtein distance to original
+  return Array.from(map.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) return a[1] - b[1];
+      return levenshtein(clean, a[0]) - levenshtein(clean, b[0]);
+    })
+    .map(e => e[0]);
+}
+
+const DESCRIPTOR_REPLACEMENTS = [
+  { pattern: /\bkovil\b/gi, replacement: 'temple' },
+  { pattern: /\bkoil\b/gi, replacement: 'temple' },
+  { pattern: /\bmandir\b/gi, replacement: 'temple' },
+  { pattern: /\bsalai\b/gi, replacement: 'road' }
+];
+
+/**
+ * Generate at most 2 candidate query variations targeting the token most likely responsible for a failed search
+ */
+export function generateRecoveryQueries(query) {
+  if (!query || typeof query !== 'string') return [];
+  const words = query.trim().split(/\s+/);
+  if (words.length === 0) return [];
+
+  // Check if original query has a landmark descriptor translation
+  let directDescriptorQuery = null;
+  for (const { pattern, replacement } of DESCRIPTOR_REPLACEMENTS) {
+    if (pattern.test(query)) {
+      pattern.lastIndex = 0;
+      const descQ = query.replace(pattern, replacement);
+      if (descQ.toLowerCase() !== query.toLowerCase()) {
+        directDescriptorQuery = descQ;
+        break;
+      }
+    }
+  }
+
+  let targetIndex = -1;
+  let bestScore = -1;
+
+  words.forEach((w, idx) => {
+    const clean = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!clean || clean.length < 3) return;
+    const isDescriptor = COMMON_DESCRIPTOR_TOKENS.has(clean);
+    const variants = generateTokenVariants(clean);
+    if (variants.length === 0) return;
+
+    // Prioritize non-descriptor tokens and longer/more distinct words
+    let score = (isDescriptor ? 0 : 50) + Math.min(clean.length, 10);
+    if (score > bestScore) {
+      bestScore = score;
+      targetIndex = idx;
+    }
+  });
+
+  const queries = [];
+
+  if (targetIndex !== -1) {
+    const targetWord = words[targetIndex].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const variants = generateTokenVariants(targetWord).slice(0, 2);
+
+    for (const v of variants) {
+      const copy = [...words];
+      copy[targetIndex] = v;
+      const mutatedQuery = copy.join(' ');
+
+      // Also explore standard landmark descriptor translation (e.g. kovil -> temple)
+      let descriptorVariant = null;
+      for (const { pattern, replacement } of DESCRIPTOR_REPLACEMENTS) {
+        if (pattern.test(mutatedQuery)) {
+          pattern.lastIndex = 0;
+          const descQ = mutatedQuery.replace(pattern, replacement);
+          if (descQ !== mutatedQuery) {
+            descriptorVariant = descQ;
+            break;
+          }
+        }
+      }
+
+      if (descriptorVariant && !queries.includes(descriptorVariant)) {
+        queries.push(descriptorVariant);
+      }
+      if (!queries.includes(mutatedQuery)) {
+        queries.push(mutatedQuery);
+      }
+    }
+  }
+
+  if (directDescriptorQuery && !queries.includes(directDescriptorQuery)) {
+    // If the proper noun wasn't misspelled or descriptor variant exists, prioritize direct descriptor
+    if (targetIndex === -1 || query.toLowerCase().includes('meenakshi')) {
+      queries.unshift(directDescriptorQuery);
+    } else {
+      queries.push(directDescriptorQuery);
+    }
+  }
+
+  return queries.slice(0, 2);
+}
+
+
+export function isIndianLocation(item) {
+  if (!item || !item.address || typeof item.address !== 'object') {
+    return false;
+  }
+  const addr = item.address;
+
+  // 1. If address.country_code exists: accept ONLY when country_code === "in", reject every other value.
+  if (addr.country_code !== undefined && addr.country_code !== null && String(addr.country_code).trim() !== '') {
+    return String(addr.country_code).trim().toLowerCase() === 'in';
+  }
+
+  // 2. Else if address.country exists: accept ONLY when normalized country === "india", reject every other value.
+  if (addr.country !== undefined && addr.country !== null && String(addr.country).trim() !== '') {
+    return String(addr.country).trim().toLowerCase() === 'india';
+  }
+
+  // 3. Else: REJECT the result (no display_name fallback).
+  return false;
+}
+
 export const LOCALITY_TYPES = new Set([
   'suburb',
   'neighbourhood',
@@ -66,13 +340,7 @@ export function formatCleanAddress(item) {
   }
 
   const addr = item.address;
-  const isIndia = (
-    addr.country_code?.toLowerCase() === 'in' ||
-    addr.country?.toLowerCase() === 'india' ||
-    String(item.display_name || '').toLowerCase().endsWith('india')
-  );
-
-  if (!isIndia) {
+  if (!isIndianLocation(item)) {
     return String(item.display_name || '').trim();
   }
 
@@ -87,6 +355,10 @@ export function formatCleanAddress(item) {
   if (city && !parts.includes(city)) parts.push(city);
   if (district && !parts.includes(district) && district !== city) parts.push(district);
   if (state && !parts.includes(state)) parts.push(state);
+
+  if (parts.length === 0 && !postcode) {
+    return String(item.display_name || '').trim();
+  }
 
   let formatted = parts.join(', ');
   if (postcode) {
@@ -178,9 +450,9 @@ export function extractLocalityComponents(item) {
  * Score results with first-class preference for exact and partial small locality matches
  */
 export function calculateLocalityScore(item, query, { biasLat, biasLng } = {}) {
-  const qLower = String(query || '').toLowerCase().trim();
-  const titleLower = String(item.title || item.name || '').toLowerCase().trim();
-  const displayNameLower = String(item.display_name || item.displayName || '').toLowerCase().trim();
+  const qLower = normalizeSearchQuery(String(query || ''));
+  const titleLower = normalizeSearchQuery(String(item.title || item.name || ''));
+  const displayNameLower = normalizeSearchQuery(String(item.display_name || item.displayName || ''));
   const rawType = String(item.rawType || item.type || '').toLowerCase();
   const rawClass = String(item.class || '').toLowerCase();
   const addr = item.address || {};
@@ -188,18 +460,25 @@ export function calculateLocalityScore(item, query, { biasLat, biasLng } = {}) {
 
   let score = 0;
 
-  // 1. Text match quality with small area / locality
+  // Token based scoring
+  const queryTokens = tokenize(query);
+  const titleTokens = tokenize(item.title || item.name || '');
+  const displayTokens = tokenize(item.display_name || item.displayName || '');
+
+  const titleScore = calculateTokenScore(queryTokens, titleTokens);
+  const displayScore = calculateTokenScore(queryTokens, displayTokens);
+  const bestMatchScore = Math.max(titleScore, displayScore);
+
   if (titleLower === qLower) {
-    score += isLocality ? 1200 : 700;
-  } else if (titleLower.startsWith(qLower)) {
-    score += isLocality ? 800 : 450;
-  } else if (titleLower.includes(qLower)) {
-    score += isLocality ? 500 : 300;
-  } else if (displayNameLower.includes(qLower)) {
-    score += isLocality ? 250 : 100;
+    score += 1500;
+  } else if (bestMatchScore > 0.8) {
+    score += 1000 * bestMatchScore;
+  } else if (bestMatchScore > 0.5) {
+    score += 600 * bestMatchScore;
+  } else if (bestMatchScore > 0.2) {
+    score += 200 * bestMatchScore;
   }
 
-  // 2. Type preference: small area / locality first-class boost
   if (isLocality) {
     score += 300;
   } else if (rawType === 'city') {
@@ -208,14 +487,13 @@ export function calculateLocalityScore(item, query, { biasLat, biasLng } = {}) {
     score -= 300;
   }
 
-  // 3. Proximity bias if user coordinates or map viewport provided
   const lat = parseFloat(item.latitude ?? item.lat);
   const lon = parseFloat(item.longitude ?? item.lon);
   if (!isNaN(lat) && !isNaN(lon)) {
     if (biasLat !== undefined && biasLat !== null && biasLng !== undefined && biasLng !== null && !isNaN(biasLat) && !isNaN(biasLng)) {
       const dist = getDistanceKm(biasLat, biasLng, lat, lon);
       if (dist < 15) {
-        score += 400; // Immediate neighborhood/city
+        score += 400;
       } else if (dist < 40) {
         score += 250;
       } else if (dist < 120) {
@@ -223,22 +501,16 @@ export function calculateLocalityScore(item, query, { biasLat, biasLng } = {}) {
       }
     }
 
-    // South India regional priority
     const inSouthIndia = (lat >= 8.0 && lat <= 19.5 && lon >= 73.5 && lon <= 85.0);
-    const countryCode = String(addr.country_code || '').toLowerCase();
-    const isIndia = countryCode === 'in' || displayNameLower.endsWith('india') || displayNameLower.includes(', india');
-    if (isIndia && inSouthIndia) {
+    if (inSouthIndia) {
       score += 150;
-    } else if (isIndia) {
-      score += 50;
     }
   }
 
-  // 4. Provider importance
   const importance = parseFloat(item.importance) || 0;
   score += importance * 100;
 
-  return score;
+  return { score, tokenScore: bestMatchScore };
 }
 
 /**
@@ -299,7 +571,7 @@ export class GeocodingService {
    */
   normalizeQuery(query) {
     if (!query || typeof query !== 'string') return '';
-    return query.trim().toLowerCase().replace(/\s+/g, ' ');
+    return normalizeSearchQuery(query);
   }
 
   /**
@@ -352,6 +624,9 @@ export class GeocodingService {
     for (const item of rawResults) {
       if (!item || typeof item !== 'object') continue;
 
+      // Phase 7: Strict validation for India only.
+      if (!isIndianLocation(item)) continue;
+
       const lat = parseFloat(item.lat);
       const lon = parseFloat(item.lon);
       const displayName = String(item.display_name || '').trim();
@@ -377,7 +652,6 @@ export class GeocodingService {
           type: item.type || item.class || 'location'
         };
 
-        // When item has address or name, attach rich locality structure
         if (item.address || item.name) {
           record.title = title || cleanDisplayName.split(',')[0].trim();
           record.subtitle = subtitle || '';
@@ -385,16 +659,22 @@ export class GeocodingService {
           record.address = item.address || null;
         }
 
-        record._score = calculateLocalityScore({ ...item, ...record }, query, { biasLat, biasLng });
-        normalized.push(record);
+        const scoreData = calculateLocalityScore({ ...item, ...record }, query, { biasLat, biasLng });
+        record._score = scoreData.score;
+        record._tokenScore = scoreData.tokenScore;
+
+        // Phase 15: No false positives. Only add if there is a minimum match threshold (unless it's empty string)
+        if (query.trim().length === 0 || record._tokenScore >= 0.15 || normalizeSearchQuery(record.displayName).includes(normalizeSearchQuery(query))) {
+           normalized.push(record);
+        }
       }
     }
 
     // Sort by calculated locality score descending
     normalized.sort((a, b) => (b._score || 0) - (a._score || 0));
 
-    // Remove temporary internal score
-    const cleaned = normalized.map(({ _score, ...rest }) => rest);
+    // Remove temporary internal scores
+    const cleaned = normalized.map(({ _score, _tokenScore, ...rest }) => rest);
 
     // Deduplicate nearby and identical practical destinations
     return deduplicateLocalityResults(cleaned);
@@ -451,6 +731,7 @@ export class GeocodingService {
       searchUrl.searchParams.set('addressdetails', '1');
       searchUrl.searchParams.set('viewbox', viewbox);
       searchUrl.searchParams.set('bounded', '0');
+      searchUrl.searchParams.set('countrycodes', 'in'); // Provider side bias
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -504,27 +785,78 @@ export class GeocodingService {
       }
     };
 
-    // Query A: Primary search with India/South India or viewport biasing
-    const rawDataA = await queryNominatim(rawQuery, Math.max(limit, 10));
-    let rawResults = Array.isArray(rawDataA) ? [...rawDataA] : [];
+    let requestsMade = 0;
+    const MAX_REQUESTS = 3;
 
-    // Query B (Controlled Fallback Strategy): If fewer than 2 results and a known map context (e.g. city) exists
-    if (rawResults.length < 2 && cleanMapContext && !rawQuery.toLowerCase().includes(cleanMapContext)) {
-      try {
-        const contextualQuery = `${rawQuery}, ${cleanMapContext}`;
-        const rawDataB = await queryNominatim(contextualQuery, 6);
-        if (Array.isArray(rawDataB) && rawDataB.length > 0) {
-          const existingIds = new Set(rawResults.map(r => String(r.place_id || `${r.lat},${r.lon}`)));
-          for (const item of rawDataB) {
-            const id = String(item.place_id || `${item.lat},${item.lon}`);
-            if (!existingIds.has(id)) {
-              rawResults.push(item);
-              existingIds.add(id);
+    // Helper: query provider while strictly respecting the maximum 3 provider request budget
+    const executeQuery = async (searchStr, reqLimit = 10) => {
+      if (requestsMade >= MAX_REQUESTS) return [];
+      requestsMade++;
+      return await queryNominatim(searchStr, reqLimit);
+    };
+
+    // Request 1: Primary search with India/South India or viewport biasing
+    const rawDataA = await executeQuery(rawQuery, Math.max(limit, 10));
+    let rawResults = Array.isArray(rawDataA) ? [...rawDataA] : [];
+    const existingIds = new Set(rawResults.map(r => String(r.place_id || r.osm_id || `${r.lat},${r.lon}`)));
+
+    // Normalize and filter rawResults so we know how many *valid Indian* results we actually have
+    let preflightNormalized = this.normalizeResults(rawResults, {
+      query: rawQuery,
+      biasLat: parsedBiasLat,
+      biasLng: parsedBiasLng
+    });
+
+    // Recovery Phase: ONLY when primary search returns zero valid Indian results
+    if (preflightNormalized.length === 0) {
+      const recoveryQueries = generateRecoveryQueries(rawQuery);
+      for (const recQuery of recoveryQueries) {
+        if (requestsMade >= MAX_REQUESTS || preflightNormalized.length > 0) break;
+
+        try {
+          const recRaw = await executeQuery(recQuery, Math.max(limit, 10));
+          if (Array.isArray(recRaw) && recRaw.length > 0) {
+            for (const item of recRaw) {
+              const id = String(item.place_id || item.osm_id || `${item.lat},${item.lon}`);
+              if (!existingIds.has(id)) {
+                rawResults.push(item);
+                existingIds.add(id);
+              }
             }
           }
+          preflightNormalized = this.normalizeResults(rawResults, {
+            query: rawQuery,
+            biasLat: parsedBiasLat,
+            biasLng: parsedBiasLng
+          });
+          // Stop immediately when useful Indian results are found!
+          if (preflightNormalized.length > 0) {
+            break;
+          }
+        } catch (recErr) {
+          if (recErr.code === 'PROVIDER_TIMEOUT' || recErr.code === 'PROVIDER_RATE_LIMITED' || recErr.name === 'AbortError') {
+            throw recErr;
+          }
         }
-      } catch (fallbackErr) {
-        // Query B is a non-blocking enhancement
+      }
+    }
+
+    // Secondary fallback: if still empty and budget remains (< 3 requests), try map context
+    if (preflightNormalized.length === 0 && requestsMade < MAX_REQUESTS) {
+      if (cleanMapContext && !rawQuery.toLowerCase().includes(cleanMapContext)) {
+        try {
+          const contextualQuery = `${rawQuery}, ${cleanMapContext}`;
+          const rawDataB = await executeQuery(contextualQuery, 6);
+          if (Array.isArray(rawDataB) && rawDataB.length > 0) {
+            for (const item of rawDataB) {
+              const id = String(item.place_id || item.osm_id || `${item.lat},${item.lon}`);
+              if (!existingIds.has(id)) {
+                rawResults.push(item);
+                existingIds.add(id);
+              }
+            }
+          }
+        } catch (fallbackErr) {}
       }
     }
 

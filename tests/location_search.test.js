@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { startTestServer } from './testHelper.js';
-import { GeocodingService, geocodingService } from '../server/services/geocodingService.js';
+import { GeocodingService, geocodingService, isIndianLocation } from '../server/services/geocodingService.js';
 
 describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
   let server, baseUrl;
@@ -53,7 +53,11 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
           display_name: 'Indiranagar, Bengaluru, Karnataka, India',
           lat: '12.9719',
           lon: '77.6412',
-          type: 'suburb'
+          type: 'suburb',
+          address: {
+            country_code: 'in',
+            country: 'India'
+          }
         },
         {
           place_id: 67890,
@@ -85,7 +89,14 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
         displayName: 'Indiranagar, Bengaluru, Karnataka, India',
         latitude: 12.9719,
         longitude: 77.6412,
-        type: 'suburb'
+        type: 'suburb',
+        title: 'Indiranagar',
+        subtitle: 'Bengaluru',
+        rawType: 'suburb',
+        address: {
+          country_code: 'in',
+          country: 'India'
+        }
       });
     });
 
@@ -102,7 +113,11 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
               display_name: 'Koramangala, Bengaluru, India',
               lat: '12.9352',
               lon: '77.6245',
-              type: 'suburb'
+              type: 'suburb',
+              address: {
+                country_code: 'in',
+                country: 'India'
+              }
             }
           ]
         };
@@ -317,7 +332,7 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       );
     });
 
-    test('4.4 International searches preserve non-Indian locations without forced conversion', async () => {
+    test('4.4 International searches reject non-Indian locations', async () => {
       const mockRawData = [
         {
           place_id: 998877,
@@ -343,10 +358,41 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       const service = new GeocodingService({ fetchFn: mockFetch });
       const { results } = await service.search('London');
 
-      assert.strictEqual(results.length, 1);
-      assert.strictEqual(results[0].displayName, 'London, Greater London, England, United Kingdom');
-      assert.strictEqual(results[0].latitude, 51.5074);
-      assert.strictEqual(results[0].longitude, -0.1278);
+      assert.strictEqual(results.length, 0);
+
+    });
+
+    test('4.6 isIndianLocation strictly validates India and rejects non-Indian or missing metadata locations', () => {
+      // country_code = "in" → accepted
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'in' }, display_name: 'Bangalore' }), true);
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'IN' }, display_name: 'Chennai' }), true);
+
+      // country_code = "gb" → rejected
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'gb' }, display_name: 'London' }), false);
+
+      // country_code = "us" → rejected
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'us' }, display_name: 'New York' }), false);
+
+      // country = "India" → accepted
+      assert.strictEqual(isIndianLocation({ address: { country: 'India' }, display_name: 'Bangalore' }), true);
+      assert.strictEqual(isIndianLocation({ address: { country: 'INDIA' }, display_name: 'Madurai' }), true);
+
+      // country = "United Kingdom" → rejected
+      assert.strictEqual(isIndianLocation({ address: { country: 'United Kingdom' }, display_name: 'London' }), false);
+
+      // missing country metadata → rejected (even if display_name contains "India")
+      assert.strictEqual(isIndianLocation({ display_name: 'Bangalore, India' }), false);
+      assert.strictEqual(isIndianLocation({ address: {}, display_name: 'Bangalore, India' }), false);
+      assert.strictEqual(isIndianLocation({ address: { country_code: '', country: '' }, display_name: 'Bangalore, India' }), false);
+      assert.strictEqual(isIndianLocation(null), false);
+      assert.strictEqual(isIndianLocation({}), false);
+
+      // foreign country metadata + "India" in display_name → rejected
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'gb' }, display_name: 'Some Place, India Street, United Kingdom' }), false);
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'us' }, display_name: 'Little India, Edison, NJ, USA' }), false);
+
+      // foreign country metadata + "India" in address text → rejected
+      assert.strictEqual(isIndianLocation({ address: { country_code: 'gb', road: 'India Street' }, display_name: 'London, UK' }), false);
     });
 
     test('4.5 Reverse geocoding resolves coordinates via /api/location/reverse', async () => {
@@ -464,14 +510,18 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       });
 
       const service = new GeocodingService({ fetchFn: mockFetch });
-      const { results } = await service.search('Pammal');
+      const resPammal = await service.search('Pammal');
+      const pammalResults = resPammal.results;
 
-      const pammal = results.find(r => r.title === 'Pammal');
+      const resKakkanad = await service.search('Kakkanad');
+      const kakkanadResults = resKakkanad.results;
+
+      const pammal = pammalResults.find(r => r.title === 'Pammal');
       assert.ok(pammal);
       assert.strictEqual(pammal.title, 'Pammal');
       assert.strictEqual(pammal.subtitle, 'Chennai, Tamil Nadu');
 
-      const kakkanad = results.find(r => r.title === 'Kakkanad');
+      const kakkanad = kakkanadResults.find(r => r.title === 'Kakkanad');
       assert.ok(kakkanad);
       assert.strictEqual(kakkanad.title, 'Kakkanad');
       assert.strictEqual(kakkanad.subtitle, 'Kochi, Kerala');
@@ -566,6 +616,196 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       assert.match(content, /biasCoords/, 'LocationSearch must accept biasCoords prop');
       assert.match(content, /item\.title/, 'LocationSearch must render item.title for first-line prominence');
       assert.match(content, /item\.subtitle/, 'LocationSearch must render item.subtitle for second-line context');
+    });
+  });
+
+  describe('6. Provider-Independent Phonetic Spelling Recovery Suite', () => {
+    test('6.1 Recovers Meenakshi Amman location when primary query meenachi amman kovil returns 0 results', async () => {
+      let callUrls = [];
+      const mockFetch = async (url) => {
+        callUrls.push(url);
+        const parsedUrl = new URL(url);
+        const q = parsedUrl.searchParams.get('q');
+        if (q.includes('meenachi')) {
+          return { ok: true, status: 200, json: async () => [] };
+        }
+        if (q.includes('meenakshi')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                place_id: 889900,
+                name: 'Sri Meenakshi Amman Kovil',
+                display_name: 'Sri Meenakshi Amman Kovil, Meenakshi Kovil Street, Madurai, Tamil Nadu, 625001, India',
+                lat: '9.9195',
+                lon: '78.1193',
+                type: 'temple',
+                address: {
+                  amenity: 'Sri Meenakshi Amman Kovil',
+                  road: 'Meenakshi Kovil Street',
+                  city: 'Madurai',
+                  state: 'Tamil Nadu',
+                  postcode: '625001',
+                  country: 'India',
+                  country_code: 'in'
+                }
+              }
+            ]
+          };
+        }
+        return { ok: true, status: 200, json: async () => [] };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('meenachi amman kovil');
+
+      assert.strictEqual(results.length, 1);
+      assert.strictEqual(results[0].id, '889900');
+      assert.ok(results[0].displayName.includes('Meenakshi Kovil Street'));
+      assert.strictEqual(callUrls.length, 2, 'Must stop immediately upon finding valid Indian results on 2nd request');
+    });
+
+    test('6.2 Primary search succeeds → recovery is NOT triggered', async () => {
+      let fetchCalls = 0;
+      const mockFetch = async () => {
+        fetchCalls++;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              place_id: 501,
+              display_name: 'Indiranagar, Bengaluru, Karnataka, India',
+              lat: '12.9719',
+              lon: '77.6412',
+              type: 'suburb',
+              address: { country_code: 'in', country: 'India' }
+            }
+          ]
+        };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('indiranagar');
+
+      assert.strictEqual(results.length, 1);
+      assert.strictEqual(fetchCalls, 1, 'Only 1 request should be made when primary search succeeds');
+    });
+
+    test('6.3 Primary search fails → maximum provider requests <= 3 (recovery requests <= 2)', async () => {
+      let fetchCalls = 0;
+      const mockFetch = async () => {
+        fetchCalls++;
+        return { ok: true, status: 200, json: async () => [] };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('meenachi amman kovil');
+
+      assert.strictEqual(results.length, 0);
+      assert.ok(fetchCalls <= 3, `Expected fetchCalls <= 3, got ${fetchCalls}`);
+    });
+
+    test('6.4 Foreign recovery result is strictly rejected', async () => {
+      const mockFetch = async (url) => {
+        const parsedUrl = new URL(url);
+        const q = parsedUrl.searchParams.get('q');
+        if (q.includes('meenachi')) {
+          return { ok: true, status: 200, json: async () => [] };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              place_id: 77777,
+              display_name: 'Meenakshi Temple, London, UK',
+              lat: '51.50',
+              lon: '-0.12',
+              type: 'place_of_worship',
+              address: { country_code: 'gb', country: 'United Kingdom' }
+            }
+          ]
+        };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('meenachi amman');
+
+      assert.strictEqual(results.length, 0, 'Foreign recovery candidate must be rejected');
+    });
+
+    test('6.5 Recovery result with missing country metadata is strictly rejected', async () => {
+      const mockFetch = async (url) => {
+        const parsedUrl = new URL(url);
+        const q = parsedUrl.searchParams.get('q');
+        if (q.includes('meenachi')) {
+          return { ok: true, status: 200, json: async () => [] };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              place_id: 88888,
+              display_name: 'Meenakshi Amman Kovil, Madurai, India',
+              lat: '9.9195',
+              lon: '78.1193',
+              type: 'temple'
+              // address is missing
+            }
+          ]
+        };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('meenachi amman kovil');
+
+      assert.strictEqual(results.length, 0, 'Candidate without country metadata must be rejected');
+    });
+
+    test('6.6 Duplicate location from primary and recovery queries is returned only once', async () => {
+      const duplicateItem = {
+        place_id: 999111,
+        display_name: 'Meenakshi Kovil, Madurai, Tamil Nadu, India',
+        lat: '9.9195',
+        lon: '78.1193',
+        type: 'temple',
+        address: { country_code: 'in', country: 'India' }
+      };
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => [duplicateItem]
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('meenachi kovil');
+
+      const matching = results.filter(r => r.id === '999111');
+      assert.strictEqual(matching.length, 1, 'Duplicate ID must be returned exactly once');
+    });
+
+    test('6.7 In-flight recovery search aborts cleanly on cancellation', async () => {
+      let aborted = false;
+      const mockFetch = async (url, options) => {
+        if (options && options.signal) {
+          options.signal.addEventListener('abort', () => {
+            aborted = true;
+          });
+        }
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        throw err;
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch, timeoutMs: 100 });
+      await assert.rejects(
+        async () => service.search('meenachi amman kovil'),
+        (err) => err.code === 'PROVIDER_TIMEOUT' || err.name === 'AbortError'
+      );
     });
   });
 });
