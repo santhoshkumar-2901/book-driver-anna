@@ -1246,7 +1246,7 @@ export default function DriverPortalPage({
                         disabled={startingTripId === (trip.bookingId || trip.id)}
                         className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
                       >
-                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip'}
+                        {startingTripId === (trip.bookingId || trip.id) ? 'Starting Trip...' : 'Start Trip (Run Meter)'}
                       </button>
                     )}
                   </div>

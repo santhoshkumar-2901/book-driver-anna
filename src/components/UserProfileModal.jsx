@@ -93,10 +93,22 @@ export default function UserProfileModal({
   });
 
   const isMountedRef = useRef(true);
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
+  const reloadTimerRef = useRef(null);
+  const clientUserRef = useRef(clientUser);
+
+  useEffect(() => {
+    clientUserRef.current = clientUser;
+  }, [clientUser]);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+      }
     };
   }, []);
 
@@ -193,23 +205,36 @@ export default function UserProfileModal({
     }
   }, [clientUser]);
 
-  const fetchBookings = useCallback(async () => {
-    if (!isOpen || !clientUser) return;
+  const fetchBookings = useCallback(async (options = {}) => {
+    const currentUser = clientUserRef.current || clientUser;
+    if (!isOpen || !currentUser) return;
 
     // 1. If this is a seeded demo user, show the 2 demo bookings
-    if (isDemoUser(clientUser)) {
+    if (isDemoUser(currentUser)) {
       setUserBookings(DEFAULT_DEMO_BOOKINGS);
       return;
     }
+
+    // In-flight guard: prevent duplicate parallel calls
+    if (isFetchingRef.current) return;
+
+    // Cooldown guard: throttle background updates to at most once per 4 seconds unless explicitly forced
+    const now = Date.now();
+    if (!options.force && (now - lastFetchTimeRef.current < 4000)) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
 
     try {
       const storedPaid = new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
       setPaidBookingIds(storedPaid);
     } catch (e) {}
 
-    const userPhoneClean = (clientUser.phone || '').replace(/[^0-9]/g, '');
-    const userEmailClean = (clientUser.email || '').toLowerCase().trim();
-    const currentUserId = clientUser.id ? String(clientUser.id).trim() : null;
+    const userPhoneClean = (currentUser.phone || '').replace(/[^0-9]/g, '');
+    const userEmailClean = (currentUser.email || '').toLowerCase().trim();
+    const currentUserId = currentUser.id ? String(currentUser.id).trim() : null;
 
     const matched = [];
     const seenIds = new Set();
@@ -485,6 +510,7 @@ export default function UserProfileModal({
       setUserBookings(matched);
       setIsLoadingBookings(false);
     }
+    isFetchingRef.current = false;
   }, [isOpen, clientUser]);
 
   // Load user bookings whenever modal opens or bookings are updated
@@ -497,10 +523,11 @@ export default function UserProfileModal({
       return;
     }
 
-    fetchBookings();
+    // Initial load when modal opens
+    fetchBookings({ force: true });
 
-    // Cross-tab broadcast and storage event subscriber
-    const unsubscribeSync = onBookingUpdate((detail) => {
+    // Real-time synchronization when bookings or payment status updates across tabs
+    const handleSyncUpdate = (detail) => {
       if (detail && (detail.isPaid || detail.status === 'Completed')) {
         const bId = detail.bookingId || detail.id;
         if (bId) {
@@ -511,28 +538,42 @@ export default function UserProfileModal({
           });
         }
       }
-      fetchBookings();
-    });
-
-    const handleRideCompleted = (e) => {
-      const bId = e?.detail?.id || e?.detail?.bookingId;
-      if (bId) {
-        setPaidBookingIds(prev => {
-          const updated = new Set(prev);
-          updated.add(bId);
-          return updated;
-        });
+      // Debounce reload to collapse bursts of updates into a single network call
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
       }
-      fetchBookings();
+      reloadTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          fetchBookings();
+        }
+      }, 350);
     };
-    window.addEventListener('bda_ride_completed', handleRideCompleted);
 
-    // Periodic polling every 3 seconds while modal is open to ensure immediate reflection
-    const pollInterval = setInterval(fetchBookings, 3000);
+    const unsubscribeSync = onBookingUpdate(handleSyncUpdate);
+    window.addEventListener('bda_ride_completed', handleSyncUpdate);
+
+    // Refresh if tab regains focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isMountedRef.current) {
+        fetchBookings();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Gentle fallback heartbeat (60s) to keep bookings refreshed while modal is open, without spamming
+    const pollInterval = setInterval(() => {
+      if (isMountedRef.current) {
+        fetchBookings();
+      }
+    }, 60000);
 
     return () => {
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+      }
       clearInterval(pollInterval);
-      window.removeEventListener('bda_ride_completed', handleRideCompleted);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('bda_ride_completed', handleSyncUpdate);
       unsubscribeSync();
     };
   }, [isOpen, clientUser, fetchBookings]);
@@ -849,7 +890,7 @@ export default function UserProfileModal({
               {bookingsError && (
                 <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold flex items-center justify-between">
                   <span>⚠️ {bookingsError}</span>
-                  <button onClick={fetchBookings} className="underline hover:text-white cursor-pointer ml-2">Retry</button>
+                  <button onClick={() => fetchBookings({ force: true })} className="underline hover:text-white cursor-pointer ml-2">Retry</button>
                 </div>
               )}
 

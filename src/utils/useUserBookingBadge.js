@@ -150,6 +150,7 @@ export function useUserBookingBadge(clientUser) {
     return checkUserHasPendingOrConfirmedBooking(clientUser);
   });
   const lastBackendFetchRef = useRef(0);
+  const isEvaluatingRef = useRef(false);
 
   const evaluateBadge = useCallback(async ({ force = false } = {}) => {
     if (!clientUser || isDummyOrDemoUser(clientUser)) {
@@ -169,6 +170,9 @@ export function useUserBookingBadge(clientUser) {
       return;
     }
 
+    // Guard against concurrent in-flight requests
+    if (isEvaluatingRef.current) return;
+
     // 2. Query authoritative backend /api/bookings/my if local check was negative
     // Throttled to avoid flooding the backend with repetitive GET requests
     const now = Date.now();
@@ -177,6 +181,7 @@ export function useUserBookingBadge(clientUser) {
     }
 
     try {
+      isEvaluatingRef.current = true;
       lastBackendFetchRef.current = now;
       const res = await apiClient.getMyBookings();
       if (res && res.data && Array.isArray(res.data.bookings)) {
@@ -186,6 +191,8 @@ export function useUserBookingBadge(clientUser) {
       }
     } catch (err) {
       // Backend lookup fallback
+    } finally {
+      isEvaluatingRef.current = false;
     }
 
     setHasActiveBadge(false);
