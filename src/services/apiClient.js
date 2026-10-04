@@ -243,8 +243,12 @@ export const apiClient = {
     request('/chat', { method: 'POST', body: { message, history } }),
 
   // 7. Location Endpoints (Backend Proxy)
-  searchLocations: (query, { signal } = {}) => {
-    const params = new URLSearchParams({ q: query }).toString();
+  searchLocations: (query, { biasLat, biasLng, mapContext, signal } = {}) => {
+    const searchParams = { q: query };
+    if (biasLat !== undefined && biasLat !== null) searchParams.biasLat = String(biasLat);
+    if (biasLng !== undefined && biasLng !== null) searchParams.biasLng = String(biasLng);
+    if (mapContext) searchParams.mapContext = String(mapContext);
+    const params = new URLSearchParams(searchParams).toString();
     return request(`/location/search?${params}`, { method: 'GET', signal });
   },
   reverseGeocode: (latitude, longitude, { signal } = {}) => {

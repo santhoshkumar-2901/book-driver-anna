@@ -369,4 +369,203 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       assert.strictEqual(data.data.longitude, 80.2707);
     });
   });
+
+  describe('5. Small Area / Locality Search & Autocomplete Suite', () => {
+    test('5.1 Exact small locality/suburb match outranks broad city/state matches', async () => {
+      const mockRawData = [
+        {
+          place_id: 1,
+          name: 'Tamil Nadu',
+          display_name: 'Tamil Nadu, India',
+          lat: '11.00',
+          lon: '78.00',
+          type: 'administrative',
+          importance: 0.8,
+          address: { state: 'Tamil Nadu', country: 'India', country_code: 'in' }
+        },
+        {
+          place_id: 2,
+          name: 'Chennai',
+          display_name: 'Chennai, Tamil Nadu, India',
+          lat: '13.08',
+          lon: '80.27',
+          type: 'city',
+          importance: 0.75,
+          address: { city: 'Chennai', state: 'Tamil Nadu', country: 'India', country_code: 'in' }
+        },
+        {
+          place_id: 3,
+          name: 'Porur',
+          display_name: 'Porur, Chennai, Chennai District, Tamil Nadu, 600116, India',
+          lat: '13.03',
+          lon: '80.15',
+          type: 'suburb',
+          importance: 0.5,
+          address: { suburb: 'Porur', city: 'Chennai', state: 'Tamil Nadu', postcode: '600116', country: 'India', country_code: 'in' }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('Porur');
+
+      assert.ok(results.length >= 1);
+      assert.strictEqual(results[0].title, 'Porur', 'Exact locality must be ranked #1 above broad city/state');
+      assert.strictEqual(results[0].subtitle, 'Chennai, Tamil Nadu');
+      assert.strictEqual(results[0].type, 'suburb');
+    });
+
+    test('5.2 Structured two-line locality display extracts clean title and subtitle', async () => {
+      const mockRawData = [
+        {
+          place_id: 10,
+          name: 'Pammal',
+          display_name: 'Pammal, Pallavaram, Chengalpattu, Tamil Nadu, 600074, India',
+          lat: '12.9696',
+          lon: '80.1345',
+          type: 'suburb',
+          address: {
+            suburb: 'Pammal',
+            county: 'Pallavaram',
+            state_district: 'Chengalpattu',
+            state: 'Tamil Nadu',
+            postcode: '600074',
+            country: 'India',
+            country_code: 'in'
+          }
+        },
+        {
+          place_id: 20,
+          name: 'Kakkanad',
+          display_name: 'Kakkanad, Ernakulam, Kanayannur, Ernakulam, Kerala, 682030, India',
+          lat: '10.0158',
+          lon: '76.3419',
+          type: 'suburb',
+          address: {
+            suburb: 'Kakkanad',
+            city_district: 'Ernakulam',
+            state: 'Kerala',
+            postcode: '682030',
+            country: 'India',
+            country_code: 'in'
+          }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('Pammal');
+
+      const pammal = results.find(r => r.title === 'Pammal');
+      assert.ok(pammal);
+      assert.strictEqual(pammal.title, 'Pammal');
+      assert.strictEqual(pammal.subtitle, 'Chennai, Tamil Nadu');
+
+      const kakkanad = results.find(r => r.title === 'Kakkanad');
+      assert.ok(kakkanad);
+      assert.strictEqual(kakkanad.title, 'Kakkanad');
+      assert.strictEqual(kakkanad.subtitle, 'Kochi, Kerala');
+    });
+
+    test('5.3 Deduplication consolidates near-identical practical destinations within 3km', async () => {
+      const mockRawData = [
+        {
+          place_id: 101,
+          name: 'Medavakkam',
+          display_name: 'Medavakkam, Tambaram, Sholinganallur, Tamil Nadu, 600100, India',
+          lat: '12.918',
+          lon: '80.192',
+          type: 'suburb',
+          address: { suburb: 'Medavakkam', city: 'Chennai', state: 'Tamil Nadu', postcode: '600100', country: 'India', country_code: 'in' }
+        },
+        {
+          place_id: 102,
+          name: 'Medavakkam',
+          display_name: 'Medavakkam, Sivagami Nagar, First Street, Medavakkam, Sholinganallur, Tamil Nadu, 600100, India',
+          lat: '12.919',
+          lon: '80.193',
+          type: 'bus_stop',
+          address: { road: 'Medavakkam', suburb: 'Medavakkam', city: 'Chennai', state: 'Tamil Nadu', postcode: '600100', country: 'India', country_code: 'in' }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('Medavakkam');
+
+      assert.strictEqual(results.length, 1, 'Near-identical locality records within 3km must be deduplicated');
+      assert.strictEqual(results[0].title, 'Medavakkam');
+      assert.strictEqual(results[0].type, 'suburb', 'More specific suburb record must take precedence over bus stop');
+    });
+
+    test('5.4 Viewport / user coordinates bias ambiguous localities (Ram Nagar)', async () => {
+      const mockRawData = [
+        {
+          place_id: 201,
+          name: 'Ram Nagar',
+          display_name: 'Ram Nagar, Coimbatore, Tamil Nadu, India',
+          lat: '11.0168',
+          lon: '76.9558',
+          type: 'suburb',
+          address: { suburb: 'Ram Nagar', city: 'Coimbatore', state: 'Tamil Nadu', country: 'India', country_code: 'in' }
+        },
+        {
+          place_id: 202,
+          name: 'Ram Nagar',
+          display_name: 'Ram Nagar, Chennai, Tamil Nadu, India',
+          lat: '12.9800',
+          lon: '80.1800',
+          type: 'suburb',
+          address: { suburb: 'Ram Nagar', city: 'Chennai', state: 'Tamil Nadu', country: 'India', country_code: 'in' }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      // When biased near Coimbatore coordinates (11.01, 76.95)
+      const resCoimbatore = await service.search('Ram Nagar', { biasLat: 11.01, biasLng: 76.95 });
+      assert.strictEqual(resCoimbatore.results[0].subtitle, 'Coimbatore, Tamil Nadu');
+
+      // When biased near Chennai coordinates (13.08, 80.27)
+      const resChennai = await service.search('Ram Nagar', { biasLat: 13.08, biasLng: 80.27 });
+      assert.strictEqual(resChennai.results[0].subtitle, 'Chennai, Tamil Nadu');
+    });
+
+    test('5.5 /api/location/search accepts bias coordinates and passes them to service', async () => {
+      const res = await fetch(`${baseUrl}/api/location/search?q=Adyar&biasLat=13.00&biasLng=80.25`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.success, true);
+      assert.ok(Array.isArray(data.data));
+    });
+
+    test('5.6 LocationSearch component accepts biasCoords and supports two-line rendering', () => {
+      const componentPath = path.resolve('src/components/map/LocationSearch.jsx');
+      const content = fs.readFileSync(componentPath, 'utf8');
+
+      assert.match(content, /biasCoords/, 'LocationSearch must accept biasCoords prop');
+      assert.match(content, /item\.title/, 'LocationSearch must render item.title for first-line prominence');
+      assert.match(content, /item\.subtitle/, 'LocationSearch must render item.subtitle for second-line context');
+    });
+  });
 });

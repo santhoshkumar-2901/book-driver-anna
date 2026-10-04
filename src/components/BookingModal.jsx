@@ -857,6 +857,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       id="pickup-location-search"
                       placeholder="Search pickup area, street, or landmark..."
                       onSelect={handleSelectPickup}
+                      biasCoords={customerLocation || (destinationLocation ? { latitude: destinationLocation.latitude, longitude: destinationLocation.longitude } : null)}
                     />
                   )}
                 </div>
@@ -905,6 +906,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       id="destination-location-search"
                       placeholder="Search destination area, street, or landmark..."
                       onSelect={handleSelectDestination}
+                      biasCoords={pickupLocation ? { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude } : customerLocation}
                     />
                   )}
                 </div>

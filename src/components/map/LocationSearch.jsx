@@ -13,7 +13,9 @@ export default function LocationSearch({
   onSelect,
   initialValue = '',
   className = '',
-  id = 'location-search-input'
+  id = 'location-search-input',
+  biasCoords = null,
+  mapContext = ''
 }) {
   const [query, setQuery] = useState(initialValue);
   const [results, setResults] = useState([]);
@@ -46,7 +48,7 @@ export default function LocationSearch({
     };
   }, []);
 
-  // Perform backend search with AbortController
+  // Perform backend search with AbortController and optional viewport biasing
   const performSearch = useCallback(async (searchQuery) => {
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
@@ -66,8 +68,16 @@ export default function LocationSearch({
     setLoading(true);
     setError(null);
 
+    const biasLat = biasCoords?.latitude ?? biasCoords?.lat;
+    const biasLng = biasCoords?.longitude ?? biasCoords?.lng;
+
     try {
-      const response = await apiClient.searchLocations(trimmed, { signal: abortController.signal });
+      const response = await apiClient.searchLocations(trimmed, {
+        biasLat,
+        biasLng,
+        mapContext,
+        signal: abortController.signal
+      });
       if (abortControllerRef.current === abortController) {
         if (response && response.success && Array.isArray(response.data)) {
           setResults(response.data);
@@ -91,7 +101,7 @@ export default function LocationSearch({
         setLoading(false);
       }
     }
-  }, []);
+  }, [biasCoords, mapContext]);
 
   // Debounced query change handler (350ms delay)
   const handleInputChange = (e) => {
@@ -234,10 +244,10 @@ export default function LocationSearch({
                   <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-100 font-medium truncate">
-                      {item.displayName.split(',')[0]}
+                      {item.title || item.displayName.split(',')[0]}
                     </p>
                     <p className="text-[11px] text-slate-400 truncate">
-                      {item.displayName}
+                      {item.subtitle || item.displayName}
                     </p>
                   </div>
                   {item.type && (

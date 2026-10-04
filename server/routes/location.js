@@ -35,7 +35,17 @@ router.get('/search', locationRateLimiter, async (req, res, next) => {
       });
     }
 
-    const { results, fromCache } = await geocodingService.search(rawQuery, { limit: 5 });
+    const biasLat = req.query.biasLat ?? req.query.lat ?? req.query.latitude;
+    const biasLng = req.query.biasLng ?? req.query.lng ?? req.query.lon ?? req.query.longitude;
+    const mapContext = req.query.mapContext ?? req.query.city;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 10) : 8;
+
+    const { results, fromCache } = await geocodingService.search(rawQuery, {
+      limit,
+      biasLat: biasLat !== undefined && biasLat !== '' ? parseFloat(biasLat) : undefined,
+      biasLng: biasLng !== undefined && biasLng !== '' ? parseFloat(biasLng) : undefined,
+      mapContext
+    });
 
     res.json({
       success: true,
