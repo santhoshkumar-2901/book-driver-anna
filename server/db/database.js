@@ -414,9 +414,9 @@ export async function queryAll(sql, params = []) {
 export async function execute(sql, params = []) {
   if (isTiDB) {
     await ensureDatabaseReady();
-    const res = await tidbConn.execute(sql, params);
+    const res = await tidbConn.execute(sql, params, { fullResult: true });
     return {
-      affectedRows: res?.rowsAffected ?? res?.affectedRows ?? 0,
+      affectedRows: res?.rowsAffected ?? res?.rowCount ?? res?.affectedRows ?? 0,
       insertId: res?.lastInsertId ?? null,
       raw: res
     };
@@ -462,10 +462,11 @@ export async function withTransaction(callback) {
           return Array.isArray(rows) ? normalizeRows(rows) : [];
         },
         execute: async (sql, params = []) => {
-          const res = await tx.execute(sql, params);
+          const res = await tx.execute(sql, params, { fullResult: true });
           return {
-            affectedRows: res?.rowsAffected ?? 0,
-            insertId: res?.lastInsertId ?? null
+            affectedRows: res?.rowsAffected ?? res?.rowCount ?? res?.affectedRows ?? 0,
+            insertId: res?.lastInsertId ?? null,
+            raw: res
           };
         }
       };

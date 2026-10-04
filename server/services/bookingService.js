@@ -514,16 +514,21 @@ export async function updateBookingStatus({
       err.code = 'BOOKING_NOT_FOUND';
       throw err;
     }
-    if (current.status === 'COMPLETED' || current.status === 'CANCELLED') {
+    // If the booking is already in the desired status (idempotent retry or MySQL reported 0 rows changed),
+    // treat it as successful and return current record
+    if (String(current.status).toUpperCase() === normalizedNewStatus) {
+      // Successfully in target status already; continue to audit log and return updated
+    } else if (current.status === 'COMPLETED' || current.status === 'CANCELLED') {
       const err = new Error(`Cannot modify or transition booking in terminal '${current.status}' status.`);
       err.statusCode = 400;
       err.code = 'INVALID_STATE_TRANSITION';
       throw err;
+    } else {
+      const err = new Error('Booking could not be updated due to a concurrent state change.');
+      err.statusCode = 409;
+      err.code = 'CONCURRENT_MODIFICATION';
+      throw err;
     }
-    const err = new Error('Booking could not be updated due to a concurrent state change.');
-    err.statusCode = 409;
-    err.code = 'CONCURRENT_MODIFICATION';
-    throw err;
   }
 
   await logAuditEvent({

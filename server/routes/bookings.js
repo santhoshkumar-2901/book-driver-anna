@@ -380,13 +380,18 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     `, [paymentMode || null, bookingId]);
 
     if (result.affectedRows === 0) {
-      return res.status(409).json({
-        success: false,
-        error: {
-          code: 'CONCURRENT_MODIFICATION',
-          message: 'Booking state changed concurrently. Completion failed.'
-        }
-      });
+      const current = await queryOne('SELECT status FROM bookings WHERE id = ?', [bookingId]);
+      if (current && current.status === 'COMPLETED') {
+        // Idempotent success
+      } else {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'CONCURRENT_MODIFICATION',
+            message: 'Booking state changed concurrently. Completion failed.'
+          }
+        });
+      }
     }
 
     await logAuditEvent({
