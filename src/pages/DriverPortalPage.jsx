@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Car, ShieldCheck, CheckCircle2, MapPin, Phone, LogOut, ArrowUpRight, 
   DollarSign, TrendingUp, Calendar, Clock, Award, AlertCircle, Check, X, 
@@ -255,11 +255,23 @@ export default function DriverPortalPage({
 
   const [availableDuties, setAvailableDuties] = useState([]);
 
+  const isFetchingRef = useRef(false);
+  const reloadTimerRef = useRef(null);
+  const driverUserRef = useRef(driverUser);
+
+  useEffect(() => {
+    driverUserRef.current = driverUser;
+  }, [driverUser]);
+
   // Authoritative fetch of driver duties & history from backend
-  const fetchDuties = useCallback(async () => {
-    if (!driverUser) return;
+  const fetchDuties = useCallback(async (options = {}) => {
+    const currentUser = driverUserRef.current || driverUser;
+    if (!currentUser) return;
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsLoadingDuties(true);
     setDutiesError(null);
+
     try {
       // 1. Fetch duties assigned to this driver
       const res = await apiClient.getDriverDuties();
@@ -277,7 +289,7 @@ export default function DriverPortalPage({
         setAcceptedTrips(formatted);
         setPastTrips(historicalDuties.map(formatDuty));
 
-        // Update non-authoritative convenience cache with fresh backend data
+        // Update non-authoritative convenience cache ONLY if changed to prevent storage event loops
         try {
           const onlyDriverDuties = serverDuties
             .filter(b => b.booking_type === 'driver' || (!b.booking_type && !b.id?.startsWith('BDA-VEH-') && !b.id?.startsWith('BDA-CLS-')))
@@ -290,7 +302,11 @@ export default function DriverPortalPage({
               fare: b.calculated_fare !== undefined ? b.calculated_fare : (b.fare !== undefined ? b.fare : 0),
               tripTitle: b.service_name || b.tripTitle || 'Driver Service'
             }));
-          localStorage.setItem('bda_driver_bookings', JSON.stringify(onlyDriverDuties));
+          const serialized = JSON.stringify(onlyDriverDuties);
+          const existing = localStorage.getItem('bda_driver_bookings');
+          if (existing !== serialized) {
+            localStorage.setItem('bda_driver_bookings', serialized);
+          }
         } catch (e) {}
       } else {
         setAcceptedTrips([]);
@@ -315,22 +331,25 @@ export default function DriverPortalPage({
         console.warn('[DRIVER PORTAL] Failed to fetch available duties:', aErr.message);
       }
 
-      // Query dedicated bounded history endpoint if available
-      try {
-        const historyRes = await apiClient.getDriverHistory();
-        if (historyRes && historyRes.data && Array.isArray(historyRes.data.history)) {
-          setPastTrips(historyRes.data.history.map(formatDuty));
+      // 3. Query dedicated bounded history endpoint ONLY when on history tab or explicitly requested
+      if (options.includeHistory || dutiesTab === 'history') {
+        try {
+          const historyRes = await apiClient.getDriverHistory();
+          if (historyRes && historyRes.data && Array.isArray(historyRes.data.history)) {
+            setPastTrips(historyRes.data.history.map(formatDuty));
+          }
+        } catch (hErr) {
+          // Fallback already assigned from serverDuties
         }
-      } catch (hErr) {
-        // Fallback already assigned from serverDuties
       }
     } catch (err) {
       console.warn('[DRIVER PORTAL] Failed to fetch server duties:', err.message);
       setDutiesError(err.message || 'Unable to load duties from server.');
     } finally {
       setIsLoadingDuties(false);
+      isFetchingRef.current = false;
     }
-  }, [driverUser]);
+  }, [dutiesTab, driverUser?.id]);
 
   useEffect(() => {
     fetchDuties();
@@ -338,12 +357,18 @@ export default function DriverPortalPage({
 
   // Real-time synchronization when admin assigns or modifies bookings across tabs and windows
   useEffect(() => {
-    const reloadDuties = (payload) => {
-      fetchDuties();
+    const handleDutyChange = (payload) => {
+      // Debounce reload to collapse bursts of updates into a single network call
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+      }
+      reloadTimerRef.current = setTimeout(() => {
+        fetchDuties();
+      }, 350);
 
       // Notify if a duty was just assigned to THIS driver by admin
       if (payload && (payload.bookingId || payload.id)) {
-        const currentDriver = driverUser || (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('bda_driver_user') || 'null') : null) || {};
+        const currentDriver = driverUserRef.current || (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('bda_driver_user') || 'null') : null) || {};
         if (isDutyAssignedToDriver(payload, currentDriver)) {
           setToastMessage(`🔔 New Trip Assigned! Duty #${payload.bookingId || payload.id} has been assigned to you by Dispatch Admin.`);
           setTimeout(() => setToastMessage(null), 6000);
@@ -351,18 +376,18 @@ export default function DriverPortalPage({
       }
     };
 
-    const unsubscribe = onBookingUpdate(reloadDuties);
-    window.addEventListener('storage', reloadDuties);
-    window.addEventListener('bda_booking_updated', reloadDuties);
-    window.addEventListener('bda_order_created', reloadDuties);
+    // onBookingUpdate already handles BroadcastChannel, storage, and bda_booking_updated events
+    const unsubscribe = onBookingUpdate(handleDutyChange);
+    window.addEventListener('bda_order_created', handleDutyChange);
 
     return () => {
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+      }
       if (unsubscribe) unsubscribe();
-      window.removeEventListener('storage', reloadDuties);
-      window.removeEventListener('bda_booking_updated', reloadDuties);
-      window.removeEventListener('bda_order_created', reloadDuties);
+      window.removeEventListener('bda_order_created', handleDutyChange);
     };
-  }, [driverUser, fetchDuties]);
+  }, [fetchDuties]);
 
   const handleAcceptDuty = async (duty) => {
     if (!isOnline) {
@@ -1036,7 +1061,10 @@ export default function DriverPortalPage({
               </button>
               <button
                 type="button"
-                onClick={() => setDutiesTab('history')}
+                onClick={() => {
+                  setDutiesTab('history');
+                  fetchDuties({ includeHistory: true });
+                }}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   dutiesTab === 'history'
                     ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
