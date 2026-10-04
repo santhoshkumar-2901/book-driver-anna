@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -15,17 +15,35 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Default center: Bengaluru (Bangalore) coordinates
-export const DEFAULT_MAP_CENTER = [12.9716, 77.5946];
-export const DEFAULT_MAP_ZOOM = 12;
+// Default center: South India geographic focus (covering Tamil Nadu, Kerala, Karnataka, Andhra Pradesh, Telangana, Puducherry)
+export const DEFAULT_MAP_CENTER = [13.0, 78.5];
+export const DEFAULT_MAP_ZOOM = 6;
 
 /**
- * Controller to smoothly pan/zoom when center, zoom, or bounds props change
+ * Controller to smoothly pan/zoom when center, zoom, or bounds props change,
+ * and ensure responsive container dimensions via invalidateSize.
  */
 function MapViewController({ center, zoom, bounds }) {
   const map = useMap();
   const prevCenterRef = React.useRef(null);
   const prevBoundsRef = React.useRef(null);
+
+  // Invalidate map size on layout mount and window resize to eliminate gray tiles or incorrect bounds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
 
   useEffect(() => {
     // 1. If explicit coordinate bounds are provided, fit the map view to them
@@ -61,6 +79,25 @@ function MapViewController({ center, zoom, bounds }) {
 }
 
 /**
+ * Controller to dispatch interactive map clicks
+ */
+function MapEventsController({ onMapClick }) {
+  useMapEvents({
+    click(e) {
+      if (onMapClick && e?.latlng) {
+        onMapClick({
+          latitude: e.latlng.lat,
+          longitude: e.latlng.lng,
+          lat: e.latlng.lat,
+          lng: e.latlng.lng
+        });
+      }
+    }
+  });
+  return null;
+}
+
+/**
  * Reusable MapView Component
  *
  * Provides an isolated, responsive Leaflet map using OpenStreetMap tiles.
@@ -76,6 +113,7 @@ export default function MapView({
   error = null,
   children,
   onMapReady,
+  onMapClick,
   interactive = true,
   ariaLabel = 'Interactive route map'
 }) {
@@ -120,12 +158,16 @@ export default function MapView({
           zoomControl={interactive}
           attributionControl={true}
           whenReady={(mapInstance) => {
+            if (mapInstance?.target?.invalidateSize) {
+              mapInstance.target.invalidateSize();
+            }
             if (onMapReady) onMapReady(mapInstance.target);
           }}
           className="w-full h-full z-0 outline-none"
           style={{ height: '100%', width: '100%' }}
         >
           <MapViewController center={center} zoom={zoom} bounds={bounds} />
+          {onMapClick && <MapEventsController onMapClick={onMapClick} />}
           
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'

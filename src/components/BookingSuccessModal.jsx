@@ -5,7 +5,7 @@ import { toDDMMYYYY } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 import { onBookingUpdate } from '../utils/broadcastSync';
 import { SUPPORT_HELPLINE } from '../data/mockData';
-import { MapView, PickupMarker, DestinationMarker, DriverLocationMarker, RoutePolyline } from './map';
+import { MapView, DEFAULT_MAP_CENTER, PickupMarker, DestinationMarker, DriverLocationMarker, RoutePolyline } from './map';
 import { useDriverRealtimeLocation } from '../utils/useDriverRealtimeLocation';
 import { apiClient } from '../services/apiClient';
 
@@ -127,7 +127,7 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
     if (booking?.pickupLatitude && booking?.pickupLongitude) {
       return [booking.pickupLatitude, booking.pickupLongitude];
     }
-    return [12.9716, 77.5946];
+    return DEFAULT_MAP_CENTER;
   });
   const hasInitializedCenterRef = useRef(false);
 

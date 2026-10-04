@@ -250,4 +250,123 @@ describe('Phase 4 — Location Search & Geocoding Proxy Suite', () => {
       }
     });
   });
+
+  describe('4. Map Localization — India First & South India Priority Suite', () => {
+    test('4.1 MapView exports DEFAULT_MAP_CENTER and DEFAULT_MAP_ZOOM focused on South India', () => {
+      const componentPath = path.resolve('src/components/map/MapView.jsx');
+      const content = fs.readFileSync(componentPath, 'utf8');
+
+      assert.match(content, /export const DEFAULT_MAP_CENTER = \[13\.0,\s*78\.5\]/, 'Center must be [13.0, 78.5]');
+      assert.match(content, /export const DEFAULT_MAP_ZOOM = 6/, 'Default zoom must be 6');
+      assert.match(content, /invalidateSize/, 'Must call invalidateSize for responsive container sizing');
+    });
+
+    test('4.2 GeocodingService passes South India viewbox and bounded=0 to provider for geographic biasing', async () => {
+      let requestedUrl = null;
+      const mockFetch = async (url) => {
+        requestedUrl = url;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => []
+        };
+      };
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      await service.search('Anna Nagar');
+
+      assert.ok(requestedUrl, 'Must dispatch provider request');
+      const urlObj = new URL(requestedUrl);
+      assert.strictEqual(urlObj.searchParams.get('viewbox'), '73.5,19.5,84.5,8.0');
+      assert.strictEqual(urlObj.searchParams.get('bounded'), '0', 'bounded must be 0 to allow international searches without hard restriction');
+    });
+
+    test('4.3 Clean Indian address formatting preserves locality, city, district, state, and PIN code', async () => {
+      const mockRawData = [
+        {
+          place_id: 112233,
+          display_name: 'Anna Nagar West, Chennai, Chennai District, Tamil Nadu, 600040, India',
+          lat: '13.0850',
+          lon: '80.2100',
+          type: 'suburb',
+          address: {
+            suburb: 'Anna Nagar West',
+            city: 'Chennai',
+            state_district: 'Chennai District',
+            state: 'Tamil Nadu',
+            postcode: '600040',
+            country: 'India',
+            country_code: 'in'
+          }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('Anna Nagar West');
+
+      assert.strictEqual(results.length, 1);
+      assert.strictEqual(
+        results[0].displayName,
+        'Anna Nagar West, Chennai, Chennai District, Tamil Nadu - 600040, India'
+      );
+    });
+
+    test('4.4 International searches preserve non-Indian locations without forced conversion', async () => {
+      const mockRawData = [
+        {
+          place_id: 998877,
+          display_name: 'London, Greater London, England, United Kingdom',
+          lat: '51.5074',
+          lon: '-0.1278',
+          type: 'city',
+          address: {
+            city: 'London',
+            state: 'England',
+            country: 'United Kingdom',
+            country_code: 'gb'
+          }
+        }
+      ];
+
+      const mockFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => mockRawData
+      });
+
+      const service = new GeocodingService({ fetchFn: mockFetch });
+      const { results } = await service.search('London');
+
+      assert.strictEqual(results.length, 1);
+      assert.strictEqual(results[0].displayName, 'London, Greater London, England, United Kingdom');
+      assert.strictEqual(results[0].latitude, 51.5074);
+      assert.strictEqual(results[0].longitude, -0.1278);
+    });
+
+    test('4.5 Reverse geocoding resolves coordinates via /api/location/reverse', async () => {
+      const cacheKey = 'rev:13.08270,80.27070';
+      geocodingService.setInCache(cacheKey, {
+        id: 'rev-chennai-central',
+        displayName: 'Chennai Central, Chennai, Tamil Nadu - 600003, India',
+        latitude: 13.0827,
+        longitude: 80.2707,
+        type: 'railway'
+      });
+
+      const res = await fetch(`${baseUrl}/api/location/reverse?lat=13.0827&lng=80.2707`);
+      const data = await res.json();
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(data.success, true);
+      assert.strictEqual(data.data.displayName, 'Chennai Central, Chennai, Tamil Nadu - 600003, India');
+      assert.strictEqual(data.data.latitude, 13.0827);
+      assert.strictEqual(data.data.longitude, 80.2707);
+    });
+  });
 });

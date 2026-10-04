@@ -52,6 +52,64 @@ router.get('/search', locationRateLimiter, async (req, res, next) => {
 });
 
 /**
+ * GET /api/location/reverse?lat=...&lng=...
+ *
+ * Secure backend reverse geocoding proxy to OpenStreetMap Nominatim.
+ * Resolves geographic coordinates to structured location and address.
+ */
+router.get('/reverse', locationRateLimiter, async (req, res, next) => {
+  try {
+    const rawLat = req.query.lat ?? req.query.latitude;
+    const rawLng = req.query.lng ?? req.query.lon ?? req.query.longitude;
+
+    if (rawLat === undefined || rawLng === undefined || String(rawLat).trim() === '' || String(rawLng).trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Both latitude and longitude parameters are required.'
+        }
+      });
+    }
+
+    const lat = parseFloat(rawLat);
+    const lng = parseFloat(rawLng);
+
+    if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Coordinates must be valid finite numbers.'
+        }
+      });
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDINATES',
+          message: 'Coordinates must be within geographic bounds (-90..90 latitude, -180..180 longitude).'
+        }
+      });
+    }
+
+    const { result, fromCache } = await geocodingService.reverseGeocode(lat, lng);
+
+    res.json({
+      success: true,
+      data: result,
+      meta: {
+        fromCache
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/location/route?pickupLat=...&pickupLng=...&destLat=...&destLng=...
  *
  * Secure backend routing proxy to OSRM.

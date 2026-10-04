@@ -247,6 +247,10 @@ export const apiClient = {
     const params = new URLSearchParams({ q: query }).toString();
     return request(`/location/search?${params}`, { method: 'GET', signal });
   },
+  reverseGeocode: (latitude, longitude, { signal } = {}) => {
+    const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude) }).toString();
+    return request(`/location/reverse?${params}`, { method: 'GET', signal });
+  },
   getLocationRoute: ({ pickupLat, pickupLng, destLat, destLng, pickupLatitude, pickupLongitude, destinationLatitude, destinationLongitude } = {}, { signal } = {}) => {
     const pLat = pickupLat ?? pickupLatitude;
     const pLng = pickupLng ?? pickupLongitude;
