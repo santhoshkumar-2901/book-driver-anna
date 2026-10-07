@@ -45,14 +45,14 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
     });
 
     test('2. Correct service pricing is selected for different services', () => {
-      // Airport drop
+      // Airport is a normal destination and uses normal city driver fare
       const airportFare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'one-way',
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
         distanceKm: 34.5
       });
-      assert.strictEqual(airportFare.basePrice, 899, 'Airport drop base fare must be 899');
+      assert.strictEqual(airportFare.basePrice, 299, 'Airport drop uses normal city driver base fare 299');
 
       // Outstation 150km tier
       const outstation150 = calculateAuthoritativeFare({
@@ -289,9 +289,9 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
 
       const result = await createBooking(maliciousPayload);
       assert.ok(result.booking, 'Booking must be created');
-      // For Airport Drop, base fare is 899, GST 45, total 944.
+      // For City Driver (including Airport drop), base fare is 299, GST 15, total 314.
       // Must NOT be the client-submitted 10!
-      assert.strictEqual(result.booking.calculated_fare, 944, 'Server authoritative fare must win over client fare');
+      assert.strictEqual(result.booking.calculated_fare, 314, 'Server authoritative fare must win over client fare');
     });
 
     test('14. Client-provided distance cannot override authoritative distance', async () => {

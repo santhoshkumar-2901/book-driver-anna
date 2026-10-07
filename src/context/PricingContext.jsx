@@ -1,26 +1,29 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../services/apiClient';
 
+export const OBSOLETE_DRIVER_SERVICE_IDS = [
+  'driver_hourly_2hr',
+  'driver_hourly_4hr',
+  'driver_hourly_6hr',
+  'driver_hourly_8hr',
+  'driver_hourly_12hr',
+  'driver_outstation_12hr',
+  'driver_outstation_24hr',
+  'driver_outstation_46hr',
+  'driver_outstation_72hr',
+  'driver_airport_drop',
+  'driver_night_party'
+];
+
 export const DEFAULT_PRICING_MAP = {
-  // Driver Services
-  driver_hourly_2hr: { id: 'driver_hourly_2hr', category: 'driver', name: 'In-City Hourly Driver (2 Hours)', price: 199, unit: '/ 2 hrs', description: 'Minimum 2-hour in-city acting driver package' },
-  driver_hourly_4hr: { id: 'driver_hourly_4hr', category: 'driver', name: 'In-City Hourly Driver (4 Hours)', price: 349, unit: '/ 4 hrs', description: '4-hour city errand, shopping & commute package' },
-  driver_hourly_6hr: { id: 'driver_hourly_6hr', category: 'driver', name: 'In-City Hourly Driver (6 Hours)', price: 499, unit: '/ 6 hrs', description: '6-hour flexible city travel and business commute package' },
-  driver_hourly_8hr: { id: 'driver_hourly_8hr', category: 'driver', name: 'In-City Hourly Driver (8 Hours)', price: 599, unit: '/ 8 hrs', description: '8-hour full day in-city driver package' },
-  driver_hourly_12hr: { id: 'driver_hourly_12hr', category: 'driver', name: 'In-City Hourly Driver (12 Hours)', price: 899, unit: '/ 12 hrs', description: '12-hour extended city driving package' },
+  // Driver Services (Distance-Based & Corporate Monthly)
   driver_base_fare: { id: 'driver_base_fare', category: 'driver', name: 'Base Fare', price: 100, unit: 'booking', description: 'Base starting fare for distance rides' },
   driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 15, unit: 'km', description: 'Distance rate per kilometer for driver services' },
   driver_min_fare: { id: 'driver_min_fare', category: 'driver', name: 'Minimum Fare', price: 150, unit: 'booking', description: 'Minimum charge for distance rides' },
   driver_one_way_city: { id: 'driver_one_way_city', category: 'driver', name: 'One-Way City Drop', price: 299, unit: 'flat', description: 'Point A to Point B drop across Bangalore' },
-  driver_airport_drop: { id: 'driver_airport_drop', category: 'driver', name: 'Kempegowda Airport (BLR T1/T2) Drop', price: 899, unit: 'flat', description: 'Dedicated airport drop with zero return fare' },
-  driver_night_party: { id: 'driver_night_party', category: 'driver', name: 'Night Party Driver', price: 399, unit: '/ trip', description: 'Late-night safe ride home from Indiranagar/Koramangala' },
-  driver_outstation_12hr: { id: 'driver_outstation_12hr', category: 'driver', name: 'Outstation Driver (Round Trip 12hr)', price: 1199, unit: '/ 12 hrs', description: 'Day getaway highway driver' },
-  driver_outstation_24hr: { id: 'driver_outstation_24hr', category: 'driver', name: 'Outstation Driver (Round Trip 24hr)', price: 1999, unit: '/ day', description: 'Weekend road trip driver package' },
-  driver_outstation_46hr: { id: 'driver_outstation_46hr', category: 'driver', name: 'Outstation Driver (Round Trip 46hr)', price: 3899, unit: '/ 46 hrs', description: 'Multi-day long getaway driver' },
-  driver_outstation_72hr: { id: 'driver_outstation_72hr', category: 'driver', name: 'Outstation Driver (Round Trip 72hr)', price: 5799, unit: '/ 72 hrs', description: 'Extended vacation tour driver' },
-  driver_outstation_150km: { id: 'driver_outstation_150km', category: 'driver', name: 'Outstation Driver One-Way (Up to 150 km)', price: 1199, unit: 'flat', description: 'One-way intercity drop up to 150 km' },
-  driver_outstation_300km: { id: 'driver_outstation_300km', category: 'driver', name: 'Outstation Driver One-Way (Up to 300 km)', price: 1799, unit: 'flat', description: 'One-way intercity drop up to 300 km' },
-  driver_outstation_500km: { id: 'driver_outstation_500km', category: 'driver', name: 'Outstation Driver One-Way (Up to 500 km)', price: 2399, unit: 'flat', description: 'One-way intercity drop up to 500 km' },
+  driver_outstation_150km: { id: 'driver_outstation_150km', category: 'driver', name: 'Outstation Driver (Up to 150 km)', price: 1199, unit: 'flat', description: 'One-way intercity drop up to 150 km' },
+  driver_outstation_300km: { id: 'driver_outstation_300km', category: 'driver', name: 'Outstation Driver (Up to 300 km)', price: 1799, unit: 'flat', description: 'One-way intercity drop up to 300 km' },
+  driver_outstation_500km: { id: 'driver_outstation_500km', category: 'driver', name: 'Outstation Driver (Up to 500 km)', price: 2399, unit: 'flat', description: 'One-way intercity drop up to 500 km' },
   driver_monthly: { id: 'driver_monthly', category: 'driver', name: 'Monthly Corporate Driver', price: 18000, unit: '/ month', description: 'Dedicated full-time driver contract with replacements' },
 
   // Fleet Vehicle Rentals
@@ -51,7 +54,14 @@ export function PricingProvider({ children }) {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && typeof parsed === 'object') {
-          return { ...DEFAULT_PRICING_MAP, ...parsed };
+          // Strip out obsolete driver service keys
+          const clean = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            if (!OBSOLETE_DRIVER_SERVICE_IDS.includes(k)) {
+              clean[k] = v;
+            }
+          }
+          return { ...DEFAULT_PRICING_MAP, ...clean };
         }
       }
     } catch (e) {}

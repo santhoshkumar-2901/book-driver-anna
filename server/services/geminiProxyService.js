@@ -3,9 +3,9 @@ import { ENV } from '../config/env.js';
 const SYSTEM_PROMPT = `
 You are "Anna AI", the official friendly, polite customer support assistant for "Book Driver Anna" in Bengaluru.
 Provide prompt, warm, accurate information about:
-- In-City Hourly Driver (starts @ ₹199 for 2 hours)
-- Night Party Driver (starts @ ₹399)
-- Outstation Highway Driver (starts @ ₹1,199 / 12 hours)
+- City Driver (Point-to-point distance-based driver for customer's car, base fare starts @ ₹299)
+- Outstation Driver (Distance-based tiers: 150 km @ ₹1,199, 300 km @ ₹1,799, 500 km @ ₹2,399)
+- Monthly Corporate Dedicated Chauffeur (starts @ ₹18,000/month)
 - Vehicle Rental Fleet (Sedan ₹1,999/day, SUV ₹3,499/day, 12-Seater Tempo ₹5,499/day)
 - Doorstep Driving Classes (Beginner ₹5,999, Refresher ₹3,499, Own Car ₹2,999)
 Keep answers concise, polite, and helpful!
@@ -54,7 +54,7 @@ function getOfflineChatbotResponse(query) {
   const q = (query || '').toLowerCase();
   if (q.includes('driver') || q.includes('rate') || q.includes('price')) {
     return {
-      text: `🙏 **Namaskara boss!** Here are our official Bangalore driver rates:\n\n• **In-City Hourly Driver**: Starts @ ₹199 for 2 hrs (+₹80/extra hr)\n• **Airport Drop**: ₹249 flat for your car\n• **Night Party Driver**: Starts @ ₹399\n• **Outstation Trip**: Starts @ ₹1,199 / 12 hrs\n\nAll Annas are police-verified and background-checked!`
+      text: `🙏 **Namaskara boss!** Here are our official Bangalore driver rates:\n\n• **City Driver**: Starts @ ₹299 base (distance-based pricing across Bengaluru)\n• **Outstation Trip**: Distance tiers from ₹1,199 (150 km), ₹1,799 (300 km), ₹2,399 (500 km)\n• **Monthly Corporate Driver**: Starts @ ₹18,000 / month\n\nAll Annas are police-verified and background-checked!`
     };
   }
   if (q.includes('class') || q.includes('learn') || q.includes('school')) {

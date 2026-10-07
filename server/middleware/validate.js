@@ -201,6 +201,22 @@ export function validateBookingInput(req, res, next) {
     });
   }
 
+  if (bookingCategory === 'driver') {
+    const isObsolete = req.body.driverTripOption === 'round-trip' ||
+      (typeof req.body.roundTripDuration === 'string' && req.body.roundTripDuration.trim() !== '') ||
+      (typeof req.body.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(req.body.outstationPackage));
+
+    if (isObsolete) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'OBSOLETE_SERVICE',
+          message: 'Time-based hourly driver packages and destination-specific driver services have been retired. Please book a City Driver or distance-based Outstation Driver service.'
+        }
+      });
+    }
+  }
+
   if (!date || !isValidCalendarDate(date)) {
     return res.status(400).json({
       success: false,

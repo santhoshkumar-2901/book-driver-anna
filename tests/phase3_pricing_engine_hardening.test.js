@@ -363,52 +363,52 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
     test('5.3 BookingModal shows warning and disables submission when route exceeds 500 km', () => {
       assert.match(modalContent, /Route exceeds 500 km limit/, 'Must show route limit banner');
       assert.match(modalContent, /Route Exceeds 500 km Limit — Contact Support/, 'Must show disabled button label');
-      assert.match(modalContent, /Outstation one-way pricing currently supports routes up to 500 km/, 'Must show clear explanation');
+      assert.match(modalContent, /Outstation (one-way )?pricing currently supports routes up to 500 km/, 'Must show clear explanation');
     });
   });
 
   // =========================================================================
-  // OBJECTIVE 6: ROUND TRIP PACKAGE PRICING INTACT
+  // OBJECTIVE 6: TIME-BASED DRIVER PACKAGES DECOMMISSIONED
   // =========================================================================
-  describe('Objective 6 — Round Trip Package Pricing', () => {
-    test('6.1 Round Trip maintains hourly package pricing even when road coordinates are provided', () => {
-      const fare = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '4hr',
-        distanceKm: 25.5,
-        durationMinutes: 45
+  describe('Objective 6 — Time-Based Driver Packages Decommissioned', () => {
+    test('6.1 Round Trip hourly package pricing is rejected with 400 OBSOLETE_SERVICE', () => {
+      assert.throws(() => {
+        calculateAuthoritativeFare({
+          bookingCategory: 'driver',
+          driverTripOption: 'round-trip',
+          roundTripDuration: '4hr',
+          distanceKm: 25.5,
+          durationMinutes: 45
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-      // 4hr package = 349 + GST (5% = 17) = 366
-      assert.strictEqual(fare.basePrice, 349);
-      assert.strictEqual(fare.totalFare, 366);
-      assert.strictEqual(fare.distanceKm, 25.5);
-      assert.strictEqual(fare.durationMinutes, 45);
-      assert.strictEqual(fare.pricePerKm, 0, 'Must not apply per-km tariff to Round Trip');
     });
 
-    test('6.2 Round Trip booking persists distance but bills authoritative hourly package', async () => {
-      const { booking } = await createBooking({
-        customerName: 'Roundtrip Tester',
-        customerPhone: '9845700001',
-        bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '6hr', // 499 + GST = 524
-        pickupArea: 'Indiranagar',
-        dropLocation: 'Electronic City',
-        pickupLat: BANGALORE_INDIRANAGAR.lat,
-        pickupLng: BANGALORE_INDIRANAGAR.lng,
-        destLat: BANGALORE_KORAMANGALA.lat,
-        destLng: BANGALORE_KORAMANGALA.lng,
-        date: '2026-11-20',
-        time: '10:00'
+    test('6.2 Round Trip booking creation is rejected with 400 OBSOLETE_SERVICE', async () => {
+      await assert.rejects(async () => {
+        await createBooking({
+          customerName: 'Roundtrip Tester',
+          customerPhone: '9845700001',
+          bookingCategory: 'driver',
+          driverTripOption: 'round-trip',
+          roundTripDuration: '6hr',
+          pickupArea: 'Indiranagar',
+          dropLocation: 'Electronic City',
+          pickupLat: BANGALORE_INDIRANAGAR.lat,
+          pickupLng: BANGALORE_INDIRANAGAR.lng,
+          destLat: BANGALORE_KORAMANGALA.lat,
+          destLng: BANGALORE_KORAMANGALA.lng,
+          date: '2026-11-20',
+          time: '10:00'
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-
-      const row = await queryOne('SELECT * FROM bookings WHERE id = ?', [booking.id]);
-      assert.strictEqual(row.trip_type, 'round-trip');
-      assert.strictEqual(Number(row.calculated_fare), 524); // 499 + 25 = 524
-      assert.strictEqual(Number(row.base_fare), 499);
-      assert.ok(row.distance_km > 0, 'Must persist calculated road distance');
     });
   });
 

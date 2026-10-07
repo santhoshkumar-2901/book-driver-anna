@@ -119,22 +119,22 @@ export default function HomePage({
                   On-Demand Driver Anna
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Hire an acting driver for your personal vehicle. Ideal for traffic commutes, airport drops, party returns, or outstation tours.
+                  Hire an acting driver for your personal vehicle. Ideal for traffic commutes, corporate travel, or outstation road trips.
                 </p>
               </div>
 
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
-                  <span>Hourly In-City:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_hourly_2hr', 199)} / 2 hrs</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Airport Transfer:</span>
-                  <span className="font-semibold text-white">{formatPrice('driver_airport_drop', 899)} flat</span>
+                  <span>City Driver:</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_one_way_city', 299)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Outstation Driver:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_outstation_12hr', 1199)} / day</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_outstation_150km', 1199)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Pricing Model:</span>
+                  <span className="font-semibold text-amber-400">Route Distance Based</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Gear Compatibility:</span>

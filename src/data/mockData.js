@@ -40,11 +40,11 @@ export const OUTSTATION_DESTINATIONS = [
 export const BOOK_DRIVER_TRIP_TYPES = [
   {
     id: 'one-way',
-    title: 'One Way Trip',
+    title: 'City Driver (One Way)',
     badge: 'Point A to Point B Drop',
     subtitle: 'Point A to Point B drop across Bangalore',
-    description: 'Need Anna to drive your car from your location to a specific drop location like Bengaluru Airport, office, or railway station?',
-    pricing: 'Starts @ ₹249 flat',
+    description: 'Need Anna to drive your car from your location to a specific drop location across Bengaluru, office, or airport?',
+    pricing: 'Starts @ ₹249 flat (or ₹15/km)',
     features: [
       'Specific Pickup & Drop Locations',
       'Instant SMS & Live GPS tracking',
@@ -53,33 +53,17 @@ export const BOOK_DRIVER_TRIP_TYPES = [
     ]
   },
   {
-    id: 'round-trip',
-    title: 'Round Trip',
-    badge: 'In-City Hourly Packages',
-    subtitle: 'Flexible hourly driving & return home',
-    description: 'Hire Anna for city errands, shopping, hospital visits, or office commutes. Anna stays with your car and drives you back home.',
-    pricing: 'Starts @ ₹199 / 2 hours',
-    durationOptions: ['2hr', '4hr', '6hr', '12hr'],
-    features: [
-      'Choose 2hr, 4hr, 6hr, or 12hr duration',
-      'Anna waits with your car at stops',
-      'Covers multiple stops across city',
-      'Zero cancellation charges'
-    ]
-  },
-  {
     id: 'outstation',
-    title: 'Outstation',
+    title: 'Outstation Driver',
     badge: 'Highway & Hill Getaways',
-    subtitle: 'Outstation trips across South India',
+    subtitle: 'Distance-based outstation trips across South India',
     description: 'Planning a road trip to Coorg, Nandi Hills, Chikmagalur or Mysore? Book an experienced outstation Anna for safe highway driving.',
-    pricing: 'Starts @ ₹1,199',
+    pricing: 'Starts @ ₹1,199 (150 km)',
     outstationPackages: [
-      'Round trip 12hr', 'Round trip 24hr', 'Round trip 46hr', 'Round trip 72hr',
-      'One Way (Up to 150 km)', 'One Way (Up to 300 km)', 'One Way (Up to 500 km)', 'One Way Custom Drop'
+      'Up to 150 km', 'Up to 300 km', 'Up to 500 km'
     ],
     features: [
-      'Trip Options: Round Trip (12hr-72hr) & One Way Drop',
+      'Distance Tiers: Up to 150 km, 300 km, or 500 km',
       'Ghat road & hill driving specialists',
       'Includes driver return/food allowance guidelines',
       'Night allowance included after 10 PM'
@@ -89,42 +73,22 @@ export const BOOK_DRIVER_TRIP_TYPES = [
 
 export const DRIVER_SERVICES = [
   {
-    id: "hourly-driver",
-    title: "In-City Hourly Driver",
+    id: "city-driver",
+    title: "City Acting Driver",
     subtitle: "Your car, our expert Anna",
-    icon: "Clock",
+    icon: "Compass",
     tag: "Most Popular in Namma Bengaluru",
-    description: "Tired of Bangalore traffic & Silk Board jams? Hire a professional driver for 2, 4, 8, or 12 hours. Sit back, work on your laptop or relax while Anna handles the wheel.",
-    pricing: "Starts @ ₹199 / 2 hours",
+    description: "Tired of Bangalore traffic & Silk Board jams? Hire a professional driver for point-to-point city trips and commutes. Sit back, work on your laptop or relax while Anna handles the wheel.",
+    pricing: "Starts @ ₹249 flat (or ₹15/km)",
     features: [
-      "Minimum 2-hour package",
+      "Pay for distance traveled",
       "Police verified & background checked",
       "Proficient in Kannada, English & Hindi",
       "Manual & Automatic car experts",
       "Zero hidden charges"
     ],
-    basePrice: 199,
-    extraHourRate: 80,
-    popularUseCases: ["Traffic commute to office", "Shopping spree in Commercial St", "Hospital visits", "Family errands"]
-  },
-  {
-    id: "night-driver",
-    title: "Night Party Driver",
-    subtitle: "Safe drive back after night out",
-    icon: "Moon",
-    tag: "24/7 Night Service",
-    description: "Enjoy your night out in Indiranagar, Koramangala or MG Road without worrying about driving back! Our night-owl Annas will reach your club and drive you home safe.",
-    pricing: "Starts @ ₹399 / trip",
-    features: [
-      "Available 24/7 till 4:00 AM",
-      "Strict breathalyzer test before drive",
-      "Double GPS tracked for safety",
-      "Emergency SOS button included",
-      "Doorstep valet hand-off"
-    ],
-    basePrice: 399,
-    extraHourRate: 100,
-    popularUseCases: ["Indiranagar Pub Hopping", "Koramangala Parties", "Weekend Dinners", "Late night airport drop"]
+    basePrice: 249,
+    popularUseCases: ["Traffic commute to office", "Shopping in Commercial St", "Hospital visits", "Family errands"]
   },
   {
     id: "outstation-driver",
@@ -133,8 +97,9 @@ export const DRIVER_SERVICES = [
     icon: "Compass",
     tag: "Weekend Getaways",
     description: "Planning a trip to Nandi Hills, Coorg, Wayanad or Mysore? Hire an experienced outstation Anna who knows highway routes, scenic spots, and best roadside tiffin rooms.",
-    pricing: "Starts @ ₹1,199 / day",
+    pricing: "Starts @ ₹1,199 (150 km)",
     features: [
+      "Distance-based tiers: 150 km, 300 km, 500 km",
       "Experienced highway certified drivers",
       "Night allowance included after 10 PM",
       "Includes driver food allowance guidelines",
@@ -142,7 +107,6 @@ export const DRIVER_SERVICES = [
       "Clean driving record verified"
     ],
     basePrice: 1199,
-    extraHourRate: 120,
     popularUseCases: ["Coorg Weekend Trip", "Chikmagalur Homestays", "Mysore Expressway Run", "Tirupati Temple Visit"]
   },
   {

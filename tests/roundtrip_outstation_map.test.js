@@ -53,17 +53,16 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.match(modalContent, /handleUseCurrentLocationForPickup/, 'Must provide current location button');
     });
 
-    test('1.2 Round Trip preserves package duration buttons while offering map search', () => {
-      assert.match(modalContent, /driverTripOption === 'round-trip'/, 'Must support round-trip driver option');
-      assert.match(modalContent, /Round Trip Duration \(2hr, 4hr, 6hr, 12hr\)/, 'Must render duration selector');
-      assert.match(modalContent, /Round Trip Locations/, 'Must render Round Trip Locations title');
+    test('1.2 Round trip hourly packages are decommissioned in BookingModal', () => {
+      assert.ok(!modalContent.includes("Round Trip Duration (2hr, 4hr, 6hr, 12hr)"));
+      assert.ok(!modalContent.includes("driver_hourly_2hr"));
     });
 
-    test('1.3 Outstation preserves trip modes and package options while offering map search', () => {
+    test('1.3 Outstation uses distance tiers without duration packages in BookingModal', () => {
       assert.match(modalContent, /driverTripOption === 'outstation'/, 'Must support outstation driver option');
-      assert.match(modalContent, /Outstation Trip Mode/, 'Must render Outstation Trip Mode selector');
-      assert.match(modalContent, /Select One Way Drop Package/, 'Must render outstation package selector');
-      assert.match(modalContent, /Outstation Locations/, 'Must render Outstation Locations title');
+      assert.match(modalContent, /Select Distance Tier/, 'Must render distance tier selector');
+      assert.ok(!modalContent.includes("Outstation Trip Mode"));
+      assert.ok(!modalContent.includes("driver_outstation_12hr"));
     });
 
     test('1.4 MapView renders Leaflet components for markers and route polyline', () => {
@@ -80,10 +79,10 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
   });
 
   // =========================================================================
-  // 2. Round Trip Map, Routing & Pricing Flow
+  // 2. Obsolete Package Rejection & City Driver Route Integration
   // =========================================================================
-  describe('2. Round Trip Routing & Fare Integration', () => {
-    test('2.1 Round trip estimates road distance and duration via backend without forcing distance per-km tariff', async () => {
+  describe('2. Obsolete Package Rejection & City Driver Integration', () => {
+    test('2.1 Round trip time packages are rejected with 400 OBSOLETE_SERVICE', async () => {
       const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,85 +95,63 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         })
       });
 
-      assert.strictEqual(res.status, 200, 'Must return HTTP 200');
+      assert.strictEqual(res.status, 400);
       const body = await res.json();
-      assert.strictEqual(body.success, true);
-      assert.ok(body.data.distanceKm > 0, 'Must return positive road distance');
-      assert.ok(body.data.durationMinutes > 0, 'Must return positive duration in minutes');
-      // Round trip preserves 4hr package price (e.g. 349 + 5% GST = 366 or 349 base)
-      assert.ok(body.data.totalFare >= 199, 'Must preserve package fare for round trip');
+      assert.strictEqual(body.error.code, 'OBSOLETE_SERVICE');
     });
 
-    test('2.2 Round trip booking creation persists road coordinates and distance in bookings snapshot', async () => {
-      const result = await createBooking({
-        customerName: 'RoundTrip Tester',
-        customerPhone: '9888877771',
-        customerEmail: 'roundtrip@example.com',
-        bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '4hr',
-        pickupArea: BANGALORE_INDIRANAGAR.name,
-        dropLocation: BANGALORE_ELECTRONIC_CITY.name,
-        pickupLat: BANGALORE_INDIRANAGAR.lat,
-        pickupLng: BANGALORE_INDIRANAGAR.lng,
-        destLat: BANGALORE_ELECTRONIC_CITY.lat,
-        destLng: BANGALORE_ELECTRONIC_CITY.lng,
-        date: '2026-10-15',
-        time: '10:00',
-        paymentMode: 'cash'
+    test('2.2 Round trip booking creation is rejected with 400 OBSOLETE_SERVICE', async () => {
+      await assert.rejects(async () => {
+        await createBooking({
+          customerName: 'RoundTrip Tester',
+          customerPhone: '9888877771',
+          customerEmail: 'roundtrip@example.com',
+          bookingCategory: 'driver',
+          driverTripOption: 'round-trip',
+          roundTripDuration: '4hr',
+          pickupArea: BANGALORE_INDIRANAGAR.name,
+          dropLocation: BANGALORE_ELECTRONIC_CITY.name,
+          pickupLat: BANGALORE_INDIRANAGAR.lat,
+          pickupLng: BANGALORE_INDIRANAGAR.lng,
+          destLat: BANGALORE_ELECTRONIC_CITY.lat,
+          destLng: BANGALORE_ELECTRONIC_CITY.lng,
+          date: '2026-10-15',
+          time: '10:00',
+          paymentMode: 'cash'
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-
-      assert.ok(result && result.booking && result.booking.id, 'Booking must be created');
-      const stored = await queryOne('SELECT * FROM bookings WHERE id = ?', [result.booking.id]);
-      assert.ok(stored, 'Booking must exist in database');
-      assert.strictEqual(stored.trip_type, 'round-trip');
-      assert.ok(stored.pickup_latitude !== null, 'pickup_latitude must be persisted');
-      assert.ok(stored.pickup_longitude !== null, 'pickup_longitude must be persisted');
-      assert.ok(stored.destination_latitude !== null, 'destination_latitude must be persisted');
-      assert.ok(stored.destination_longitude !== null, 'destination_longitude must be persisted');
-      assert.ok(stored.distance_km !== null, 'distance_km must be persisted');
-      assert.ok(stored.calculated_fare > 0, 'calculated_fare must be authoritative');
     });
 
-    test('2.3 Round trip route changes when destination changes', async () => {
-      const res1 = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
+    test('2.3 City Driver estimates road distance and calculates distance-based fare', async () => {
+      const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
-          roundTripDuration: '2hr',
+          driverTripOption: 'one-way',
           pickup: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng },
           destination: { latitude: BANGALORE_ELECTRONIC_CITY.lat, longitude: BANGALORE_ELECTRONIC_CITY.lng }
         })
       });
-      const data1 = await res1.json();
-
-      const res2 = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
-          roundTripDuration: '2hr',
-          pickup: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng },
-          destination: { latitude: MYSORE_PALACE.lat, longitude: MYSORE_PALACE.lng }
-        })
-      });
-      const data2 = await res2.json();
-
-      assert.notStrictEqual(data1.data.distanceKm, data2.data.distanceKm, 'Distance must update when destination changes');
-      assert.ok(data2.data.distanceKm > data1.data.distanceKm, 'Mysore route distance must be significantly larger than Electronic City');
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.success, true);
+      assert.ok(data.data.distanceKm > 0);
+      assert.ok(data.data.totalFare > 0);
     });
 
-    test('2.4 Round trip rejects identical pickup and destination coordinates in estimate and booking', async () => {
+    test('2.4 City driver rejects identical pickup and destination coordinates in estimate and booking', async () => {
       // 1. Fare estimate endpoint rejects same location
       const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
+          driverTripOption: 'one-way',
           pickup: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng },
           destination: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng }
         })
@@ -190,7 +167,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           customerName: 'Same Location Tester',
           customerPhone: '9888877775',
           bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
+          driverTripOption: 'one-way',
           pickupArea: BANGALORE_INDIRANAGAR.name,
           dropLocation: BANGALORE_INDIRANAGAR.name,
           pickupLat: BANGALORE_INDIRANAGAR.lat,
@@ -384,8 +361,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         customerName: 'Hacker Spoof',
         customerPhone: '9888877776',
         bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '4hr',
+        driverTripOption: 'one-way',
         pickupArea: BANGALORE_INDIRANAGAR.name,
         dropLocation: BANGALORE_ELECTRONIC_CITY.name,
         pickupLat: BANGALORE_INDIRANAGAR.lat,
@@ -405,9 +381,9 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       // Server must have calculated the true road distance (~15-25 km), NOT 500 km
       assert.notStrictEqual(stored.distance_km, 500, 'Server must reject client-supplied distanceKm');
       assert.ok(stored.distance_km < 100, 'Distance must be authoritative OSRM route distance');
-      // Server must have calculated authoritative fare (~349 + GST), NOT 10 INR
+      // Server must have calculated authoritative fare, NOT 10 INR
       assert.notStrictEqual(stored.calculated_fare, 10, 'Server must reject client-supplied fare');
-      assert.ok(stored.calculated_fare >= 349, 'Fare must be authoritative server fare');
+      assert.ok(stored.calculated_fare >= 200, 'Fare must be authoritative server fare');
     });
 
     test('4.3 Invalid, NaN, and Infinity coordinates are rejected with 400', async () => {
@@ -417,7 +393,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           customerName: 'NaN Coords',
           customerPhone: '9888877777',
           bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
+          driverTripOption: 'one-way',
           pickupArea: 'Indiranagar',
           dropLocation: 'Whitefield',
           pickupLat: NaN,
@@ -439,7 +415,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           customerName: 'Inf Coords',
           customerPhone: '9888877778',
           bookingCategory: 'driver',
-          driverTripOption: 'round-trip',
+          driverTripOption: 'one-way',
           pickupArea: 'Indiranagar',
           dropLocation: 'Whitefield',
           pickupLat: 12.9784,

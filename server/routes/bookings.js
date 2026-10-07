@@ -114,10 +114,25 @@ const handleEstimateRequest = async (req, res, next) => {
     // 2. Fetch live pricing tariffs from database
     const pricingData = await getAllPricing().catch(() => null);
 
+    if (category === 'driver') {
+      if (
+        params.driverTripOption === 'round-trip' ||
+        params.roundTripDuration ||
+        (typeof params.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(params.outstationPackage))
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'OBSOLETE_SERVICE',
+            message: 'Time-based hourly driver packages and destination-specific driver services are permanently discontinued. Please select a valid distance-based City Driver or Outstation Driver service.'
+          }
+        });
+      }
+    }
+
     // Determine if distance pricing should be applied
     const isFareEstimateRoute = req.originalUrl?.includes('fare-estimate') || req.path?.includes('fare-estimate');
-    const isPackageTrip = params.driverTripOption === 'round-trip' || params.driverTripOption === 'outstation';
-    const isDistanceRequested = !isPackageTrip && Boolean(
+    const isDistanceRequested = Boolean(
       params.useDistancePricing === true ||
       params.isDistancePricing === true ||
       params.driverTripOption === 'distance' ||

@@ -753,7 +753,9 @@ describe('Phase 8 — Database Coordinate Persistence Suite', () => {
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
         distanceKm: 35
       });
-      assert.strictEqual(fareAirport.basePrice, 899);
+      // Airport is a normal destination without special airport tariff
+      assert.strictEqual(fareAirport.basePrice, 299);
+      assert.strictEqual(fareAirport.totalFare, 314);
     });
 
     test('27. Strict Phase 8 Boundary: ZERO driver GPS or realtime tracking columns added', () => {

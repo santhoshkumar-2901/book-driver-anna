@@ -33,7 +33,7 @@ describe('Booking Security, Integrity, & Concurrency Tests', () => {
   });
 
   test('1. Client Price Tampering Defense: Server ignores client-supplied price and calculates authoritatively', async () => {
-    // Attempt to inject a fake price of 1 Rupee for a 4-hour round trip (official price: 349 + 5% GST = 366)
+    // Attempt to inject a fake price of 1 Rupee for a one-way city drop (official price: 299 + 5% GST = 314)
     const res = await fetch(`${baseUrl}/api/bookings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,9 +41,9 @@ describe('Booking Security, Integrity, & Concurrency Tests', () => {
         customerName: 'Santhosh Price Test',
         customerPhone: '+91 98765 11111',
         bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '4hr',
+        driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
+        dropLocation: 'Whitefield',
         date: '2026-11-15',
         time: '10:00 AM',
         totalFare: 1, // Tampered price
@@ -56,12 +56,12 @@ describe('Booking Security, Integrity, & Concurrency Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, true);
     
-    // Server must compute 349 + 17 = 366
-    assert.strictEqual(data.data.booking.calculated_fare, 366, 'Server must enforce authoritative fare calculation');
+    // Server must compute 299 + 15 = 314
+    assert.strictEqual(data.data.booking.calculated_fare, 314, 'Server must enforce authoritative fare calculation');
     
     // Verify in database
     const inDb = db.prepare('SELECT calculated_fare FROM bookings WHERE id = ?').get(data.data.booking.id);
-    assert.strictEqual(inDb.calculated_fare, 366);
+    assert.strictEqual(inDb.calculated_fare, 314);
   });
 
   test('2. Past Date Rejection: Bookings for past dates are strictly rejected', async () => {

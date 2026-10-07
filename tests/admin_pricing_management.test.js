@@ -50,7 +50,8 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(data.success, true);
     assert.ok(data.data.map, 'Pricing response must include key-value map');
     assert.ok(Array.isArray(data.data.list), 'Pricing response must include list array');
-    assert.ok(data.data.map.driver_hourly_2hr, 'Must include driver_hourly_2hr');
+    assert.ok(data.data.map.driver_one_way_city, 'Must include driver_one_way_city');
+    assert.strictEqual(data.data.map.driver_hourly_2hr, undefined, 'Must NOT include obsolete driver_hourly_2hr');
     assert.ok(data.data.map.vehicle_sedan_daily, 'Must include vehicle_sedan_daily');
     assert.ok(data.data.map.class_beginner, 'Must include class_beginner');
   });
@@ -69,11 +70,11 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(res.status, 200, 'Admin should receive 200 with valid JWT');
     const data = await res.json();
     assert.strictEqual(data.success, true);
-    assert.ok(data.data.map.driver_hourly_2hr.price > 0);
+    assert.ok(data.data.map.driver_one_way_city.price > 0);
   });
 
   test('4. Admin can modify service tariffs and changes are saved to database', async () => {
-    // Update In-City Hourly (2hr) from 199 to 249, and Sedan daily rate from 1999 to 2299
+    // Update City Driver from 299 to 349, and Sedan daily rate from 1999 to 2299
     const updateRes = await fetch(`${baseUrl}/api/admin/pricing`, {
       method: 'PUT',
       headers: {
@@ -82,7 +83,7 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
       },
       body: JSON.stringify({
         items: [
-          { id: 'driver_hourly_2hr', price: 249 },
+          { id: 'driver_one_way_city', price: 349 },
           { id: 'vehicle_sedan_daily', price: 2299 }
         ]
       })
@@ -91,28 +92,27 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(updateRes.status, 200, 'PUT /api/admin/pricing should return 200');
     const updateData = await updateRes.json();
     assert.strictEqual(updateData.success, true);
-    assert.strictEqual(updateData.data.map.driver_hourly_2hr.price, 249, 'Updated driver price should be 249');
+    assert.strictEqual(updateData.data.map.driver_one_way_city.price, 349, 'Updated driver price should be 349');
     assert.strictEqual(updateData.data.map.vehicle_sedan_daily.price, 2299, 'Updated sedan price should be 2299');
 
     // Verify public /api/pricing now serves the newly modified prices to website
     const publicRes = await fetch(`${baseUrl}/api/pricing`);
     const publicData = await publicRes.json();
-    assert.strictEqual(publicData.data.map.driver_hourly_2hr.price, 249);
+    assert.strictEqual(publicData.data.map.driver_one_way_city.price, 349);
     assert.strictEqual(publicData.data.map.vehicle_sedan_daily.price, 2299);
   });
 
   test('5. Backend authoritative fare calculation uses the updated price', () => {
     const customPricingMap = {
-      driver_hourly_2hr: { price: 249 }
+      driver_one_way_city: { price: 349 }
     };
     const fare = calculateAuthoritativeFare({
       bookingCategory: 'driver',
-      driverTripOption: 'round-trip',
-      roundTripDuration: '2hr'
+      driverTripOption: 'one-way'
     }, customPricingMap);
 
-    assert.strictEqual(fare.basePrice, 249, 'Base fare should use updated 249 rate');
-    assert.strictEqual(fare.totalFare, 249 + Math.round(249 * 0.05));
+    assert.strictEqual(fare.basePrice, 349, 'Base fare should use updated 349 rate');
+    assert.strictEqual(fare.totalFare, 349 + Math.round(349 * 0.05));
   });
 
   test('6. Admin can reset tariffs back to factory defaults', async () => {
@@ -126,8 +126,26 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.strictEqual(resetRes.status, 200, 'POST /api/admin/pricing/reset should return 200');
     const resetData = await resetRes.json();
     assert.strictEqual(resetData.success, true);
-    assert.strictEqual(resetData.data.map.driver_hourly_2hr.price, 199, 'Price should be reset to default 199');
+    assert.strictEqual(resetData.data.map.driver_one_way_city.price, 299, 'Price should be reset to default 299');
     assert.strictEqual(resetData.data.map.vehicle_sedan_daily.price, 1999, 'Sedan price should be reset to 1999');
+  });
+
+  test('6b. Attempting to update obsolete service tariff is rejected with 400 OBSOLETE_SERVICE', async () => {
+    const obsoleteRes = await fetch(`${baseUrl}/api/admin/pricing`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        items: [
+          { id: 'driver_hourly_2hr', price: 299 }
+        ]
+      })
+    });
+    assert.strictEqual(obsoleteRes.status, 400);
+    const errData = await obsoleteRes.json();
+    assert.strictEqual(errData.error?.code || errData.code, 'OBSOLETE_SERVICE');
   });
 
   test('7. AdminSidebar, AdminPage, and HomePage contain Pricing section wiring', () => {
@@ -162,7 +180,7 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.match(adminPageCode, /clean === ['"]\/admin\/pricing['"]/, 'parseTabFromPath must map /admin/pricing to pricing tab');
   });
 
-  test('9. BookingModal dynamically formats tariffs and calculates authoritative fares including 6hr package', () => {
+  test('9. BookingModal dynamically formats tariffs and calculates authoritative fares including city driver package', () => {
     const modalCode = fs.readFileSync(path.resolve('src/components/BookingModal.jsx'), 'utf8');
     
     // BookingModal imports usePricing and formatPrice
@@ -170,14 +188,13 @@ describe('Admin Pricing Section & Live Website Tariff Synchronization Suite', ()
     assert.match(modalCode, /formatPrice/, 'BookingModal must use formatPrice for dynamic rendering');
     assert.match(modalCode, /refreshPricing/, 'BookingModal must refresh pricing when opened');
 
-    // 6hr duration supported in calculateAuthoritativeFare
-    const fare6hr = calculateAuthoritativeFare({
+    // City driver supported in calculateAuthoritativeFare
+    const fareCity = calculateAuthoritativeFare({
       bookingCategory: 'driver',
-      driverTripOption: 'round-trip',
-      roundTripDuration: '6hr'
+      driverTripOption: 'one-way'
     });
-    assert.strictEqual(fare6hr.basePrice, 499, '6hr round trip base fare must be 499');
-    assert.strictEqual(fare6hr.totalFare, 499 + Math.round(499 * 0.05));
+    assert.strictEqual(fareCity.basePrice, 299, 'City drop base fare must be 299');
+    assert.strictEqual(fareCity.totalFare, 299 + Math.round(299 * 0.05));
 
     // Driving classes have all-inclusive flat pricing with zero GST
     const classFare = calculateAuthoritativeFare({

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { queryOne, queryAll, execute, withTransaction, isTiDB } from '../db/database.js';
-import { calculateAuthoritativeFare, getAllPricing } from './pricingService.js';
+import { calculateAuthoritativeFare, getAllPricing, OBSOLETE_DRIVER_SERVICE_IDS } from './pricingService.js';
 import { routingService } from './routingService.js';
 import { logAuditEvent } from './auditService.js';
 import { isValidCalendarDate, getTodayIST } from '../middleware/validate.js';
@@ -27,9 +27,9 @@ export async function createBooking({
   vehicleCategory = 'Sedan',
   driverTripOption = 'one-way',
   dropLocation = '',
-  roundTripDuration = '4hr',
-  outstationTripType = 'round-trip',
-  outstationPackage = 'Round trip 24hr',
+  roundTripDuration = null,
+  outstationTripType = null,
+  outstationPackage = 'One Way (Up to 150 km)',
   outstationDestination = '',
   pickupArea = 'Pickup Location',
   pickupLat = undefined,
@@ -59,6 +59,20 @@ export async function createBooking({
     err.statusCode = 400;
     err.code = 'INVALID_INPUT';
     throw err;
+  }
+
+  // 1.1 Prohibit and reject obsolete time-based driver packages and services
+  if (bookingCategory === 'driver') {
+    const isObsolete = driverTripOption === 'round-trip' ||
+      (typeof roundTripDuration === 'string' && roundTripDuration.trim() !== '') ||
+      (typeof outstationPackage === 'string' && /(12|24|46|72)hr/i.test(outstationPackage));
+
+    if (isObsolete) {
+      const err = new Error('Time-based hourly driver packages and destination-specific driver services have been retired. Please book a City Driver or distance-based Outstation Driver service.');
+      err.statusCode = 400;
+      err.code = 'OBSOLETE_SERVICE';
+      throw err;
+    }
   }
 
   // 2. Validate Date: Must be a valid calendar date in YYYY-MM-DD format and cannot be in the past (IST)

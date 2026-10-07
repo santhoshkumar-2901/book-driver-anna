@@ -47,27 +47,27 @@ export default function Footer({ setActivePage, openBookingModal, openCancelModa
             </h4>
             <ul className="space-y-1.5 text-xs">
               <li>
-                <button 
-                  onClick={() => openBookingModal('driver')} 
+                <button
+                  onClick={() => openBookingModal('driver', { driverTripOption: 'one-way' })}
                   className="hover:text-white transition-colors cursor-pointer"
                 >
-                  Hourly In-City Driver
+                  City Driver
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => openBookingModal('driver')} 
+                <button
+                  onClick={() => openBookingModal('driver', { driverTripOption: 'outstation' })}
                   className="hover:text-white transition-colors cursor-pointer"
                 >
-                  Night Party Driver
+                  Outstation Driver
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => openBookingModal('driver')} 
+                <button
+                  onClick={() => openBookingModal('driver', { driverTripOption: 'one-way' })}
                   className="hover:text-white transition-colors cursor-pointer"
                 >
-                  Outstation Highway Driver
+                  Monthly Corporate Driver
                 </button>
               </li>
               <li>

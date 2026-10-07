@@ -138,10 +138,10 @@ export default function ServicesPage({ openBookingModal }) {
             </div>
           </div>
 
-          {/* 3 CORE TRIP CARDS */}
+          {/* 3 CORE DRIVER SERVICES */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            {/* ONE WAY TRIP */}
+            {/* CITY DRIVER */}
             <div 
               onClick={() => handleOpenDriverOptionForm('one-way')}
               className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
@@ -149,7 +149,7 @@ export default function ServicesPage({ openBookingModal }) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Navigation className="w-3.5 h-3.5" /> One Way
+                    <Navigation className="w-3.5 h-3.5" /> City Driver
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
                     Starts @ {formatPrice('driver_one_way_city', 299)}
@@ -157,90 +157,39 @@ export default function ServicesPage({ openBookingModal }) {
                 </div>
 
                 <h3 className="text-2xl font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
-                  One Way Trip
+                  City Driver
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Hire Anna to drive your car from your pickup location to your drop location across Bangalore or Kempegowda Airport.
+                  Hire Anna to drive your car anywhere across Bengaluru. Realtime distance-based pricing from pickup to drop.
                 </p>
 
                 {/* Option Highlights */}
                 <div className="space-y-2 pt-2 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Form Highlights:</div>
+                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Features:</div>
                   <div className="flex items-center gap-2 text-xs text-slate-200">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span><strong>Pickup Location</strong> (Bangalore)</span>
+                    <span><strong>Pickup to Drop</strong> (Distance-based fare)</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-200">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span><strong>Drop Location</strong> (Airport / City landmark)</span>
+                    <span><strong>Any Bengaluru Location</strong> (Including Airport)</span>
                   </div>
                 </div>
               </div>
 
               <div className="pt-6 border-t border-slate-800 flex items-center justify-between mt-6">
-                <span className="text-xs text-slate-400 font-medium">Point A to Point B</span>
+                <span className="text-xs text-slate-400 font-medium">Distance-Based</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleOpenDriverOptionForm('one-way'); }}
                   className="py-2.5 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow transition-colors flex items-center gap-1.5"
                 >
-                  <span>Book One Way</span>
+                  <span>Book City Driver</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* ROUND TRIP */}
-            <div 
-              onClick={() => handleOpenDriverOptionForm('round-trip')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Round Trip
-                  </span>
-                  <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ {formatPrice('driver_hourly_2hr', 199)}
-                  </span>
-                </div>
-
-                <h3 className="text-2xl font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
-                  Round Trip
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Hire Anna for in-city errands, shopping, hospital visits, night parties, or office commute & return home safely.
-                </p>
-
-                {/* Option Highlights */}
-                <div className="space-y-2 pt-2 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Duration Packages:</div>
-                  <div className="grid grid-cols-4 gap-1.5 pt-1">
-                    {['2hr', '4hr', '6hr', '12hr'].map((dur) => (
-                      <span key={dur} className="bg-slate-900 text-amber-400 border border-amber-400/30 text-center py-1 text-[11px] rounded-lg font-bold">
-                        {dur}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Pickup Location & Return Home</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-800 flex items-center justify-between mt-6">
-                <span className="text-xs text-slate-400 font-medium">In-City Hourly</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleOpenDriverOptionForm('round-trip'); }}
-                  className="py-2.5 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow transition-colors flex items-center gap-1.5"
-                >
-                  <span>Book Round Trip</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* OUTSTATION */}
+            {/* OUTSTATION DRIVER */}
             <div 
               onClick={() => handleOpenDriverOptionForm('outstation')}
               className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
@@ -248,33 +197,33 @@ export default function ServicesPage({ openBookingModal }) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Compass className="w-3.5 h-3.5" /> Outstation
+                    <Compass className="w-3.5 h-3.5" /> Outstation Driver
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ {formatPrice('driver_outstation_12hr', 1199)}
+                    Starts @ {formatPrice('driver_outstation_150km', 1199)}
                   </span>
                 </div>
 
                 <h3 className="text-2xl font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
-                  Outstation
+                  Outstation Driver
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Hire an experienced highway & hill driver Anna for long-distance weekend trips to Coorg, Nandi Hills, Chikmagalur, Mysore, etc.
+                  Hire an expert highway & ghat-road driver Anna for long-distance trips to Mysuru, Coorg, Chikmagalur, Ooty, Chennai, etc.
                 </p>
 
                 {/* Option Highlights */}
                 <div className="space-y-2 pt-2 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Outstation Trip Packages:</div>
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
-                    {['Round trip (12-72hr)', 'One Way Drop (150-500km)'].map((pkg) => (
-                      <span key={pkg} className="bg-slate-900 text-amber-400 border border-amber-400/30 text-center py-1 text-[10px] rounded-lg font-bold">
+                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Distance Tiers:</div>
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
+                    {['150 km', '300 km', '500 km'].map((pkg) => (
+                      <span key={pkg} className="bg-slate-900 text-amber-400 border border-amber-400/30 text-center py-1 text-[11px] rounded-lg font-bold">
                         {pkg}
                       </span>
                     ))}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Both Round Trip & One Way Drops</span>
+                    <span>Includes Return Bus Allowance</span>
                   </div>
                 </div>
               </div>
@@ -286,6 +235,54 @@ export default function ServicesPage({ openBookingModal }) {
                   className="py-2.5 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow transition-colors flex items-center gap-1.5"
                 >
                   <span>Book Outstation</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* MONTHLY CORPORATE DRIVER */}
+            <div 
+              onClick={() => handleOpenDriverOptionForm('one-way')}
+              className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5" /> Corporate
+                  </span>
+                  <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
+                    Starts @ {formatPrice('driver_corporate_monthly', 24999)}/mo
+                  </span>
+                </div>
+
+                <h3 className="text-2xl font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
+                  Corporate Driver
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Dedicated, police-verified executive chauffeur for executives, business fleets, and monthly corporate retainer contracts.
+                </p>
+
+                {/* Option Highlights */}
+                <div className="space-y-2 pt-2 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Retainer Benefits:</div>
+                  <div className="flex items-center gap-2 text-xs text-slate-200">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Dedicated Assigned Chauffeur</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-200">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Monthly Corporate Invoicing & GST</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-800 flex items-center justify-between mt-6">
+                <span className="text-xs text-slate-400 font-medium">Monthly Retainer</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleOpenDriverOptionForm('one-way'); }}
+                  className="py-2.5 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow transition-colors flex items-center gap-1.5"
+                >
+                  <span>Inquire Corporate</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

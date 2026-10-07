@@ -181,7 +181,7 @@ describe('Antigravity Phase 23 — Full QA & End-to-End Verification Suite', () 
         customerName: 'Other Customer QA',
         customerPhone: `98001${String(ts).slice(-5)}`,
         bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
+        driverTripOption: 'one-way',
         pickupArea: 'Whitefield, Bengaluru',
         dropLocation: 'MG Road, Bengaluru',
         pickupLat: 12.9698,

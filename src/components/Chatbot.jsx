@@ -15,13 +15,13 @@ const INITIAL_MESSAGES = [
   {
     id: 'welcome-1',
     sender: 'anna',
-    text: `Welcome to Book Driver Anna Support Desk.\n\nHow can we help you today?\n\n• **In-City Hourly Drivers** (Starts @ ₹199 / 2 hrs)\n• **Night Party Drivers** (24/7 safe drive home @ ₹399)\n• **Outstation Drivers** (Coorg, Mysuru, Ooty & more)\n• **Vehicle Rentals** (Sedans, SUVs & Tempo Travellers)\n• **Driving Classes** (Doorstep 1-on-1 certified training)\n\nAsk any question about our services, hourly rates, or coverage areas!`,
+    text: `Welcome to Book Driver Anna Support Desk.\n\nHow can we help you today?\n\n• **City Drivers** (Point-to-point distance-based fare starts @ ₹299)\n• **Outstation Drivers** (Distance-based tiers for Mysuru, Coorg, Ooty & more)\n• **Monthly Corporate Drivers** (Dedicated executive chauffeur)\n• **Vehicle Rentals** (Sedans, SUVs & Tempo Travellers)\n• **Driving Classes** (Doorstep 1-on-1 certified training)\n\nAsk any question about our services, routes, or coverage areas!`,
     timestamp: 'Just now',
     actions: [
       { label: 'Driving Classes', query: 'Tell me about driving classes and fees' },
-      { label: 'Hourly Driver Rates', query: 'What are hourly driver rates?' },
-      { label: 'Night Drivers', query: 'Tell me about night party driver service' },
-      { label: 'Outstation Trips', query: 'Outstation trips to Coorg and Mysore' },
+      { label: 'City Driver Rates', query: 'What are city driver rates?' },
+      { label: 'Outstation Trips', query: 'Tell me about outstation driver trips and rates' },
+      { label: 'Corporate Drivers', query: 'Tell me about monthly corporate driver service' },
       { label: 'Vehicle Rentals', query: 'What rental cars and vehicles do you have?' }
     ]
   }
@@ -316,16 +316,16 @@ export default function Chatbot({ openBookingModal }) {
           {/* D. QUICK TOPICS BAR */}
           <div className="px-3 py-1.5 bg-slate-950 border-t border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
-              onClick={() => handleSendMessage('What are your hourly driver packages and rates?')}
+              onClick={() => handleSendMessage('How does City Driver point-to-point booking work?')}
               className="px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium whitespace-nowrap transition-colors border border-slate-800"
             >
-              Hourly Rates
+              City Driver
             </button>
             <button
-              onClick={() => handleSendMessage('Tell me about night party drivers in Koramangala')}
+              onClick={() => handleSendMessage('Tell me about monthly corporate driver service')}
               className="px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium whitespace-nowrap transition-colors border border-slate-800"
             >
-              Night Drivers
+              Monthly Driver
             </button>
             <button
               onClick={() => handleSendMessage('Can I book an outstation driver for Coorg?')}

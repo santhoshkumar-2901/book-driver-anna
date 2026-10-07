@@ -9,21 +9,13 @@ Always provide direct, clear, and well-structured answers using bullet points an
 
 KEY INFORMATION ABOUT BOOK DRIVER ANNA SERVICES:
 
-1. IN-CITY HOURLY DRIVER (For Customer's Own Car):
-   - Pricing: Starts @ ₹199 for 2 hours (Minimum 2-hour package).
-   - Extra Hours: ₹80 per additional hour.
-   - Use Cases: Silk Board traffic commute, office runs to Whitefield/Electronic City, shopping sprees in Commercial St/Indiranagar, hospital visits, family errands.
+1. CITY DRIVER (For Customer's Own Car):
+   - Pricing: Point-to-point distance-based driver pricing (starts @ ₹299 base fare).
+   - Use Cases: City traffic commute, office runs to Whitefield/Electronic City, shopping trips, airport drops, hospital visits, family errands.
    - Highlights: Manual & Automatic car specialists, 100% background checked & police verified, prompt doorstep arrival.
 
-2. NIGHT PARTY DRIVER (24/7 Safe Ride Home):
-   - Pricing: Starts @ ₹399 / trip.
-   - Availability: 24/7, active till 4:00 AM.
-   - Features: Strict breathalyzer test before taking the wheel, dual GPS tracking for safety, emergency SOS, doorstep valet drop.
-   - Popular Spots: Indiranagar 100ft Road, Koramangala 80ft Rd, MG Road, Church Street pubs, UB City.
-
-3. OUTSTATION HIGHWAY & HILL DRIVER:
-   - Pricing: Starts @ ₹1,199 / 12 hours (or day).
-   - Packages: Round trip 12hr, 24hr, 46hr, 72hr.
+2. OUTSTATION HIGHWAY & HILL DRIVER:
+   - Pricing: Distance-based tiers (Up to 150 km @ ₹1,199, Up to 300 km @ ₹1,799, Up to 500 km @ ₹2,399).
    - Highlights: Ghat road & hill driving specialists, zero motion-sickness driving, clean driving records.
    - Popular Destinations:
      * Nandi Hills (60 km, ~1.5 hrs)
@@ -34,13 +26,9 @@ KEY INFORMATION ABOUT BOOK DRIVER ANNA SERVICES:
      * Wayanad (280 km, ~6 hrs)
      * Pondicherry (310 km, ~6.5 hrs)
 
-4. MONTHLY / CORPORATE DEDICATED DRIVER:
+3. MONTHLY / CORPORATE DEDICATED DRIVER:
    - Pricing: Starts @ ₹18,000 / month.
    - Features: Dedicated Anna, 100% document & police verified, uniformed, free driver replacement within 24 hours, GST billing for companies.
-
-5. POINT-TO-POINT & ROUND TRIPS:
-   - One-Way Drop: Starts @ ₹249 flat (Point A to Point B drop across Bangalore, Airport BLR T1/T2 drops, no return fare needed for driver).
-   - In-City Round Trip: Starts @ ₹199 / 2 hours (Anna stays with car at all stops).
 
 6. VEHICLE RENTAL FLEET (With Professional Driver):
    - Sedan (Maruti Dzire / Honda City / Etios): 4 seats, 3 bags, ₹399/hr | ₹1,999/day | ₹14/km outstation.
@@ -111,46 +99,40 @@ export function getOfflineKnowledgeResponse(query) {
 
   // 1. Pricing / Rates / Fares
   if (q.includes('rate') || q.includes('price') || q.includes('cost') || q.includes('fare') || q.includes('charge') || q.includes('how much')) {
-    if (q.includes('night') || q.includes('party')) {
-      return {
-        text: `🌙 **Night Party Driver Pricing**:\n\n• **Starting Fare**: ₹399 flat per trip\n• **Extra Hours**: ₹100/hr\n• **Timing**: Active 24/7 up to 4:00 AM\n• **Safety**: 100% breathalyzer tested Anna, GPS tracked, and doorstep drop!\n\nWould you like me to reserve a night party driver for you?`,
-        actions: [{ label: '🚗 Book Night Driver', type: 'driver', data: { tripOption: 'one-way' } }]
-      };
-    }
     if (q.includes('outstation') || q.includes('coorg') || q.includes('mysore') || q.includes('ooty') || q.includes('nandi')) {
       return {
-        text: `🛣️ **Outstation Driver Pricing**:\n\n• **Daily / 12-Hour Package**: Starts @ ₹1,199\n• **Overtime / Extra Hour**: ₹120/hr\n• **Packages Available**: 12hr, 24hr, 48hr, 72hr round trips\n• **Includes**: Experienced ghat & highway drivers, food allowance guidelines, night allowance included after 10 PM.`,
-        actions: [{ label: '🛣️ Book Outstation Anna', type: 'driver', data: { tripOption: 'outstation' } }]
+        text: `🛣️ **Outstation Driver Pricing (Distance-Based)**:\n\n• **Up to 150 km**: ₹1,199 (Mysuru, Hassan)\n• **Up to 300 km**: ₹1,799 (Coorg, Chikmagalur)\n• **Up to 500 km**: ₹2,399 (Wayanad, Ooty, Chennai)\n• **Includes**: Experienced ghat & highway drivers, food allowance guidelines, return bus allowance.`,
+        actions: [{ label: '🛣️ Book Outstation Anna', type: 'driver', data: { driverTripOption: 'outstation' } }]
       };
     }
     if (q.includes('monthly') || q.includes('month') || q.includes('corporate') || q.includes('full time')) {
       return {
         text: `💼 **Monthly / Corporate Driver Fares**:\n\n• **Starting Rate**: ₹18,000 / month\n• **Driver**: Dedicated, background checked & police verified Anna\n• **Guarantee**: Free replacement within 24 hours if Anna is unwell\n• **Billing**: Monthly GST invoicing available for companies.`,
-        actions: [{ label: '💼 Inquire Monthly Driver', type: 'driver', data: { tripOption: 'round-trip' } }]
+        actions: [{ label: '💼 Inquire Corporate Driver', type: 'driver', data: { driverTripOption: 'one-way' } }]
       };
     }
     return {
-      text: `💰 **Book Driver Anna Fares Overview**:\n\n• **In-City Hourly Driver**: Starts @ **₹199** for 2 hours (₹80/extra hr)\n• **Night Party Driver**: Starts @ **₹399** / trip (24/7 till 4 AM)\n• **One-Way Drop (City/Airport)**: Starts @ **₹249** flat\n• **Outstation Driver**: Starts @ **₹1,199** / 12 hrs\n• **Monthly Driver**: Starts @ **₹18,000** / month\n\n• **Car Rentals (Vehicle + Driver)**:\n  - Sedan (Dzire/Etios): ₹1,999/day\n  - SUV (Innova/Ertiga): ₹3,499/day\n  - 12-Seater Tempo: ₹5,499/day`,
+      text: `💰 **Book Driver Anna Fares Overview**:\n\n• **City Driver**: Starts @ **₹299** base (point-to-point distance-based driver for your car)\n• **Outstation Driver**: From **₹1,199** (150 km), **₹1,799** (300 km), **₹2,399** (500 km)\n• **Monthly Corporate Driver**: Starts @ **₹18,000** / month\n\n• **Car Rentals (Vehicle + Driver)**:\n  - Sedan (Dzire/Etios): ₹1,999/day\n  - SUV (Innova/Ertiga): ₹3,499/day\n  - 12-Seater Tempo: ₹5,499/day`,
       actions: [
-        { label: '🚗 Book Hourly Driver', type: 'driver', data: { tripOption: 'round-trip' } },
+        { label: '🚗 Book City Driver', type: 'driver', data: { driverTripOption: 'one-way' } },
         { label: '🚙 Rent a Vehicle', type: 'vehicle', data: {} }
       ]
     };
   }
 
-  // 2. Night Driver
+  // 2. City / Night Driving
   if (q.includes('night') || q.includes('party') || q.includes('alcohol') || q.includes('drink') || q.includes('pub') || q.includes('club') || q.includes('koramangala') || q.includes('indiranagar')) {
     return {
-      text: `🍻 **Night Party Driver Service (Safe Drive Home)**:\n\nParty hard in Indiranagar, Koramangala, or UB City—Anna will drive your car home safely!\n\n• **Fare**: Starts @ ₹399 / trip\n• **Hours**: Available 24/7 until 4:00 AM\n• **Verification**: Strict breathalyzer test before driving\n• **Features**: Live GPS tracking, emergency SOS, and safe doorstep parking.\n\nReady to book your night driver Anna?`,
-      actions: [{ label: '🌙 Book Night Driver', type: 'driver', data: { tripOption: 'one-way' } }]
+      text: `🚗 **Safe City Drive Home**:\n\nReturning late from Indiranagar, Koramangala, or UB City? Anna will drive your car home safely 24/7!\n\n• **Fare**: Standard distance-based City Driver rate (starts @ ₹299 base)\n• **Hours**: Available 24/7\n• **Safety**: Strict police-verified Annas with live GPS tracking and safe doorstep drop.\n\nReady to book your driver Anna?`,
+      actions: [{ label: '🚗 Book City Driver', type: 'driver', data: { driverTripOption: 'one-way' } }]
     };
   }
 
   // 3. Outstation Trips
   if (q.includes('outstation') || q.includes('coorg') || q.includes('mysore') || q.includes('mysuru') || q.includes('ooty') || q.includes('chikmagalur') || q.includes('nandi') || q.includes('wayanad') || q.includes('pondicherry') || q.includes('highway') || q.includes('hill') || q.includes('ghat')) {
     return {
-      text: `🌄 **Outstation Driver Anna Service**:\n\nPlanning a highway getaway? Our experienced highway & ghat-road Annas know the smoothest routes and best roadside breakfast stops!\n\n• **Popular Spots**:\n  - **Nandi Hills**: 60 km (~1.5 hrs)\n  - **Mysore Expressway**: 145 km (~2.5 hrs)\n  - **Chikmagalur / Coorg**: 240-265 km (~4.5 - 5.5 hrs)\n  - **Ooty / Wayanad**: 270-280 km (~6 hrs)\n• **Package**: Starts @ ₹1,199 / 12 hrs\n• **Benefits**: Safe ghat driving, zero motion sickness, night driving certified.`,
-      actions: [{ label: '🛣️ Book Outstation Driver', type: 'driver', data: { tripOption: 'outstation' } }]
+      text: `🌄 **Outstation Driver Anna Service**:\n\nPlanning a highway getaway? Our experienced highway & ghat-road Annas know the smoothest routes and best roadside breakfast stops!\n\n• **Distance Tiers**:\n  - **Up to 150 km**: ₹1,199 (Mysore, Nandi Hills)\n  - **Up to 300 km**: ₹1,799 (Chikmagalur, Coorg)\n  - **Up to 500 km**: ₹2,399 (Ooty, Wayanad, Chennai)\n• **Benefits**: Safe ghat driving, zero motion sickness, return bus allowance included.`,
+      actions: [{ label: '🛣️ Book Outstation Driver', type: 'driver', data: { driverTripOption: 'outstation' } }]
     };
   }
 
@@ -168,9 +150,9 @@ export function getOfflineKnowledgeResponse(query) {
   // 5. Airport BLR
   if (q.includes('airport') || q.includes('blr') || q.includes('terminal') || q.includes('flight') || q.includes('kempegowda')) {
     return {
-      text: `✈️ **Kempegowda Airport (BLR T1 / T2) Service**:\n\n• **Drive Your Car**: One-way drop starts @ ₹249 flat! Anna drops you at Terminal 1 or 2 and you don't have to pay return fare for Anna.\n• **Rental Sedan/SUV**: Airport pickup or drop starts at ₹1,499 all-inclusive.\n• **Punctuality**: 100% on-time guarantee. Annas know the airport expressway bypasses!`,
+      text: `✈️ **Kempegowda Airport (BLR T1 / T2) Service**:\n\n• **Drive Your Car**: Normal City Driver booking with standard distance pricing! Anna drops you at Terminal 1 or 2 safely.\n• **Rental Sedan/SUV**: Airport pickup or drop starting at ₹1,499 all-inclusive.\n• **Punctuality**: 100% on-time guarantee. Annas know the airport expressway bypasses!`,
       actions: [
-        { label: '🚗 Driver For Airport Drop', type: 'driver', data: { tripOption: 'one-way' } },
+        { label: '🚗 Driver For Airport Drop', type: 'driver', data: { driverTripOption: 'one-way' } },
         { label: '✈️ Rent Airport Cab', type: 'vehicle', data: { category: 'Sedan' } }
       ]
     };
@@ -214,11 +196,11 @@ export function getOfflineKnowledgeResponse(query) {
   // 10. Greetings & Default
   if (q.includes('hi') || q.includes('hello') || q.includes('namaskara') || q.includes('namaste') || q.includes('hey') || q === '') {
     return {
-      text: `🙏 **Namaskara boss! Welcome to Book Driver Anna!**\n\nI am your **Anna AI Assistant**. How can I help you today?\n\n• Need an **In-City Hourly Driver** (Starts ₹199)?\n• Heading out for a **Night Party** in Indiranagar/Koramangala (Starts ₹399)?\n• Planning an **Outstation Trip** to Coorg, Nandi Hills or Mysore (Starts ₹1,199)?\n• Want to **Rent a Sedan, SUV or Tempo Traveller**?\n• Want to **Learn Driving with Anna** (Classes start ₹2,999)?\n\nAsk me anything about fares, routes, or click a quick option below!`,
+      text: `🙏 **Namaskara boss! Welcome to Book Driver Anna!**\n\nI am your **Anna AI Assistant**. How can I help you today?\n\n• Need a **City Driver** (Point A to Point B drop across Bangalore from ₹299)?\n• Planning an **Outstation Trip** to Coorg, Nandi Hills or Mysore (Distance-based from ₹1,199)?\n• Need a dedicated **Monthly Corporate Driver**?\n• Want to **Rent a Sedan, SUV or Tempo Traveller**?\n• Want to **Learn Driving with Anna** (Classes start ₹2,999)?\n\nAsk me anything about fares, routes, or click a quick option below!`,
       actions: [
-        { label: '🚗 Hourly Driver Rates', query: 'What are hourly driver rates?' },
+        { label: '🚗 City Driver Drop', query: 'What are city driver rates?' },
         { label: '🎓 Driving Classes', query: 'Tell me about driving classes and fees' },
-        { label: '🌙 Night Party Driver', query: 'Tell me about night party driver' },
+        { label: '💼 Monthly Corporate Driver', query: 'Tell me about monthly corporate driver' },
         { label: '🛣️ Outstation Trips', query: 'Outstation trips to Coorg and Mysore' },
         { label: '🚙 Rental Vehicles', query: 'What rental cars and buses do you have?' }
       ]
@@ -227,9 +209,9 @@ export function getOfflineKnowledgeResponse(query) {
 
   // Generic Catch-All
   return {
-    text: `👍 **Got it boss!**\n\nAt **Book Driver Anna**, we provide verified professional drivers for your own car (starts @ ₹199 for 2 hrs) as well as commercial rental vehicles (Sedans, SUVs, 12-seater Tempos & 24-seater Buses).\n\n• **Instant Booking**: Anna arrives promptly at your doorstep.\n• **24/7 Helpline**: ${SUPPORT_HELPLINE}.\n\nWould you like to book a driver for your car or rent a vehicle?`,
+    text: `👍 **Got it boss!**\n\nAt **Book Driver Anna**, we provide verified professional drivers for your own car (distance-based City Drops from ₹299 & Outstation from ₹1,199) as well as commercial rental vehicles (Sedans, SUVs, 12-seater Tempos & 24-seater Buses).\n\n• **Instant Booking**: Anna arrives promptly at your doorstep.\n• **24/7 Helpline**: ${SUPPORT_HELPLINE}.\n\nWould you like to book a driver for your car or rent a vehicle?`,
     actions: [
-      { label: '🚗 Book a Driver', type: 'driver', data: { tripOption: 'round-trip' } },
+      { label: '🚗 Book a Driver', type: 'driver', data: { driverTripOption: 'one-way' } },
       { label: '🚙 Book a Vehicle', type: 'vehicle', data: {} }
     ]
   };

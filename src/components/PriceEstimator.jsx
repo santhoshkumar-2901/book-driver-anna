@@ -9,8 +9,7 @@ export default function PriceEstimator({ openBookingModal }) {
   
   // Driver estimator state
   const [pickupArea, setPickupArea] = useState('Indiranagar');
-  const [driverDuration, setDriverDuration] = useState('4'); // hours
-  const [driverTripCategory, setDriverTripCategory] = useState('hourly'); // 'hourly', 'night', 'outstation'
+  const [driverServiceType, setDriverServiceType] = useState('city'); // 'city', 'outstation_150', 'outstation_300', 'outstation_500'
 
   // Vehicle estimator state
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_SERVICES[0]);
@@ -22,16 +21,12 @@ export default function PriceEstimator({ openBookingModal }) {
     return getPrice(key, fallback);
   };
 
-  // Driver price calculation using live pricing
+  // Driver price calculation using live pricing (distance-based)
   const calculateDriverFare = () => {
-    let base = getPrice('driver_hourly_2hr', 199);
-    if (driverDuration === '2') base = getPrice('driver_hourly_2hr', 199);
-    else if (driverDuration === '4') base = getPrice('driver_hourly_4hr', 349);
-    else if (driverDuration === '8') base = getPrice('driver_hourly_8hr', 599);
-    else if (driverDuration === '12') base = getPrice('driver_hourly_12hr', 899);
-
-    if (driverTripCategory === 'night') base = getPrice('driver_night_party', 399);
-    if (driverTripCategory === 'outstation') base = getPrice('driver_outstation_12hr', 1199);
+    let base = getPrice('driver_one_way_city', 299);
+    if (driverServiceType === 'outstation_150') base = getPrice('driver_outstation_150km', 1199);
+    else if (driverServiceType === 'outstation_300') base = getPrice('driver_outstation_300km', 1799);
+    else if (driverServiceType === 'outstation_500') base = getPrice('driver_outstation_500km', 2399);
 
     const gst = Math.round(base * 0.05);
     return { base, gst, total: base + gst };
@@ -55,7 +50,10 @@ export default function PriceEstimator({ openBookingModal }) {
     if (bookingType === 'driver') {
       openBookingModal('driver', {
         pickupArea,
-        driverDuration,
+        driverTripOption: driverServiceType === 'city' ? 'one-way' : 'outstation',
+        outstationPackage: driverServiceType === 'outstation_300'
+          ? 'One Way (Up to 300 km)'
+          : (driverServiceType === 'outstation_500' ? 'One Way (Up to 500 km)' : 'One Way (Up to 150 km)'),
         estimatedFare: driverFare.total
       });
     } else {
@@ -141,22 +139,22 @@ export default function PriceEstimator({ openBookingModal }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Booking Duration</span>
+                    <SteeringWheel className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Driver Service & Distance Tier</span>
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
-                      { hours: '2', label: '2 Hours', badge: 'City Commute' },
-                      { hours: '4', label: '4 Hours', badge: 'Shopping / Errands' },
-                      { hours: '8', label: '8 Hours', badge: 'Full Day Duty' },
-                      { hours: '12', label: '12 Hours', badge: 'Extended' }
+                      { id: 'city', label: 'City Driver', badge: 'Point-to-Point' },
+                      { id: 'outstation_150', label: 'Outstation 150km', badge: 'Mysuru, Hassan' },
+                      { id: 'outstation_300', label: 'Outstation 300km', badge: 'Coorg, Chikmagalur' },
+                      { id: 'outstation_500', label: 'Outstation 500km', badge: 'Wayanad, Ooty' }
                     ].map((item) => (
                       <button
-                        key={item.hours}
+                        key={item.id}
                         type="button"
-                        onClick={() => setDriverDuration(item.hours)}
+                        onClick={() => setDriverServiceType(item.id)}
                         className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                          driverDuration === item.hours
+                          driverServiceType === item.id
                             ? 'bg-amber-500/10 border-amber-500 text-white font-bold'
                             : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                         }`}

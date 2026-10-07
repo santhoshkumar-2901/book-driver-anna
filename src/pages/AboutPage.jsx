@@ -82,7 +82,7 @@ export default function AboutPage({ openBookingModal }) {
             { step: '02', title: 'Driving Assessment', desc: 'Manual and automatic transmission practical evaluation in dense peak-hour traffic.' },
             { step: '03', title: 'Bengaluru Route Exam', desc: 'Assessment of major arterials, toll roads, airport corridors, and bypass routes.' },
             { step: '04', title: 'Customer Decorum', desc: 'Training in professional etiquette, vehicle hygiene, and road safety regulations.' },
-            { step: '05', title: 'Alcohol Screening', desc: 'Mandatory breathalyzer verification for late-night party return drivers.' }
+            { step: '05', title: 'Alcohol Screening', desc: 'Zero-tolerance alcohol screening and mandatory breathalyzer verification for drivers.' }
           ].map((s) => (
             <div key={s.step} className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-1.5">
               <span className="text-lg font-bold text-amber-500 font-mono">{s.step}</span>
