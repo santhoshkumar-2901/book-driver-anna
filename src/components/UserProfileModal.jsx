@@ -275,10 +275,10 @@ export default function UserProfileModal({
               category: b.booking_type === 'vehicle' ? 'Car Rental' : (b.booking_type === 'class' ? 'Driving School' : 'Personal Driver'),
               date: b.date || 'Recent',
               time: b.time || '',
-              pickup: b.pickup_area || 'Indiranagar',
-              drop: b.drop_location || '',
-              pickupArea: b.pickup_area || 'Indiranagar',
-              dropLocation: b.drop_location || '',
+              pickup: b.pickup_location || b.pickupLocation || b.pickup_area || b.pickupArea || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location',
+              drop: b.drop_location || b.dropLocation || b.destination || '',
+              pickupArea: b.pickup_location || b.pickupLocation || b.pickup_area || b.pickupArea || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location',
+              dropLocation: b.drop_location || b.dropLocation || b.destination || '',
               amount: b.calculated_fare ? `₹${b.calculated_fare}` : '₹299',
               status: displayStatus,
               isPaid,
@@ -365,8 +365,8 @@ export default function UserProfileModal({
               category: 'Personal Driver',
               date: b.date || b.bookingDate || 'Recent',
               time: b.time || b.bookingTime || '',
-              pickup: b.pickupArea || 'Indiranagar',
-              drop: b.dropLocation || '',
+              pickup: b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location',
+              drop: b.dropLocation || b.drop_location || b.destination || '',
               amount: b.estimatedPrice || b.fare || '₹299',
               status: isLocalPaid ? 'Completed' : displayStatus,
               isPaid: isLocalPaid,
@@ -434,8 +434,8 @@ export default function UserProfileModal({
               category: 'Car Rental',
               date: b.startDate || b.date || 'Recent',
               time: b.pickupTime || b.time || '',
-              pickup: b.pickupLocation || b.pickupArea || 'Bengaluru',
-              drop: b.dropLocation || '',
+              pickup: b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location',
+              drop: b.dropLocation || b.drop_location || b.destination || '',
               amount: b.totalPrice ? `₹${b.totalPrice}` : (b.fare ? `₹${b.fare}` : '₹1,499'),
               status: isLocalPaid ? 'Completed' : displayStatus,
               isPaid: isLocalPaid,
@@ -494,7 +494,7 @@ export default function UserProfileModal({
               category: 'Driving School',
               date: b.startDate || 'Upcoming',
               time: b.preferredSlot || '',
-              pickup: b.pickupArea || 'Doorstep',
+              pickup: b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickupAddress || b.address || b.streetAddress || 'Doorstep Pickup',
               drop: '',
               amount: b.courseFee || '₹3,999',
               status: displayStatus,
@@ -731,7 +731,7 @@ export default function UserProfileModal({
 
                 <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg">
                   <div className="text-[10px] text-slate-400 uppercase font-semibold">Primary Hub</div>
-                  <div className="text-base font-bold text-slate-200 mt-0.5 truncate">{clientUser.area || 'Indiranagar'}</div>
+                  <div className="text-base font-bold text-slate-200 mt-0.5 truncate">{clientUser.area || 'Not Specified'}</div>
                   <div className="text-[10px] text-slate-400">Registered Locality</div>
                 </div>
 
@@ -797,7 +797,7 @@ export default function UserProfileModal({
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-red-400" /> Operating Locality:
                       </div>
-                      <div className="font-bold text-amber-400 text-xs mt-0.5">{clientUser.area || 'Indiranagar'}</div>
+                      <div className="font-bold text-amber-400 text-xs mt-0.5">{clientUser.area || 'Not Specified'}</div>
                     </div>
 
                   </div>

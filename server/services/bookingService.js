@@ -8,10 +8,10 @@ import { publishBookingAssignmentChange } from './realtimeService.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
-  'PENDING': ['ASSIGNED', 'CONFIRMED', 'IN_PROGRESS', 'CANCELLED'],
-  'CONFIRMED': ['ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED'],
-  'ASSIGNED': ['ARRIVED', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'],
-  'ARRIVED': ['IN_PROGRESS', 'COMPLETED', 'CONFIRMED', 'CANCELLED'],
+  'PENDING': ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
+  'CONFIRMED': ['ASSIGNED', 'CANCELLED', 'COMPLETED'],
+  'ASSIGNED': ['ARRIVED', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED', 'COMPLETED'],
+  'ARRIVED': ['IN_PROGRESS', 'CONFIRMED', 'CANCELLED', 'COMPLETED'],
   'IN_PROGRESS': ['COMPLETED'],
   'COMPLETED': [], // Terminal
   'CANCELLED': []  // Terminal
@@ -31,7 +31,7 @@ export async function createBooking({
   outstationTripType = 'round-trip',
   outstationPackage = 'Round trip 24hr',
   outstationDestination = '',
-  pickupArea = 'Indiranagar',
+  pickupArea = 'Pickup Location',
   pickupLat = undefined,
   pickupLng = undefined,
   destLat = undefined,
@@ -49,7 +49,9 @@ export async function createBooking({
   paymentMode = 'cash',
   preferredDriverId = null,
   idempotencyKey = null,
-  ipAddress = null
+  ipAddress = null,
+  useDistancePricing = false,
+  isDistancePricing = false
 }) {
   // 1. Validate Mandatory Customer Details
   if (!customerPhone || typeof customerPhone !== 'string' || !customerPhone.trim()) {
@@ -138,6 +140,14 @@ export async function createBooking({
     validatedDestLat = parsedDLat;
     validatedDestLng = parsedDLng;
 
+    // Same-location protection: Pickup and destination coordinates must be distinct
+    if (Math.abs(validatedPickupLat - validatedDestLat) < 0.0001 && Math.abs(validatedPickupLng - validatedDestLng) < 0.0001) {
+      const err = new Error('Pickup and destination must be different.');
+      err.statusCode = 400;
+      err.code = 'SAME_LOCATION';
+      throw err;
+    }
+
     try {
       const routeData = await routingService.getRoute({
         pickupLat: validatedPickupLat,
@@ -150,8 +160,12 @@ export async function createBooking({
         durationMinutes = routeData.durationMinutes;
       }
     } catch (routeErr) {
-      if (routeErr.code === 'INVALID_COORDINATES' || routeErr.code === 'NO_ROUTE_FOUND') {
+      if (routeErr.code === 'INVALID_COORDINATES' || routeErr.code === 'NO_ROUTE_FOUND' || routeErr.code === 'SAME_LOCATION') {
         routeErr.statusCode = routeErr.status || 400;
+        throw routeErr;
+      }
+      if (isDistancePricing || useDistancePricing || driverTripOption === 'distance') {
+        routeErr.statusCode = routeErr.status || 502;
         throw routeErr;
       }
       // Graceful degradation: External route provider timeout or network error must not crash booking creation
@@ -171,7 +185,9 @@ export async function createBooking({
     outstationTripType,
     outstationPackage,
     distanceKm,
-    durationMinutes
+    durationMinutes,
+    isDistancePricing: isDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver' && driverTripOption === 'distance'),
+    useDistancePricing: useDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver' && driverTripOption === 'distance')
   }, pricingData?.map || null);
 
   // 4. Generate Cryptographically Secure Booking ID
@@ -237,37 +253,108 @@ export async function createBooking({
       assignedDriverId = preferredDriverId;
     }
 
-    await tx.execute(`
-      INSERT INTO bookings (
-        id, user_id, customer_name, customer_phone, customer_email,
-        booking_type, trip_type, service_name, pickup_area, drop_location,
-        pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
-        date, time, calculated_fare, payment_mode, status,
-        assigned_driver_id, idempotency_key
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
-    `, [
-      bookingId,
-      userId,
-      customerName.trim(),
-      customerPhone.trim(),
-      customerEmail ? customerEmail.trim() : null,
-      bookingCategory,
-      driverTripOption || bookingCategory,
-      serviceName,
-      pickupArea,
-      dropLocation,
-      validatedPickupLat,
-      validatedPickupLng,
-      validatedDestLat,
-      validatedDestLng,
-      date,
-      time,
-      fareResult.totalFare,
-      paymentMode,
-      assignedDriverId,
-      idempotencyKey
-    ]);
+    let hasSnapshotColumns = true;
+    if (!isTiDB) {
+      try {
+        const info = await tx.queryAll('PRAGMA table_info(bookings)');
+        hasSnapshotColumns = info.some(c => (c.name || '').toLowerCase() === 'distance_km');
+      } catch (e) {
+        hasSnapshotColumns = false;
+      }
+    }
+
+    try {
+      if (hasSnapshotColumns) {
+        await tx.execute(`
+          INSERT INTO bookings (
+            id, user_id, customer_name, customer_phone, customer_email,
+            booking_type, trip_type, service_name, pickup_area, drop_location,
+            pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
+            date, time, calculated_fare, payment_mode, status,
+            assigned_driver_id, idempotency_key,
+            distance_km, base_fare, price_per_km, distance_fare,
+            waiting_minutes, waiting_fare, night_surcharge, discount_amount,
+            currency, pricing_version
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          bookingId,
+          userId,
+          customerName.trim(),
+          customerPhone.trim(),
+          customerEmail ? customerEmail.trim() : null,
+          bookingCategory,
+          driverTripOption || bookingCategory,
+          serviceName,
+          pickupArea,
+          dropLocation,
+          validatedPickupLat,
+          validatedPickupLng,
+          validatedDestLat,
+          validatedDestLng,
+          date,
+          time,
+          fareResult.calculatedFare ?? fareResult.totalFare,
+          paymentMode,
+          assignedDriverId,
+          idempotencyKey,
+          fareResult.distanceKm ?? (distanceKm !== null && distanceKm !== undefined ? Number(distanceKm) : null),
+          fareResult.baseFare ?? fareResult.basePrice ?? null,
+          fareResult.pricePerKm ?? null,
+          fareResult.distanceFare ?? null,
+          fareResult.waitingMinutes ?? 0,
+          fareResult.waitingFare ?? 0,
+          fareResult.nightSurcharge ?? 0,
+          fareResult.discountAmount ?? 0,
+          fareResult.currency || 'INR',
+          fareResult.pricingVersion || 1
+        ]);
+      } else {
+        await tx.execute(`
+          INSERT INTO bookings (
+            id, user_id, customer_name, customer_phone, customer_email,
+            booking_type, trip_type, service_name, pickup_area, drop_location,
+            pickup_latitude, pickup_longitude, destination_latitude, destination_longitude,
+            date, time, calculated_fare, payment_mode, status,
+            assigned_driver_id, idempotency_key
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+        `, [
+          bookingId,
+          userId,
+          customerName.trim(),
+          customerPhone.trim(),
+          customerEmail ? customerEmail.trim() : null,
+          bookingCategory,
+          driverTripOption || bookingCategory,
+          serviceName,
+          pickupArea,
+          dropLocation,
+          validatedPickupLat,
+          validatedPickupLng,
+          validatedDestLat,
+          validatedDestLng,
+          date,
+          time,
+          fareResult.calculatedFare ?? fareResult.totalFare,
+          paymentMode,
+          assignedDriverId,
+          idempotencyKey
+        ]);
+      }
+    } catch (insertErr) {
+      if (idempotencyKey && (
+        insertErr.message?.includes('UNIQUE constraint failed') ||
+        insertErr.message?.includes('Duplicate entry') ||
+        insertErr.code === 'ER_DUP_ENTRY'
+      )) {
+        const existing = await queryOne('SELECT * FROM bookings WHERE idempotency_key = ?', [idempotencyKey]);
+        if (existing) {
+          return { booking: existing, isDuplicate: true };
+        }
+      }
+      throw insertErr;
+    }
 
     const newBooking = await tx.queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
 
@@ -302,7 +389,7 @@ export async function cancelBooking({ bookingId, requesterUser = null, requester
   const cleanBookingPhone = (booking.customer_phone || '').replace(/[^0-9]/g, '').slice(-10);
   const cleanRequesterPhone = (requesterPhone || '').replace(/[^0-9]/g, '').slice(-10);
   const isGuestBooking = !booking.user_id;
-  const isPhoneMatch = isGuestBooking && cleanRequesterPhone && cleanBookingPhone.endsWith(cleanRequesterPhone);
+  const isPhoneMatch = isGuestBooking && cleanRequesterPhone && cleanRequesterPhone.length >= 10 && cleanBookingPhone === cleanRequesterPhone;
 
   if (!isAdmin && !isOwner && !isPhoneMatch) {
     await logAuditEvent({
@@ -431,11 +518,35 @@ export async function updateBookingStatus({
   // Defense-in-depth: Enforce role-based ownership authorization at service layer
   if (requesterUser) {
     if (requesterUser.role === 'driver') {
-      const requesterDriverId = requesterUser.driverId;
-      if (!booking.assigned_driver_id || (requesterDriverId && booking.assigned_driver_id !== requesterDriverId)) {
+      let requesterDriverId = requesterUser.driverId;
+      if (!requesterDriverId && requesterUser.id) {
+        const dRec = await qOne('SELECT id, status FROM drivers WHERE user_id = ?', [requesterUser.id]);
+        if (dRec) {
+          requesterDriverId = dRec.id;
+          if (dRec.status !== 'Active') {
+            const err = new Error(`Driver account is ${dRec.status.toLowerCase()}. Protected driver operations are disabled.`);
+            err.statusCode = 403;
+            err.code = 'DRIVER_INACTIVE';
+            throw err;
+          }
+        }
+      }
+      if (!booking.assigned_driver_id || !requesterDriverId || booking.assigned_driver_id !== requesterDriverId) {
         const err = new Error('Access denied: You are not authorized to modify this booking.');
         err.statusCode = 403;
         err.code = 'FORBIDDEN';
+        throw err;
+      }
+      if (['PENDING', 'CONFIRMED', 'CANCELLED', 'ASSIGNED'].includes(normalizedNewStatus)) {
+        const err = new Error(`Drivers cannot transition booking to '${normalizedNewStatus}'.`);
+        err.statusCode = 400;
+        err.code = 'INVALID_STATE_TRANSITION';
+        throw err;
+      }
+      if (currentStatus === 'ASSIGNED' && normalizedNewStatus === 'COMPLETED') {
+        const err = new Error('Drivers cannot complete booking directly from ASSIGNED without starting the trip.');
+        err.statusCode = 400;
+        err.code = 'INVALID_STATE_TRANSITION';
         throw err;
       }
     } else if (requesterUser.role === 'customer') {
@@ -565,7 +676,7 @@ export async function updateBookingStatus({
     }
   }
 
-  if (assignedDriverId !== undefined || normalizedNewStatus !== currentStatus) {
+  if (!tx && (assignedDriverId !== undefined || normalizedNewStatus !== currentStatus)) {
     try {
       await publishBookingAssignmentChange({
         bookingId,
@@ -684,7 +795,7 @@ export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = n
     throw err;
   }
 
-  return await withTransaction(async (tx) => {
+  const updated = await withTransaction(async (tx) => {
     // Pessimistic / row lock on booking
     const lockSql = isTiDB
       ? 'SELECT * FROM bookings WHERE id = ? FOR UPDATE'
@@ -732,9 +843,9 @@ export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = n
       throw err;
     }
 
-    // Update booking with driver assignment
+    let updateResult;
     try {
-      await tx.execute(`
+      updateResult = await tx.execute(`
         UPDATE bookings
         SET status = 'ASSIGNED',
             assigned_driver_id = ?,
@@ -745,7 +856,7 @@ export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = n
       `, [driver.id, driver.name, driver.phone, bookingId]);
     } catch (updateErr) {
       if (updateErr.message && (updateErr.message.includes('assigned_driver_name') || updateErr.message.includes('1054') || updateErr.message.includes('42S22'))) {
-        await tx.execute(`
+        updateResult = await tx.execute(`
           UPDATE bookings
           SET status = 'ASSIGNED',
               assigned_driver_id = ?,
@@ -755,6 +866,13 @@ export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = n
       } else {
         throw updateErr;
       }
+    }
+
+    if (!updateResult || updateResult.affectedRows === 0) {
+      const err = new Error('This duty has already been accepted by another driver.');
+      err.statusCode = 409;
+      err.code = 'DUTY_ALREADY_CLAIMED';
+      throw err;
     }
 
     let updated;
@@ -791,18 +909,20 @@ export async function acceptDriverDuty({ bookingId, requesterUser, ipAddress = n
       ipAddress
     });
 
-    try {
-      await publishBookingAssignmentChange({
-        bookingId,
-        assignedDriverId: driver.id,
-        assignedDriverName: driver.name,
-        assignedDriverPhone: driver.phone,
-        status: 'ASSIGNED'
-      });
-    } catch (realtimeErr) {
-      // Non-blocking
-    }
-
     return updated;
   });
+
+  try {
+    await publishBookingAssignmentChange({
+      bookingId,
+      assignedDriverId: updated?.assigned_driver_id || driver.id,
+      assignedDriverName: updated?.assigned_driver_name || driver.name,
+      assignedDriverPhone: updated?.assigned_driver_phone || driver.phone,
+      status: 'ASSIGNED'
+    });
+  } catch (realtimeErr) {
+    // Non-blocking
+  }
+
+  return updated;
 }

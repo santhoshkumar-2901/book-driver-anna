@@ -177,8 +177,8 @@ export default function AdminDriverTab({
 
               <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 min-w-0 overflow-hidden">
                 <div className="text-slate-400 font-bold uppercase text-[10px]">Pickup & Drop Route</div>
-                <div className="font-semibold text-slate-200 flex items-center gap-1 min-w-0">
-                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupArea || b.pickup_area || b.pickup || 'Pickup Location'}</span>
+                <div className="font-semibold text-slate-200 flex items-center gap-1 min-w-0" title={b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickup || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location'}>
+                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" /> <span className="truncate min-w-0">{b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickup || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location'}</span>
                 </div>
                 <div className="text-slate-400 truncate min-w-0" title={b.dropLocation || b.drop_location || b.destination}>Drop: {b.dropLocation || b.drop_location || b.destination || 'Drop Location'}</div>
               </div>

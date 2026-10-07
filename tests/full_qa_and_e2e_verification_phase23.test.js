@@ -731,7 +731,7 @@ describe('Antigravity Phase 23 — Full QA & End-to-End Verification Suite', () 
     test('7.4 GeocodingService normalizes external Nominatim items strictly', () => {
       const service = new GeocodingService();
       const raw = [
-        { place_id: 1, lat: '12.9716', lon: '77.5946', display_name: 'Bengaluru, Karnataka', type: 'city' },
+        { place_id: 1, lat: '12.9716', lon: '77.5946', display_name: 'Bengaluru, Karnataka, India', type: 'city', address: { country_code: 'in' } },
         { place_id: 2, lat: 'NaN', lon: '77.5', display_name: 'Bad Lat' },
         { place_id: 3, lat: '12.5', lon: '200', display_name: 'Bad Lon' },
         { place_id: 4, lat: '12.5', lon: '77.5', display_name: '' } // Empty display name
@@ -739,7 +739,7 @@ describe('Antigravity Phase 23 — Full QA & End-to-End Verification Suite', () 
 
       const normalized = service.normalizeResults(raw);
       assert.strictEqual(normalized.length, 1);
-      assert.strictEqual(normalized[0].displayName, 'Bengaluru, Karnataka');
+      assert.strictEqual(normalized[0].displayName, 'Bengaluru, Karnataka, India');
       assert.strictEqual(normalized[0].latitude, 12.9716);
       assert.strictEqual(normalized[0].longitude, 77.5946);
     });

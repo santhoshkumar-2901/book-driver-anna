@@ -13,16 +13,16 @@ import { publishBookingAssignmentChange } from '../services/realtimeService.js';
 const router = Router();
 
 /**
- * Handle estimate request for both POST and GET /api/bookings/estimate
+ * Handle estimate request for both POST and GET /api/bookings/estimate & /api/bookings/fare-estimate
  */
 const handleEstimateRequest = async (req, res, next) => {
   try {
     const params = req.method === 'POST' ? req.body : req.query;
 
-    const pickupLat = params.pickupLat ?? params.pickupLatitude;
-    const pickupLng = params.pickupLng ?? params.pickupLongitude;
-    const destLat = params.destLat ?? params.destinationLatitude;
-    const destLng = params.destLng ?? params.destinationLongitude;
+    const pickupLat = params.pickup?.latitude ?? params.pickup?.lat ?? params.pickupLat ?? params.pickupLatitude ?? params.pickup_latitude;
+    const pickupLng = params.pickup?.longitude ?? params.pickup?.lng ?? params.pickupLng ?? params.pickupLongitude ?? params.pickup_longitude;
+    const destLat = params.destination?.latitude ?? params.destination?.lat ?? params.destLat ?? params.destinationLatitude ?? params.destination_latitude;
+    const destLng = params.destination?.longitude ?? params.destination?.lng ?? params.destLng ?? params.destinationLongitude ?? params.destination_longitude;
 
     if (
       pickupLat === undefined || pickupLng === undefined ||
@@ -70,13 +70,24 @@ const handleEstimateRequest = async (req, res, next) => {
       });
     }
 
+    if (Math.abs(pLat - dLat) < 0.0001 && Math.abs(pLng - dLng) < 0.0001) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'SAME_LOCATION',
+          message: 'Pickup and destination must be different.'
+        }
+      });
+    }
+
+    const category = params.bookingType || params.bookingCategory || 'driver';
     const validCategories = ['driver', 'vehicle', 'class'];
-    if (params.bookingCategory && !validCategories.includes(params.bookingCategory)) {
+    if (!validCategories.includes(category)) {
       return res.status(400).json({
         success: false,
         error: {
           code: 'UNSUPPORTED_SERVICE',
-          message: `Unsupported booking service category '${params.bookingCategory}'.`
+          message: `Unsupported booking service category '${category}'.`
         }
       });
     }
@@ -100,21 +111,36 @@ const handleEstimateRequest = async (req, res, next) => {
       });
     }
 
-    // 2. Fetch live pricing tariffs
+    // 2. Fetch live pricing tariffs from database
     const pricingData = await getAllPricing().catch(() => null);
 
-    // 3. Authoritative Fare Calculation
+    // Determine if distance pricing should be applied
+    const isFareEstimateRoute = req.originalUrl?.includes('fare-estimate') || req.path?.includes('fare-estimate');
+    const isPackageTrip = params.driverTripOption === 'round-trip' || params.driverTripOption === 'outstation';
+    const isDistanceRequested = !isPackageTrip && Boolean(
+      params.useDistancePricing === true ||
+      params.isDistancePricing === true ||
+      params.driverTripOption === 'distance' ||
+      params.bookingType === 'distance' ||
+      (category === 'driver' && isFareEstimateRoute && (!params.driverTripOption || params.driverTripOption === 'one-way' || params.driverTripOption === 'distance'))
+    );
+
+    // 3. Authoritative Fare Calculation on Backend
     const fareResult = calculateAuthoritativeFare({
-      bookingCategory: params.bookingCategory || 'driver',
+      bookingCategory: category,
+      bookingType: params.bookingType,
       selectedClassId: params.selectedClassId,
       vehicleCategory: params.vehicleCategory,
-      driverTripOption: params.driverTripOption || 'one-way',
-      dropLocation: params.dropLocation || '',
+      driverTripOption: params.driverTripOption || (isDistanceRequested ? 'distance' : 'one-way'),
+      dropLocation: params.dropLocation || (params.destination?.displayName || ''),
       roundTripDuration: params.roundTripDuration,
       outstationTripType: params.outstationTripType,
       outstationPackage: params.outstationPackage,
       distanceKm: routeData.distanceKm,
-      durationMinutes: routeData.durationMinutes
+      durationMinutes: routeData.durationMinutes,
+      isDistancePricing: isDistanceRequested,
+      useDistancePricing: isDistanceRequested,
+      waitingMinutes: params.waitingMinutes || 0
     }, pricingData?.map || null);
 
     res.json({
@@ -124,17 +150,45 @@ const handleEstimateRequest = async (req, res, next) => {
         durationMinutes: routeData.durationMinutes,
         distanceMeters: routeData.distanceMeters,
         durationSeconds: routeData.durationSeconds,
-        basePrice: fareResult.basePrice,
-        gst: fareResult.gst,
-        estimatedFare: fareResult.totalFare,
+        baseFare: fareResult.baseFare ?? fareResult.basePrice,
+        pricePerKm: fareResult.pricePerKm ?? 0,
+        distanceFare: fareResult.distanceFare ?? 0,
+        minimumFare: fareResult.minimumFare ?? 0,
+        minimumFareApplied: fareResult.minimumFareApplied || false,
+        waitingMinutes: fareResult.waitingMinutes ?? 0,
+        waitingFare: fareResult.waitingFare ?? 0,
+        nightSurcharge: fareResult.nightSurcharge ?? 0,
+        discountAmount: fareResult.discountAmount ?? 0,
+        subtotal: fareResult.subtotal ?? fareResult.totalFare,
+        calculatedFare: fareResult.calculatedFare ?? fareResult.totalFare,
+        estimatedFare: fareResult.calculatedFare ?? fareResult.totalFare,
         totalFare: fareResult.totalFare,
-        currency: fareResult.currency || 'INR'
+        basePrice: fareResult.basePrice,
+        gst: fareResult.gst ?? 0,
+        currency: fareResult.currency || 'INR',
+        pricingVersion: fareResult.pricingVersion || 1,
+        fareBreakdown: fareResult.fareBreakdown || {
+          baseFare: fareResult.baseFare ?? fareResult.basePrice,
+          pricePerKm: fareResult.pricePerKm ?? 0,
+          distanceKm: routeData.distanceKm,
+          distanceFare: fareResult.distanceFare ?? 0,
+          minimumFare: fareResult.minimumFare ?? 0,
+          waitingMinutes: 0,
+          waitingFare: 0,
+          nightSurcharge: 0,
+          discountAmount: 0,
+          estimatedTotal: fareResult.totalFare
+        }
       }
     });
   } catch (err) {
     next(err);
   }
 };
+
+// POST & GET /api/bookings/fare-estimate
+router.post('/fare-estimate', bookingRateLimiter, handleEstimateRequest);
+router.get('/fare-estimate', bookingRateLimiter, handleEstimateRequest);
 
 // POST & GET /api/bookings/estimate
 router.post('/estimate', bookingRateLimiter, handleEstimateRequest);
@@ -160,7 +214,7 @@ router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (
       outstationTripType: req.body.outstationTripType,
       outstationPackage: req.body.outstationPackage,
       outstationDestination: req.body.outstationDestination,
-      pickupArea: req.body.pickupArea,
+      pickupArea: req.body.pickupArea || req.body.pickupLocation || req.body.pickup || req.body.address || 'Pickup Location',
       pickupLat: req.body.pickupLat ?? req.body.pickupLatitude ?? req.body.pickup_latitude,
       pickupLng: req.body.pickupLng ?? req.body.pickupLongitude ?? req.body.pickup_longitude,
       destLat: req.body.destLat ?? req.body.destinationLatitude ?? req.body.destination_latitude,
@@ -360,7 +414,7 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
     }
 
     // State Machine Validation:
-    // Only pre-completion states ('CONFIRMED', 'ASSIGNED', 'IN_PROGRESS') can be completed.
+    // Only pre-completion states ('CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS') can be completed.
     // Explicitly reject PENDING, CANCELLED, and COMPLETED.
     const COMPLETABLE_STATES = ['CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS'];
     if (!COMPLETABLE_STATES.includes(booking.status)) {
@@ -369,6 +423,18 @@ router.post('/:id/complete', requireAuth, async (req, res, next) => {
         error: {
           code: 'INVALID_STATE_TRANSITION',
           message: `Cannot complete booking in '${booking.status}' status.`
+        }
+      });
+    }
+
+    // Role-specific lifecycle constraint:
+    // Drivers cannot jump directly from ASSIGNED or CONFIRMED to COMPLETED without starting the trip.
+    if (req.user.role === 'driver' && (booking.status === 'ASSIGNED' || booking.status === 'CONFIRMED')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATE_TRANSITION',
+          message: `Drivers cannot jump directly from '${booking.status}' to COMPLETED without starting the trip.`
         }
       });
     }
@@ -426,6 +492,96 @@ router.get('/:id', requireAuth, checkBookingOwnership, (req, res) => {
     success: true,
     data: { booking: req.booking }
   });
+});
+
+// GET /api/bookings/:id/driver-location (Booking-scoped live driver tracking with ownership verification)
+router.get('/:id/driver-location', requireAuth, checkBookingOwnership, async (req, res, next) => {
+  try {
+    const booking = req.booking;
+
+    // Terminal state protection: live driver tracking stops on COMPLETED or CANCELLED
+    const upperStatus = String(booking.status || '').toUpperCase();
+    if (upperStatus === 'COMPLETED' || upperStatus === 'CANCELLED') {
+      return res.json({
+        success: true,
+        data: {
+          trackingActive: false,
+          status: booking.status,
+          message: `Trip is ${booking.status.toLowerCase()}. Live tracking is concluded.`,
+          location: null
+        }
+      });
+    }
+
+    // Check if a driver is assigned
+    if (!booking.assigned_driver_id) {
+      return res.json({
+        success: true,
+        data: {
+          trackingActive: false,
+          status: booking.status,
+          assignedDriver: null,
+          message: 'No driver assigned to this booking yet.',
+          location: null
+        }
+      });
+    }
+
+    // Retrieve ONLY the assigned driver's coordinates and freshness timestamp
+    const driver = await queryOne(
+      'SELECT id, name, status, current_latitude, current_longitude, last_location_update FROM drivers WHERE id = ?',
+      [booking.assigned_driver_id]
+    );
+
+    if (!driver || driver.current_latitude === null || driver.current_longitude === null) {
+      return res.json({
+        success: true,
+        data: {
+          trackingActive: true,
+          status: booking.status,
+          assignedDriver: {
+            id: driver?.id || booking.assigned_driver_id,
+            name: booking.assigned_driver_name || driver?.name || 'Assigned Driver'
+          },
+          freshness: 'UNAVAILABLE',
+          message: 'Driver location is not yet available.',
+          location: null
+        }
+      });
+    }
+
+    // Evaluate freshness: LIVE (<= 45s), STALE (> 45s)
+    let freshness = 'UNAVAILABLE';
+    if (driver.last_location_update) {
+      const rawDateStr = String(driver.last_location_update);
+      const isoStr = (rawDateStr.includes('T') ? rawDateStr : rawDateStr.replace(' ', 'T')) + (rawDateStr.endsWith('Z') ? '' : 'Z');
+      const ageMs = Date.now() - new Date(isoStr).getTime();
+      freshness = (!isNaN(ageMs) && Math.abs(ageMs) <= 45000) ? 'LIVE' : 'STALE';
+    }
+
+    res.json({
+      success: true,
+      data: {
+        trackingActive: true,
+        status: booking.status,
+        bookingId: booking.id,
+        assignedDriver: {
+          id: driver.id,
+          name: booking.assigned_driver_name || driver.name
+        },
+        freshness,
+        location: {
+          latitude: Number(driver.current_latitude),
+          longitude: Number(driver.current_longitude),
+          updatedAt: driver.last_location_update,
+          isLive: freshness === 'LIVE',
+          isStale: freshness === 'STALE'
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

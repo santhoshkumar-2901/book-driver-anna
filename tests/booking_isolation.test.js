@@ -42,7 +42,7 @@ describe('Booking Isolation: Demo Users vs New Users', () => {
         driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
-        date: '2026-10-05',
+        date: '2026-10-15',
         time: '06:30 AM'
       })
     });

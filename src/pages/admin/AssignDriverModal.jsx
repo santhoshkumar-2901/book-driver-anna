@@ -243,7 +243,7 @@ export default function AssignDriverModal({
                 <span>Fare: <strong className="text-amber-400">₹{booking.fare}</strong></span>
               </div>
               <div className="text-slate-400 truncate">
-                📍 Pickup: <strong>{booking.pickupArea}</strong> → Drop: <strong>{booking.dropLocation || 'Local Service'}</strong>
+                📍 Pickup: <strong>{booking.pickupLocation || booking.pickup_location || booking.pickupArea || booking.pickup_area || 'Pickup Location'}</strong> → Drop: <strong>{booking.dropLocation || booking.drop_location || 'Local Service'}</strong>
               </div>
               <div className="text-slate-400">
                 📅 Schedule: <strong>{booking.date} at {booking.time}</strong>

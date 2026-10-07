@@ -59,7 +59,7 @@ export const normalizeDriverBooking = (b) => {
     email: b.email || b.customer_email || b.customerEmail || '',
     tripType: b.tripType || b.trip_type || 'one-way',
     tripTitle: b.tripTitle || b.service_name || (b.tripType ? `${b.tripType} Driver` : 'Driver Service'),
-    pickupArea: b.pickupArea || b.pickup_area || b.pickup || 'Pickup Location',
+    pickupArea: b.pickupLocation || b.pickup_location || b.pickupArea || b.pickup_area || b.pickup || b.pickupAddress || b.address || b.streetAddress || 'Pickup Location',
     dropLocation: b.dropLocation || b.drop_location || b.destination || 'Drop Location',
     date: b.date || b.bookingDate || '',
     time: b.time || b.bookingTime || '',
@@ -1185,7 +1185,7 @@ export default function AdminPage({ onReturnToClient }) {
     const rawPhone = booking.phone || booking.customer_phone || booking.customerPhone || '';
     const cleanClientPhone = rawPhone.replace(/[^0-9]/g, '');
     const clientName = booking.customerName || booking.customer_name || booking.name || 'Valued Customer';
-    const pickup = booking.pickupArea || booking.pickup_area || booking.pickup || 'Pickup Area';
+    const pickup = booking.pickupLocation || booking.pickup_location || booking.pickupArea || booking.pickup_area || booking.pickup || booking.pickupAddress || booking.address || 'Pickup Area';
     const drop = booking.dropLocation || booking.drop_location || booking.destination || 'Drop Location';
     const fare = booking.fare !== undefined ? booking.fare : (booking.calculated_fare !== undefined ? booking.calculated_fare : (booking.totalFare || 0));
 

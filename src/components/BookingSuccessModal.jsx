@@ -22,6 +22,16 @@ function getHaversineDistanceMeters(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+const STATUS_LIFECYCLE_RANK = {
+  'PENDING': 1,
+  'CONFIRMED': 2,
+  'ASSIGNED': 3,
+  'ARRIVED': 4,
+  'IN_PROGRESS': 5,
+  'COMPLETED': 6,
+  'CANCELLED': 6
+};
+
 export default function BookingSuccessModal({ booking, onClose, onSimulateRidePayment }) {
   useScrollLock(Boolean(booking));
 
@@ -65,6 +75,7 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
   );
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState('Change of travel plans');
+  const lastStatusMetaRef = useRef({ timestamp: 0, status: null });
 
   // Synchronize state when booking prop changes (cross-booking isolation)
   useEffect(() => {
@@ -73,6 +84,10 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
       const isCanc = String(rawStatus).toUpperCase() === 'CANCELLED' || String(rawStatus).toLowerCase().includes('cancel');
       setIsCancelled(isCanc);
       setCurrentStatus(rawStatus);
+      lastStatusMetaRef.current = {
+        timestamp: Date.now(),
+        status: String(rawStatus).toUpperCase()
+      };
       const bId = booking.bookingId || booking.id;
       try {
         const paid = new Set(JSON.parse(localStorage.getItem('bda_paid_bookings') || '[]'));
@@ -479,7 +494,35 @@ export default function BookingSuccessModal({ booking, onClose, onSimulateRidePa
     const bId = booking.bookingId || booking.id;
     const unsub = onBookingUpdate((detail) => {
       if (!detail || detail.bookingId !== bId) return;
-      if (detail.status) {
+
+      const eventTime = detail.timestamp ? new Date(detail.timestamp).getTime() : Date.now();
+      const newStatusUpper = detail.status ? String(detail.status).toUpperCase() : null;
+
+      if (newStatusUpper) {
+        // Stale timestamp protection: ignore events with timestamps older than last processed status
+        if (lastStatusMetaRef.current.timestamp && eventTime < lastStatusMetaRef.current.timestamp) {
+          return;
+        }
+
+        // State machine ordering protection: prevent rolling backwards (e.g. IN_PROGRESS -> ARRIVED or ASSIGNED)
+        // Exception: admin explicitly unassigned driver (newStatus is CONFIRMED with assignedDriverId === null)
+        const currentUpper = String(currentStatus || '').toUpperCase();
+        if (
+          STATUS_LIFECYCLE_RANK[newStatusUpper] &&
+          STATUS_LIFECYCLE_RANK[currentUpper] &&
+          STATUS_LIFECYCLE_RANK[newStatusUpper] < STATUS_LIFECYCLE_RANK[currentUpper]
+        ) {
+          const isExplicitUnassignment = (newStatusUpper === 'CONFIRMED' && (detail.assignedDriverId === null || detail.assigned_driver_id === null));
+          if (!isExplicitUnassignment) {
+            return; // Discard stale backward status event
+          }
+        }
+
+        lastStatusMetaRef.current = {
+          timestamp: Math.max(lastStatusMetaRef.current.timestamp, eventTime),
+          status: newStatusUpper
+        };
+
         setCurrentStatus(detail.status);
         if (detail.status.toLowerCase().includes('cancel')) {
           setIsCancelled(true);

@@ -663,7 +663,7 @@ export default function App() {
       customerName: clientUser?.name || '',
       customerPhone: clientUser?.phone || '',
       customerEmail: clientUser?.email || '',
-      pickupArea: clientUser?.area || 'Indiranagar',
+      pickupArea: clientUser?.area || '',
       ...data
     });
     setIsBookingModalOpen(true);
@@ -755,8 +755,8 @@ export default function App() {
         emailAddress: bookingUserEmail,
         fullName: bookingDetails.customerName,
         mobileNumber: bookingUserPhone,
-        address: bookingDetails.pickupArea || 'Indiranagar, Bangalore',
-        pickupLocation: bookingDetails.pickupArea || 'Indiranagar',
+        address: bookingDetails.streetAddress || bookingDetails.pickupArea || bookingDetails.pickupLocation || 'Doorstep Pickup',
+        pickupLocation: bookingDetails.pickupArea || bookingDetails.pickupLocation || bookingDetails.streetAddress || 'Doorstep Pickup',
         courseName: bookingDetails.classCourseName || 'Beginner Driving Course',
         duration: bookingDetails.classDuration || '15 Days',
         trainingCar: bookingDetails.classTrainingCar || "Anna's Dual-Control Car",
@@ -785,7 +785,7 @@ export default function App() {
         vehicleName: bookingDetails.vehicleCategory ? `${bookingDetails.vehicleCategory} Rental` : 'Sedan (Dzire / Honda City)',
         category: bookingDetails.vehicleCategory || 'Sedan',
         rentalType: 'Full Day Rental',
-        pickupArea: bookingDetails.pickupArea || 'Indiranagar',
+        pickupArea: bookingDetails.pickupArea || bookingDetails.pickupLocation || 'Pickup Location',
         dropLocation: bookingDetails.dropLocation || 'Bangalore City',
         passengers: bookingDetails.passengers || '2 Passengers',
         luggage: bookingDetails.luggage || '1 Bag',
@@ -812,7 +812,7 @@ export default function App() {
         phone: bookingUserPhone,
         tripType: bookingDetails.driverTripOption || 'one-way',
         tripTitle: bookingDetails.serviceName || 'One Way Trip',
-        pickupArea: bookingDetails.pickupArea || 'Indiranagar',
+        pickupArea: bookingDetails.pickupArea || bookingDetails.pickupLocation || 'Pickup Location',
         dropLocation: bookingDetails.dropLocation || 'Kempegowda Intl Airport (BLR T1/T2)',
         passengers: bookingDetails.passengers || undefined,
         luggage: bookingDetails.luggage || undefined,

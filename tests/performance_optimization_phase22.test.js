@@ -239,7 +239,7 @@ describe('Antigravity Phase 22 — Performance Optimization Test Suite', () => {
   test('21. GeocodingService caches normalized results in-memory', async () => {
     let networkCallCount = 0;
     const mockNominatim = [
-      { place_id: 101, lat: '12.9352', lon: '77.6245', display_name: 'Koramangala, Bengaluru' }
+      { place_id: 101, lat: '12.9352', lon: '77.6245', display_name: 'Koramangala, Bengaluru, India', address: { country_code: 'in' } }
     ];
 
     const mockFetch = async () => {

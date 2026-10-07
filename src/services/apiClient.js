@@ -173,17 +173,19 @@ export const apiClient = {
     return request('/bookings', { method: 'POST', body: bookingData, idempotencyKey: key });
   },
   getMyBookings: () => request('/bookings/my', { method: 'GET' }),
+  getBooking: (bookingId) => request(`/bookings/${bookingId}`, { method: 'GET' }),
   lookupBooking: (bookingId, phone) =>
     request('/bookings/lookup', { method: 'POST', body: { bookingId, phone } }),
   cancelBooking: (bookingId, phone, reason) =>
     request(`/bookings/${bookingId}/cancel`, { method: 'POST', body: { phone, reason } }),
   completeBooking: (bookingId, paymentMode = 'cash') =>
     request(`/bookings/${bookingId}/complete`, { method: 'POST', body: { paymentMode } }),
-  getBookingById: (bookingId) => request(`/bookings/${bookingId}`, { method: 'GET' }),
+  getFareEstimate: (estimateData, { signal } = {}) =>
+    request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
   getBookingEstimate: (estimateData, { signal } = {}) =>
-    request('/bookings/estimate', { method: 'POST', body: estimateData, signal }),
+    request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
   estimateBookingFare: (estimateData, { signal } = {}) =>
-    request('/bookings/estimate', { method: 'POST', body: estimateData, signal }),
+    request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),
@@ -201,6 +203,8 @@ export const apiClient = {
     request('/drivers/location', { method: 'PUT', body: coords }),
   getDriverLocation: () =>
     request('/drivers/location', { method: 'GET' }),
+  getBookingDriverLocation: (bookingId) =>
+    request(`/bookings/${bookingId}/driver-location`, { method: 'GET' }),
   getRealtimeUrl: () => {
     if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REALTIME_URL) {
       return import.meta.env.VITE_REALTIME_URL;

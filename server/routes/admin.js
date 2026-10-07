@@ -229,6 +229,16 @@ router.delete('/bookings/:id', async (req, res, next) => {
       });
     }
 
+    if (existing.status === 'IN_PROGRESS' || existing.status === 'ARRIVED') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'ACTIVE_TRIP_CANNOT_BE_DELETED',
+          message: `Cannot delete booking while trip is active (${existing.status}). Complete or cancel it first.`
+        }
+      });
+    }
+
     await execute('DELETE FROM bookings WHERE id = ?', [bookingId]);
 
     await logAuditEvent({

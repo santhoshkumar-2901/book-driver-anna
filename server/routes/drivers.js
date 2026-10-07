@@ -223,7 +223,13 @@ router.patch('/duties/:id/status', requireAuth, requireRole('driver', 'admin'), 
       }
 
       const booking = await queryOne('SELECT assigned_driver_id FROM bookings WHERE id = ?', [bookingId]);
-      if (!booking || booking.assigned_driver_id !== driver.id) {
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'BOOKING_NOT_FOUND', message: 'Booking not found.' }
+        });
+      }
+      if (booking.assigned_driver_id !== driver.id) {
         return res.status(403).json({
           success: false,
           error: { code: 'FORBIDDEN', message: 'You can only update duties assigned to you.' }
@@ -247,6 +253,15 @@ router.patch('/duties/:id/status', requireAuth, requireRole('driver', 'admin'), 
         error: {
           code: 'INVALID_STATE_TRANSITION',
           message: 'Drivers cannot revert assigned duties to PENDING.'
+        }
+      });
+    }
+    if (normalizedTarget.includes('CANCEL') || normalizedTarget.includes('CONFIRM') || normalizedTarget.includes('ASSIGN')) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATE_TRANSITION',
+          message: 'Drivers cannot perform administrative lifecycle changes.'
         }
       });
     }
@@ -341,11 +356,14 @@ router.put('/location', driverLocationRateLimiter, requireAuth, requireRole('dri
       console.warn('[REALTIME] Failed to dispatch driver location:', err.message);
     });
 
+    const updatedDriver = await queryOne('SELECT last_location_update FROM drivers WHERE id = ?', [driver.id]);
+
     res.json({
       success: true,
       data: {
         latitude: parsedLat,
-        longitude: parsedLng
+        longitude: parsedLng,
+        updatedAt: updatedDriver?.last_location_update || new Date().toISOString()
       }
     });
   } catch (err) {
@@ -369,7 +387,8 @@ router.get('/location', requireAuth, requireRole('driver'), async (req, res, nex
       data: {
         latitude: driver.current_latitude,
         longitude: driver.current_longitude,
-        lastLocationUpdate: driver.last_location_update
+        lastLocationUpdate: driver.last_location_update,
+        updatedAt: driver.last_location_update
       }
     });
   } catch (err) {

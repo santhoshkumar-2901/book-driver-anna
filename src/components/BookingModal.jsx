@@ -12,6 +12,13 @@ import { MapView, LocationMarker, LocationSearch, PickupMarker, DestinationMarke
 
 export { generateClientBookingIdempotencyKey };
 
+const getRouteRoadDistance = (rd) => {
+  if (!rd) return null;
+  if (typeof rd.distanceKm === 'number') return rd.distanceKm;
+  if (typeof rd.distanceMeters === 'number') return rd.distanceMeters / 1000;
+  return null;
+};
+
 export default function BookingModal({ isOpen, onClose, clientUser = null, initialType = 'driver', initialData = {}, onBookingComplete, onOpenEnrollmentModal, onRequireAuth }) {
   useScrollLock(isOpen);
 
@@ -45,7 +52,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   const [acPreference, setAcPreference] = useState('AC'); // 'AC' or 'Non-AC'
 
   // Location & date/time
-  const [pickupArea, setPickupArea] = useState(initialData.pickupArea || 'Indiranagar');
+  const [pickupArea, setPickupArea] = useState(initialData.pickupArea || '');
   const [streetAddress, setStreetAddress] = useState('');
   const [bookingDate, setBookingDate] = useState(getTodayDDMMYYYY());
   const [bookingTime, setBookingTime] = useState('09:00');
@@ -127,11 +134,34 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     if (fareAbortRef.current) fareAbortRef.current.abort();
   };
 
+  const formatDuration = (minutes) => {
+    if (!minutes || isNaN(minutes) || minutes <= 0) return '';
+    const m = Math.round(minutes);
+    if (m < 60) return `${m} min`;
+    const hrs = Math.floor(m / 60);
+    const remMin = m % 60;
+    return remMin > 0 ? `${hrs} hr ${remMin} min` : `${hrs} hr`;
+  };
+
+  const handleDriverTripOptionChange = (newOption) => {
+    if (newOption === driverTripOption) return;
+    if (routeAbortRef.current) routeAbortRef.current.abort();
+    if (fareAbortRef.current) fareAbortRef.current.abort();
+    setRouteData(null);
+    setRouteLoading(false);
+    setRouteError(null);
+    setFareEstimate(null);
+    setFareLoading(false);
+    setFareError(null);
+    setDriverTripOption(newOption);
+  };
+
   const handleSelectDestination = (item) => {
     setDestinationLocation(item);
     setIsEditingDestination(false);
     if (item?.displayName) {
       setDropLocation(item.displayName.split(',')[0].trim());
+      setOutstationDestination(item.displayName.split(',')[0].trim());
     }
   };
 
@@ -150,13 +180,15 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
   const handleUseCurrentLocationForPickup = () => {
     if (customerLocation) {
+      const locName = customerLocation.displayName || 'Current Location (GPS)';
       setPickupLocation({
         id: 'gps-current-location',
-        displayName: 'Current Location (GPS)',
+        displayName: locName,
         latitude: customerLocation.latitude,
         longitude: customerLocation.longitude,
         type: 'current_location'
       });
+      setPickupArea(locName);
       setIsEditingPickup(false);
     } else {
       requestLocation();
@@ -170,7 +202,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     }
   }, [customerLocation, pickupLocation, locationLoading]);
 
-  // Phase 6: OSRM Routing between pickup and destination
+  // Phase 6: OSRM Routing between pickup and destination (supports One Way, Round Trip & Outstation)
   useEffect(() => {
     // 1. If either pickup or destination is missing or invalid, clear route
     if (
@@ -184,7 +216,19 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
-    // 2. Abort any previous in-flight route request to prevent race conditions
+    // 2. Reject identical pickup and destination locations
+    if (
+      Math.abs(pickupLocation.latitude - destinationLocation.latitude) < 0.0001 &&
+      Math.abs(pickupLocation.longitude - destinationLocation.longitude) < 0.0001
+    ) {
+      if (routeAbortRef.current) routeAbortRef.current.abort();
+      setRouteData(null);
+      setRouteLoading(false);
+      setRouteError('Pickup and destination must be different.');
+      return;
+    }
+
+    // 3. Abort any previous in-flight route request to prevent race conditions
     if (routeAbortRef.current) {
       routeAbortRef.current.abort();
     }
@@ -210,7 +254,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
             setRouteError(null);
           } else {
             setRouteData(null);
-            setRouteError('Unable to calculate road route.');
+            setRouteError('Unable to calculate route. Please check the pickup and destination locations.');
           }
         }
       })
@@ -218,7 +262,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
         if (err.name === 'AbortError') return;
         if (routeAbortRef.current === controller) {
           setRouteData(null);
-          setRouteError(err.message || 'Unable to calculate road route.');
+          setRouteError(err.message || 'Unable to calculate route. Please check the pickup and destination locations.');
         }
       })
       .finally(() => {
@@ -256,17 +300,35 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     setFareLoading(true);
     setFareError(null);
 
+    const isDriverService = bookingCategory === 'driver';
+    const isDistanceTrip = isDriverService && (driverTripOption === 'one-way' || driverTripOption === 'distance');
+
     apiClient.getBookingEstimate({
+      pickup: {
+        latitude: pickupLocation.latitude,
+        longitude: pickupLocation.longitude
+      },
+      destination: {
+        latitude: destinationLocation.latitude,
+        longitude: destinationLocation.longitude
+      },
       pickupLat: pickupLocation.latitude,
       pickupLng: pickupLocation.longitude,
       destLat: destinationLocation.latitude,
       destLng: destinationLocation.longitude,
+      bookingType: bookingCategory,
       bookingCategory,
-      driverTripOption,
+      driverTripOption: isDistanceTrip ? 'distance' : driverTripOption,
+      roundTripDuration,
+      outstationTripType,
+      outstationPackage,
+      outstationDestination: destinationLocation.displayName || outstationDestination,
       vehicleCategory,
       selectedClassId,
       dropLocation: destinationLocation.displayName || dropLocation,
-      pickupArea: pickupLocation.displayName || pickupArea
+      pickupArea: pickupLocation.displayName || pickupArea,
+      useDistancePricing: isDistanceTrip,
+      isDistancePricing: isDistanceTrip
     }, { signal: controller.signal })
       .then((res) => {
         if (fareAbortRef.current === controller) {
@@ -283,7 +345,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
         if (err.name === 'AbortError') return;
         if (fareAbortRef.current === controller) {
           setFareEstimate(null);
-          setFareError(err.message || 'Unable to calculate fare estimate.');
+          setFareError(err.message || 'Unable to calculate fare estimate. Please try again.');
         }
       })
       .finally(() => {
@@ -296,7 +358,25 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       controller.abort();
     };
     return cleanupFareEffect;
-  }, [routeData, bookingCategory, driverTripOption, vehicleCategory, selectedClassId]);
+  }, [routeData, pickupLocation, destinationLocation, bookingCategory, driverTripOption, roundTripDuration, outstationTripType, outstationPackage, vehicleCategory, selectedClassId]);
+
+  // Objective 4 & 5: Auto-synchronize Outstation one-way package with authoritative route distance
+  useEffect(() => {
+    if (bookingCategory === 'driver' && driverTripOption === 'outstation' && outstationTripType === 'one-way') {
+      if (routeData && typeof routeData.distanceKm === 'number' && routeData.distanceKm > 0) {
+        const dist = routeData.distanceKm;
+        if (dist > 300 && dist <= 500) {
+          if (outstationPackage === 'One Way (Up to 150 km)' || outstationPackage === 'One Way (Up to 300 km)') {
+            setOutstationPackage('One Way (Up to 500 km)');
+          }
+        } else if (dist > 150 && dist <= 300) {
+          if (outstationPackage === 'One Way (Up to 150 km)') {
+            setOutstationPackage('One Way (Up to 300 km)');
+          }
+        }
+      }
+    }
+  }, [routeData, bookingCategory, driverTripOption, outstationTripType, outstationPackage]);
 
   // Map Bounds calculation considering full route geometry or pickup/destination points
   const mapBounds = useMemo(() => {
@@ -457,14 +537,15 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
   };
 
   const fareInfo = calculateTotalFare();
-  const effectiveBase = (fareEstimate && routeData && typeof fareEstimate.basePrice === 'number')
-    ? fareEstimate.basePrice
+  const authoritativeTotal = fareEstimate?.calculatedFare ?? fareEstimate?.totalFare;
+  const effectiveBase = (fareEstimate && routeData && typeof (fareEstimate.baseFare ?? fareEstimate.basePrice) === 'number')
+    ? (fareEstimate.baseFare ?? fareEstimate.basePrice)
     : fareInfo.base;
   const effectiveGst = (fareEstimate && routeData && typeof fareEstimate.gst === 'number')
     ? fareEstimate.gst
     : fareInfo.gst;
-  const effectiveTotalFare = (fareEstimate && routeData && typeof fareEstimate.totalFare === 'number')
-    ? fareEstimate.totalFare
+  const effectiveTotalFare = (fareEstimate && routeData && typeof authoritativeTotal === 'number')
+    ? authoritativeTotal
     : fareInfo.total;
 
   const handleSubmitBooking = async (e) => {
@@ -484,24 +565,65 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
+    if (
+      bookingCategory === 'driver' &&
+      pickupLocation?.latitude !== undefined && destinationLocation?.latitude !== undefined &&
+      Math.abs(pickupLocation.latitude - destinationLocation.latitude) < 0.0001 &&
+      Math.abs(pickupLocation.longitude - destinationLocation.longitude) < 0.0001
+    ) {
+      setFormError('Pickup and destination must be different.');
+      return;
+    }
+
+    // Objective 4: Validate Outstation one-way distance tiers against authoritative route distance
+    const roadDist = getRouteRoadDistance(routeData);
+    if (
+      bookingCategory === 'driver' &&
+      driverTripOption === 'outstation' &&
+      outstationTripType === 'one-way' &&
+      typeof roadDist === 'number'
+    ) {
+      if (roadDist > 500) {
+        setFormError('Outstation one-way pricing currently supports routes up to 500 km. Please contact support for custom long-distance journeys.');
+        return;
+      }
+      if (roadDist > 300 && (outstationPackage.includes('150 km') || outstationPackage.includes('300 km'))) {
+        setFormError(`Route distance (${roadDist.toFixed(1)} km) exceeds ${outstationPackage}. Please select Up to 500 km package.`);
+        return;
+      }
+      if (roadDist > 150 && outstationPackage.includes('150 km')) {
+        setFormError(`Route distance (${roadDist.toFixed(1)} km) exceeds 150 km package. Please select Up to 300 km package.`);
+        return;
+      }
+    }
+
+    const effectivePickupArea = pickupLocation?.displayName || streetAddress || pickupArea || 'Pickup Location';
+    const isDriverService = bookingCategory === 'driver';
+    const isDistanceTrip = isDriverService && (driverTripOption === 'one-way' || driverTripOption === 'distance');
+
     const payloadForApi = {
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       customerEmail: customerEmail ? customerEmail.trim() : null,
       bookingCategory,
+      bookingType: bookingCategory,
       selectedClassId,
       vehicleCategory,
-      driverTripOption,
-      dropLocation,
+      driverTripOption: isDistanceTrip ? 'distance' : driverTripOption,
+      dropLocation: destinationLocation?.displayName || dropLocation,
       roundTripDuration,
       outstationTripType,
       outstationPackage,
-      outstationDestination,
-      pickupArea,
+      outstationDestination: destinationLocation?.displayName || outstationDestination,
+      pickupArea: effectivePickupArea,
+      pickupLocation: effectivePickupArea,
+      legacyPickupArea: pickupArea,
       pickupLat: pickupLocation?.latitude,
       pickupLng: pickupLocation?.longitude,
       destLat: destinationLocation?.latitude,
       destLng: destinationLocation?.longitude,
+      useDistancePricing: isDistanceTrip,
+      isDistancePricing: isDistanceTrip,
       date: toYYYYMMDD(bookingDate),
       time: bookingTime,
       paymentMode
@@ -545,8 +667,9 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       serviceName,
       category: bookingCategory === 'class' ? 'Driving Class' : (bookingCategory === 'vehicle' ? 'Book a Vehicle' : 'Book a Driver'),
       tripSummary,
-      pickupArea,
-      dropLocation: bookingCategory === 'class' ? `Doorstep Training in ${pickupArea}` : dropLocation,
+      pickupArea: effectivePickupArea,
+      pickupLocation: effectivePickupArea,
+      dropLocation: bookingCategory === 'class' ? `Doorstep Training in ${effectivePickupArea}` : dropLocation,
       roundTripDuration: bookingCategory === 'driver' && driverTripOption === 'round-trip' ? roundTripDuration : undefined,
       outstationTripType: bookingCategory === 'driver' && driverTripOption === 'outstation' ? outstationTripType : undefined,
       outstationPackage: bookingCategory === 'driver' && driverTripOption === 'outstation' ? outstationPackage : undefined,
@@ -555,7 +678,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       passengers: bookingCategory === 'vehicle' && passengerCount ? `${passengerCount} Passenger${parseInt(passengerCount) > 1 ? 's' : ''}` : undefined,
       luggage: bookingCategory === 'vehicle' && luggageCount ? `${luggageCount} Bag${parseInt(luggageCount) > 1 ? 's' : ''}` : undefined,
       acPreference: bookingCategory === 'vehicle' ? acPreference : undefined,
-      streetAddress: streetAddress || `${pickupArea}, Bengaluru`,
+      streetAddress: streetAddress || effectivePickupArea,
       bookingDate: toDDMMYYYY(bookingDate),
       date: toDDMMYYYY(bookingDate),
       bookingTime,
@@ -673,7 +796,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 {/* One Way */}
                 <button
                   type="button"
-                  onClick={() => setDriverTripOption('one-way')}
+                  onClick={() => handleDriverTripOptionChange('one-way')}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
                     driverTripOption === 'one-way'
                       ? 'bg-amber-400/10 border-amber-400 text-white shadow-lg'
@@ -690,7 +813,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 {/* Round Trip */}
                 <button
                   type="button"
-                  onClick={() => setDriverTripOption('round-trip')}
+                  onClick={() => handleDriverTripOptionChange('round-trip')}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
                     driverTripOption === 'round-trip'
                       ? 'bg-amber-400/10 border-amber-400 text-white shadow-lg'
@@ -707,7 +830,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 {/* Outstation */}
                 <button
                   type="button"
-                  onClick={() => setDriverTripOption('outstation')}
+                  onClick={() => handleDriverTripOptionChange('outstation')}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
                     driverTripOption === 'outstation'
                       ? 'bg-amber-400/10 border-amber-400 text-white shadow-lg'
@@ -767,12 +890,203 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
             </div>
           )}
 
-          {/* DYNAMIC LOCATION FIELDS FOR DRIVER OPTIONS */}
-          {bookingCategory === 'driver' && driverTripOption === 'one-way' && (
+          {/* DYNAMIC DRIVER OPTION CONFIGURATIONS */}
+          {bookingCategory === 'driver' && driverTripOption === 'round-trip' && (
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
+              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" /> Round Trip Duration (2hr, 4hr, 6hr, 12hr)
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: '2hr', label: '2hr', priceKey: 'driver_hourly_2hr', fallback: 199 },
+                  { id: '4hr', label: '4hr', priceKey: 'driver_hourly_4hr', fallback: 349 },
+                  { id: '6hr', label: '6hr', priceKey: 'driver_hourly_6hr', fallback: 499 },
+                  { id: '12hr', label: '12hr', priceKey: 'driver_hourly_12hr', fallback: 899 }
+                ].map((dur) => {
+                  const isSelected = roundTripDuration === dur.id;
+                  const displayPrice = formatPrice(dur.priceKey, dur.fallback);
+                  return (
+                    <button
+                      key={dur.id}
+                      type="button"
+                      onClick={() => setRoundTripDuration(dur.id)}
+                      className={`py-3 px-2 rounded-xl border text-center transition-all ${
+                        isSelected
+                          ? 'bg-amber-400 text-slate-950 border-amber-400 font-extrabold shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{dur.label}</div>
+                      <div className={`text-[10px] font-black mt-0.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{displayPrice}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {bookingCategory === 'driver' && driverTripOption === 'outstation' && (
+            <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
+
+              {/* Trip Nature: Round Trip vs One Way Drop */}
+              <div>
+                <label className="block text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5" /> Outstation Trip Mode *
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOutstationTripType('round-trip');
+                      if (!outstationPackage.includes('Round trip')) {
+                        setOutstationPackage('Round trip 24hr');
+                      }
+                    }}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
+                      outstationTripType === 'round-trip'
+                        ? 'bg-amber-400 text-slate-950 font-extrabold shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>⇄ Round Trip</span>
+                    <span className={`text-[10px] ${outstationTripType === 'round-trip' ? 'text-slate-900 font-semibold' : 'text-slate-500'}`}>
+                      (Both Ways Return)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOutstationTripType('one-way');
+                      if (!outstationPackage.includes('One Way')) {
+                        setOutstationPackage('One Way (Up to 300 km)');
+                      }
+                    }}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
+                      outstationTripType === 'one-way'
+                        ? 'bg-amber-400 text-slate-950 font-extrabold shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>➔ One Way Drop</span>
+                    <span className={`text-[10px] ${outstationTripType === 'one-way' ? 'text-slate-900 font-semibold' : 'text-slate-500'}`}>
+                      (Single Outstation Drop)
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Package selector based on chosen mode */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
+                  <span>
+                    {outstationTripType === 'one-way'
+                      ? 'Select One Way Drop Package'
+                      : 'Select Round Trip Duration'}
+                  </span>
+                  <span className="text-[11px] text-amber-400 font-normal">
+                    {outstationTripType === 'one-way' ? 'Includes Anna Return Bus Allowance' : 'Includes Fuel/Food Guidelines'}
+                  </span>
+                </div>
+
+                {outstationTripType === 'one-way' && routeData && typeof routeData.distanceKm === 'number' && (
+                  <div className="flex flex-wrap items-center justify-between text-[11px] bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-2 text-slate-300">
+                    <span>
+                      Road Route: <strong className="text-white font-mono">{routeData.distanceKm} km</strong> • ~{routeData.durationMinutes} min
+                    </span>
+                    {routeData.distanceKm <= 500 ? (
+                      <span className="text-amber-400 font-semibold">
+                        Recommended: {routeData.distanceKm <= 150 ? 'Up to 150 km' : (routeData.distanceKm <= 300 ? 'Up to 300 km' : 'Up to 500 km')}
+                      </span>
+                    ) : (
+                      <span className="text-red-400 font-semibold">
+                        Route exceeds 500 km limit
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {outstationTripType === 'one-way' && routeData && typeof routeData.distanceKm === 'number' && routeData.distanceKm > 500 && (
+                  <div className="p-3 bg-red-950/70 border border-red-800/80 rounded-xl text-red-200 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Route exceeds maximum supported distance:</span> Standard outstation one-way packages currently support routes up to 500 km. Calculated road route is <span className="font-mono font-bold text-white">{routeData.distanceKm} km</span>. Please contact customer support for custom routes exceeding 500 km.
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(outstationTripType === 'one-way' ? [
+                    { id: 'One Way (Up to 150 km)', label: 'Up to 150 km', sub: 'Mysuru, Hassan', priceKey: 'driver_outstation_150km', fallback: 1199, maxKm: 150 },
+                    { id: 'One Way (Up to 300 km)', label: 'Up to 300 km', sub: 'Coorg, Chikmagalur', priceKey: 'driver_outstation_300km', fallback: 1799, maxKm: 300 },
+                    { id: 'One Way (Up to 500 km)', label: 'Up to 500 km', sub: 'Wayanad, Ooty, Chennai', priceKey: 'driver_outstation_500km', fallback: 2399, maxKm: 500 },
+                    { id: 'One Way Custom Drop', label: 'Custom Drop', sub: 'Any Destination Spot', priceKey: 'driver_outstation_150km', fallback: 1499 }
+                  ] : [
+                    { id: 'Round trip 12hr', label: 'Round trip 12hr', sub: 'Day Trip (Nandi Hills)', priceKey: 'driver_outstation_12hr', fallback: 1199 },
+                    { id: 'Round trip 24hr', label: 'Round trip 24hr', sub: '1-Day Getaway', priceKey: 'driver_outstation_24hr', fallback: 1999 },
+                    { id: 'Round trip 46hr', label: 'Round trip 46hr', sub: 'Weekend Vacation', priceKey: 'driver_outstation_46hr', fallback: 3899 },
+                    { id: 'Round trip 72hr', label: 'Round trip 72hr', sub: '3-Day Road Trip', priceKey: 'driver_outstation_72hr', fallback: 5799 }
+                  ]).map((pkg) => {
+                    const isSelected = outstationPackage === pkg.id;
+                    const displayPrice = formatPrice(pkg.priceKey, pkg.fallback);
+
+                    let isUnavailable = false;
+                    let isRecommended = false;
+                    if (outstationTripType === 'one-way' && routeData && typeof routeData.distanceKm === 'number') {
+                      const dist = routeData.distanceKm;
+                      if (pkg.maxKm) {
+                        isUnavailable = dist > pkg.maxKm;
+                      }
+                      if (pkg.id === 'One Way (Up to 150 km)') isRecommended = dist <= 150;
+                      else if (pkg.id === 'One Way (Up to 300 km)') isRecommended = dist > 150 && dist <= 300;
+                      else if (pkg.id === 'One Way (Up to 500 km)') isRecommended = dist > 300 && dist <= 500;
+                    }
+
+                    return (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        disabled={isUnavailable}
+                        onClick={() => {
+                          if (!isUnavailable) {
+                            setOutstationPackage(pkg.id);
+                          }
+                        }}
+                        className={`py-3 px-2 rounded-xl border text-center transition-all ${
+                          isUnavailable
+                            ? 'bg-slate-900/40 border-slate-800/60 text-slate-600 opacity-60 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-amber-400 text-slate-950 border-amber-400 font-extrabold shadow-md cursor-pointer'
+                              : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 cursor-pointer'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{pkg.label}</div>
+                        {isUnavailable ? (
+                          <div className="text-[10px] text-red-400/80 font-medium truncate">Unavailable for this route</div>
+                        ) : isRecommended ? (
+                          <div className={`text-[10px] font-bold truncate ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>● Recommended</div>
+                        ) : (
+                          <div className={`text-[10px] truncate ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>{pkg.sub}</div>
+                        )}
+                        <div className={`text-[11px] font-black mt-1 ${isSelected ? 'text-slate-950' : (isUnavailable ? 'text-slate-600' : 'text-amber-400')}`}>{displayPrice}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC LOCATION & MAP FIELDS FOR DRIVER OPTIONS (One Way, Round Trip & Outstation) */}
+          {bookingCategory === 'driver' && (
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
               <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5">
-                  <Navigation className="w-3.5 h-3.5 text-amber-400" /> One Way Locations
+                  <Navigation className="w-3.5 h-3.5 text-amber-400" />
+                  {driverTripOption === 'one-way'
+                    ? 'One Way Locations'
+                    : (driverTripOption === 'round-trip' ? 'Round Trip Locations' : 'Outstation Locations')}
                 </span>
                 {/* Current Location Quick Action */}
                 <button
@@ -904,7 +1218,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                   ) : (
                     <LocationSearch
                       id="destination-location-search"
-                      placeholder="Search destination area, street, or landmark..."
+                      placeholder={driverTripOption === 'outstation' ? 'Search outstation destination city, town, or landmark...' : 'Search destination area, street, or landmark...'}
                       onSelect={handleSelectDestination}
                       biasCoords={pickupLocation ? { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude } : customerLocation}
                     />
@@ -912,7 +1226,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 </div>
               </div>
 
-              {/* OSRM Route & Authoritative Fare Status & Metrics (Phase 7 Integration) */}
+              {/* OSRM Route & Authoritative Fare Status & Metrics */}
               {routeLoading && (
                 <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
@@ -948,6 +1262,9 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                     <span>{routeData.distanceKm} km</span>
                     <span className="text-slate-600">•</span>
                     <span>~{routeData.durationMinutes} min</span>
+                    {routeData.durationMinutes >= 60 && (
+                      <span className="text-slate-400">({formatDuration(routeData.durationMinutes)})</span>
+                    )}
                     {fareEstimate && (
                       <>
                         <span className="text-slate-600">•</span>
@@ -960,6 +1277,163 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                   <span className="text-[10px] text-slate-400 font-mono">
                     {fareLoading ? 'Calculating fare...' : 'Authoritative Tariff'}
                   </span>
+                </div>
+              )}
+
+              {/* Price / Fare Breakdown Card for Driver Services */}
+              {driverTripOption === 'one-way' && fareEstimate && !fareLoading && !fareError && !routeError && (
+                <div className="bg-slate-900/95 border border-slate-700/80 rounded-xl p-3.5 space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pb-2.5 border-b border-slate-800 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Distance</span>
+                      <span className="font-bold text-white font-mono">{fareEstimate.distanceKm} km</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Estimated duration</span>
+                      <span className="font-bold text-white font-mono">{fareEstimate.durationMinutes} min</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Fare Breakdown
+                    </div>
+                    <div className="space-y-1.5 text-slate-300 text-xs">
+                      {typeof (fareEstimate.baseFare ?? fareEstimate.basePrice) === 'number' && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Base fare</span>
+                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.baseFare ?? fareEstimate.basePrice).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {typeof fareEstimate.distanceFare === 'number' && fareEstimate.distanceFare > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">
+                            Distance fare {fareEstimate.pricePerKm ? `(${fareEstimate.distanceKm} km × ₹${fareEstimate.pricePerKm}/km)` : ''}
+                          </span>
+                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.distanceFare).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {fareEstimate.minimumFareApplied && (
+                        <div className="flex justify-between text-amber-400 text-[11px]">
+                          <span>Minimum fare adjustment</span>
+                          <span className="font-mono">Min ₹{Number(fareEstimate.minimumFare).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {fareEstimate.waitingFare > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Waiting charges</span>
+                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.waitingFare).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {fareEstimate.nightSurcharge > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Night surcharge</span>
+                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.nightSurcharge).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {fareEstimate.discountAmount > 0 && (
+                        <div className="flex justify-between text-emerald-400">
+                          <span>Discount</span>
+                          <span className="font-mono">-₹{Number(fareEstimate.discountAmount).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {fareEstimate.gst > 0 && (
+                        <div className="flex justify-between text-slate-400">
+                          <span>GST (5%)</span>
+                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.gst).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2.5 border-t border-slate-800 font-bold">
+                    <span className="text-slate-200 text-xs">Estimated total</span>
+                    <span className="text-amber-400 font-extrabold text-sm font-mono">
+                      ₹{Number(fareEstimate.calculatedFare || fareEstimate.totalFare).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Round Trip Package Card with Distance & Drive Time */}
+              {driverTripOption === 'round-trip' && (
+                <div className="bg-slate-900/95 border border-slate-700/80 rounded-xl p-3.5 space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pb-2.5 border-b border-slate-800 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Distance</span>
+                      <span className="font-bold text-white font-mono">{routeData ? `${routeData.distanceKm} km` : 'Pending location'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Estimated driving time</span>
+                      <span className="font-bold text-white font-mono">{routeData ? `~${routeData.durationMinutes} min` : 'Pending location'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Package Details
+                    </div>
+                    <div className="space-y-1.5 text-slate-300 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Selected package</span>
+                        <span className="text-slate-200 font-medium">In-City Hourly Driver ({roundTripDuration})</span>
+                      </div>
+                      {routeData && (
+                        <div className="flex justify-between text-slate-400 text-[11px]">
+                          <span>Road route</span>
+                          <span className="font-mono text-slate-300">{routeData.distanceKm} km • ~{routeData.durationMinutes} min</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2.5 border-t border-slate-800 font-bold">
+                    <span className="text-slate-200 text-xs">Package Fare</span>
+                    <span className="text-amber-400 font-extrabold text-sm font-mono">
+                      ₹{effectiveTotalFare.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Outstation Package Card with Distance & Drive Time */}
+              {driverTripOption === 'outstation' && (
+                <div className="bg-slate-900/95 border border-slate-700/80 rounded-xl p-3.5 space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pb-2.5 border-b border-slate-800 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Distance</span>
+                      <span className="font-bold text-white font-mono">{routeData ? `${routeData.distanceKm} km` : 'Pending location'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Estimated Drive Time</span>
+                      <span className="font-bold text-white font-mono">{routeData ? (formatDuration(routeData.durationMinutes) || `~${routeData.durationMinutes} min`) : 'Pending location'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Outstation Package Details
+                    </div>
+                    <div className="space-y-1.5 text-slate-300 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Selected package</span>
+                        <span className="text-slate-200 font-medium">{outstationPackage}</span>
+                      </div>
+                      {routeData && (
+                        <div className="flex justify-between text-slate-400 text-[11px]">
+                          <span>Road route distance</span>
+                          <span className="font-mono text-slate-300">{routeData.distanceKm} km • {formatDuration(routeData.durationMinutes)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2.5 border-t border-slate-800 font-bold">
+                    <span className="text-slate-200 text-xs">Package Fare</span>
+                    <span className="text-amber-400 font-extrabold text-sm font-mono">
+                      ₹{effectiveTotalFare.toLocaleString('en-IN')}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -991,187 +1465,6 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                     />
                   )}
                 </MapView>
-              </div>
-            </div>
-          )}
-
-          {bookingCategory === 'driver' && driverTripOption === 'round-trip' && (
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
-              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" /> Round Trip Duration (2hr, 4hr, 6hr, 12hr)
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { id: '2hr', label: '2hr', priceKey: 'driver_hourly_2hr', fallback: 199 },
-                  { id: '4hr', label: '4hr', priceKey: 'driver_hourly_4hr', fallback: 349 },
-                  { id: '6hr', label: '6hr', priceKey: 'driver_hourly_6hr', fallback: 499 },
-                  { id: '12hr', label: '12hr', priceKey: 'driver_hourly_12hr', fallback: 899 }
-                ].map((dur) => {
-                  const isSelected = roundTripDuration === dur.id;
-                  const displayPrice = formatPrice(dur.priceKey, dur.fallback);
-                  return (
-                    <button
-                      key={dur.id}
-                      type="button"
-                      onClick={() => setRoundTripDuration(dur.id)}
-                      className={`py-3 px-2 rounded-xl border text-center transition-all ${
-                        isSelected
-                          ? 'bg-amber-400 text-slate-950 border-amber-400 font-extrabold shadow-md'
-                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="text-xs font-bold">{dur.label}</div>
-                      <div className={`text-[10px] font-black mt-0.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{displayPrice}</div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-amber-400" /> Pickup Location in Bangalore *
-                </label>
-                <select
-                  value={pickupArea}
-                  onChange={(e) => setPickupArea(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                >
-                  {BANGALORE_AREAS.map((a, i) => (
-                    <option key={i} value={a}>{a}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {bookingCategory === 'driver' && driverTripOption === 'outstation' && (
-            <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4 animate-in fade-in duration-200">
-              
-              {/* Trip Nature: Round Trip vs One Way Drop */}
-              <div>
-                <label className="block text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5" /> Outstation Trip Mode *
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOutstationTripType('round-trip');
-                      if (!outstationPackage.includes('Round trip')) {
-                        setOutstationPackage('Round trip 24hr');
-                      }
-                    }}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
-                      outstationTripType === 'round-trip'
-                        ? 'bg-amber-400 text-slate-950 font-extrabold shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span>⇄ Round Trip</span>
-                    <span className={`text-[10px] ${outstationTripType === 'round-trip' ? 'text-slate-900 font-semibold' : 'text-slate-500'}`}>
-                      (Both Ways Return)
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOutstationTripType('one-way');
-                      if (!outstationPackage.includes('One Way')) {
-                        setOutstationPackage('One Way (Up to 300 km)');
-                      }
-                    }}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
-                      outstationTripType === 'one-way'
-                        ? 'bg-amber-400 text-slate-950 font-extrabold shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span>➔ One Way Drop</span>
-                    <span className={`text-[10px] ${outstationTripType === 'one-way' ? 'text-slate-900 font-semibold' : 'text-slate-500'}`}>
-                      (Single Outstation Drop)
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Package selector based on chosen mode */}
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex flex-wrap items-center justify-between gap-1">
-                  <span>
-                    {outstationTripType === 'one-way' 
-                      ? 'Select One Way Drop Package' 
-                      : 'Select Round Trip Duration'}
-                  </span>
-                  <span className="text-[11px] text-amber-400 font-normal">
-                    {outstationTripType === 'one-way' ? 'Includes Anna Return Bus Allowance' : 'Includes Fuel/Food Guidelines'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {(outstationTripType === 'one-way' ? [
-                    { id: 'One Way (Up to 150 km)', label: 'Up to 150 km', sub: 'Mysuru, Hassan', priceKey: 'driver_outstation_150km', fallback: 1199 },
-                    { id: 'One Way (Up to 300 km)', label: 'Up to 300 km', sub: 'Coorg, Chikmagalur', priceKey: 'driver_outstation_300km', fallback: 1799 },
-                    { id: 'One Way (Up to 500 km)', label: 'Up to 500 km', sub: 'Wayanad, Ooty, Chennai', priceKey: 'driver_outstation_500km', fallback: 2399 },
-                    { id: 'One Way Custom Drop', label: 'Custom Drop', sub: 'Any Destination Spot', priceKey: 'driver_outstation_150km', fallback: 1499 }
-                  ] : [
-                    { id: 'Round trip 12hr', label: 'Round trip 12hr', sub: 'Day Trip (Nandi Hills)', priceKey: 'driver_outstation_12hr', fallback: 1199 },
-                    { id: 'Round trip 24hr', label: 'Round trip 24hr', sub: '1-Day Getaway', priceKey: 'driver_outstation_24hr', fallback: 1999 },
-                    { id: 'Round trip 46hr', label: 'Round trip 46hr', sub: 'Weekend Vacation', priceKey: 'driver_outstation_46hr', fallback: 3899 },
-                    { id: 'Round trip 72hr', label: 'Round trip 72hr', sub: '3-Day Road Trip', priceKey: 'driver_outstation_72hr', fallback: 5799 }
-                  ]).map((pkg) => {
-                    const isSelected = outstationPackage === pkg.id;
-                    const displayPrice = formatPrice(pkg.priceKey, pkg.fallback);
-                    return (
-                      <button
-                        key={pkg.id}
-                        type="button"
-                        onClick={() => setOutstationPackage(pkg.id)}
-                        className={`py-3 px-2 rounded-xl border text-center transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-amber-400 text-slate-950 border-amber-400 font-extrabold shadow-md'
-                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{pkg.label}</div>
-                        <div className={`text-[10px] truncate ${isSelected ? 'text-slate-800' : 'text-slate-400'}`}>{pkg.sub}</div>
-                        <div className={`text-[11px] font-black mt-1 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`}>{displayPrice}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Bangalore Pickup Location *
-                  </label>
-                  <select
-                    value={pickupArea}
-                    onChange={(e) => setPickupArea(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                  >
-                    {BANGALORE_AREAS.map((a, i) => (
-                      <option key={i} value={a}>{a}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Outstation Destination Spot *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={outstationDestination}
-                    onChange={(e) => setOutstationDestination(e.target.value)}
-                    placeholder="e.g. Coorg, Nandi Hills, Chikmagalur, Mysuru, Ooty"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -1576,13 +1869,18 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (bookingCategory === 'driver' && driverTripOption === 'outstation' && outstationTripType === 'one-way' && routeData?.distanceKm > 500)}
             className="btn-primary w-full py-3.5 text-sm sm:text-base justify-center min-h-[48px] touch-manipulation disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Confirming Booking...</span>
+              </>
+            ) : bookingCategory === 'driver' && driverTripOption === 'outstation' && outstationTripType === 'one-way' && routeData?.distanceKm > 500 ? (
+              <>
+                <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
+                <span className="truncate">Route Exceeds 500 km Limit — Contact Support</span>
               </>
             ) : (
               <>

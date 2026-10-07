@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { broadcastBookingUpdate } from './broadcastSync.js';
+import { apiClient } from '../services/apiClient.js';
 
 /**
  * useDriverRealtimeLocation
@@ -151,6 +152,34 @@ export function useDriverRealtimeLocation({
               isSubscribedRef.current = true;
               setConnectionStatus('connected');
               setError(null);
+
+              // Hydrate authoritative state after reconnect to recover any missed events
+              if (reconnectAttemptRef.current > 0 || !location) {
+                apiClient.getBookingDriverLocation(bookingId).then(res => {
+                  if (isUnmountedRef.current) return;
+                  if (res?.data?.location && typeof res.data.location.latitude === 'number') {
+                    const httpLoc = res.data.location;
+                    if (!driverId || !httpLoc.driverId || httpLoc.driverId === driverId) {
+                      setLocation(prev => {
+                        if (prev) {
+                          const prevTime = new Date(prev.timestamp || 0).getTime();
+                          const newTime = new Date(httpLoc.timestamp || httpLoc.updatedAt || Date.now()).getTime();
+                          if (!isNaN(prevTime) && !isNaN(newTime) && newTime < prevTime) {
+                            return prev;
+                          }
+                        }
+                        return {
+                          driverId: httpLoc.driverId || driverId,
+                          bookingId,
+                          latitude: httpLoc.latitude,
+                          longitude: httpLoc.longitude,
+                          timestamp: httpLoc.timestamp || httpLoc.updatedAt || new Date().toISOString()
+                        };
+                      });
+                    }
+                  }
+                }).catch(() => {});
+              }
             }
             break;
 
@@ -174,19 +203,23 @@ export function useDriverRealtimeLocation({
                 return;
               }
               // Update latest position: setLocation({ driverId, bookingId, latitude, longitude, timestamp })
-              // Deduplicate identical coordinates to avoid unnecessary React tree rerenders
+              // Stale GPS protection: ignore updates with older timestamps
               setLocation(prev => {
-                if (
-                  prev &&
-                  prev.driverId === msg.driverId &&
-                  prev.bookingId === msg.bookingId &&
-                  prev.latitude === msg.latitude &&
-                  prev.longitude === msg.longitude
-                ) {
-                  const prevTime = new Date(prev.timestamp).getTime();
+                if (prev) {
+                  const prevTime = new Date(prev.timestamp || 0).getTime();
                   const newTime = new Date(msg.timestamp || Date.now()).getTime();
-                  if (newTime - prevTime < 15000) {
+                  if (!isNaN(prevTime) && !isNaN(newTime) && newTime < prevTime) {
                     return prev;
+                  }
+                  if (
+                    prev.driverId === msg.driverId &&
+                    prev.bookingId === msg.bookingId &&
+                    prev.latitude === msg.latitude &&
+                    prev.longitude === msg.longitude
+                  ) {
+                    if (!isNaN(prevTime) && !isNaN(newTime) && newTime - prevTime < 15000) {
+                      return prev;
+                    }
                   }
                 }
                 return {
@@ -220,7 +253,8 @@ export function useDriverRealtimeLocation({
                   bookingId: msg.bookingId,
                   status: msg.status,
                   assignedDriverId: msg.assignedDriverId,
-                  assignedDriverName: msg.assignedDriverName
+                  assignedDriverName: msg.assignedDriverName,
+                  timestamp: msg.timestamp
                 });
               } catch (e) {}
             }
@@ -311,6 +345,75 @@ export function useDriverRealtimeLocation({
       }
     };
   }, [bookingId, token, enabled, driverId, getWebSocketUrl]);
+
+  // HTTP Fallback Polling Effect (Phase 6 Serverless & Reliability Hardening)
+  // When WebSocket is disconnected or in error, automatically poll GET /api/bookings/:id/driver-location
+  useEffect(() => {
+    if (!enabled || !bookingId || !token || connectionStatus === 'connected') {
+      return;
+    }
+
+    let isPollingActive = true;
+    const pollFallback = async () => {
+      try {
+        const res = await apiClient.getBookingDriverLocation(bookingId);
+        if (!isPollingActive || isUnmountedRef.current) return;
+        if (res && res.data) {
+          const { trackingActive, location: httpLoc, status: httpStatus } = res.data;
+          if (trackingActive === false) {
+            setLocation(null);
+            return;
+          }
+          if (httpLoc && typeof httpLoc.latitude === 'number' && typeof httpLoc.longitude === 'number') {
+            if (driverId && httpLoc.driverId && httpLoc.driverId !== driverId) {
+              return;
+            }
+            setLocation(prev => {
+              if (prev) {
+                const prevTime = new Date(prev.timestamp || 0).getTime();
+                const newTime = new Date(httpLoc.timestamp || httpLoc.updatedAt || Date.now()).getTime();
+                if (!isNaN(prevTime) && !isNaN(newTime) && newTime < prevTime) {
+                  return prev;
+                }
+              }
+              return {
+                driverId: httpLoc.driverId || driverId,
+                bookingId,
+                latitude: httpLoc.latitude,
+                longitude: httpLoc.longitude,
+                timestamp: httpLoc.timestamp || httpLoc.updatedAt || new Date().toISOString()
+              };
+            });
+          }
+          if (httpStatus) {
+            broadcastBookingUpdate({
+              bookingId,
+              status: httpStatus
+            });
+          }
+        }
+      } catch (e) {
+        // Safe fallback - non-blocking
+      }
+    };
+
+    let timerId = null;
+    const scheduleNextPoll = () => {
+      if (!isPollingActive) return;
+      timerId = setTimeout(async () => {
+        if (!isPollingActive) return;
+        await pollFallback();
+        scheduleNextPoll();
+      }, 10000);
+    };
+
+    pollFallback().then(scheduleNextPoll);
+
+    return () => {
+      isPollingActive = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [enabled, bookingId, token, driverId, connectionStatus]);
 
   // Phase 20: Freshness detection (LIVE vs STALE vs UNAVAILABLE) without polling
   const evaluateFreshness = () => {

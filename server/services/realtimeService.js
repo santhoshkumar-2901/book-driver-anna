@@ -19,6 +19,10 @@ export class RealtimeServer {
 
     // Subscriptions: Map<bookingId, Set<WebSocket>>
     this.bookingRooms = new Map();
+    // Driver private channels: Map<driverId, Set<WebSocket>>
+    this.driverRooms = new Map();
+    // Connected driver sockets: Map<driverId, Set<WebSocket>>
+    this.driverSockets = new Map();
     // Connected admin sockets: Set<WebSocket>
     this.adminSockets = new Set();
     // Socket metadata: WeakMap<WebSocket, { user, subscriptions, messageCount, lastReset, isAlive, authTimeout }>
@@ -331,27 +335,41 @@ export class RealtimeServer {
       meta.authTimeout = null;
     }
 
+    let resolvedDriverId = user.driverId || null;
+    if (!resolvedDriverId && (user.role || '').toLowerCase() === 'driver') {
+      const d = await queryOne('SELECT id FROM drivers WHERE user_id = ?', [user.id]);
+      if (d) resolvedDriverId = d.id;
+    }
+
     meta.user = {
       id: user.id,
       name: user.name,
       phone: user.phone || null,
       role: (user.role || 'customer').toLowerCase(),
-      driverId: user.driverId || null
+      driverId: resolvedDriverId
     };
 
     if (meta.user.role === 'admin') {
       this.adminSockets.add(ws);
     }
 
+    if (meta.user.driverId) {
+      if (!this.driverSockets.has(meta.user.driverId)) {
+        this.driverSockets.set(meta.user.driverId, new Set());
+      }
+      this.driverSockets.get(meta.user.driverId).add(ws);
+    }
+
     this.sendJson(ws, {
       type: 'authenticated',
       userId: user.id,
-      role: meta.user.role
+      role: meta.user.role,
+      driverId: meta.user.driverId || undefined
     });
   }
 
   /**
-   * Handle booking channel subscription with strict authorization
+   * Handle booking or driver channel subscription with strict authorization
    */
   async handleSubscribe(ws, msg) {
     const meta = this.socketMeta.get(ws);
@@ -364,17 +382,48 @@ export class RealtimeServer {
       return;
     }
 
-    const bookingId = (msg.bookingId || msg.channel || '').trim();
-    if (!bookingId) {
+    const targetChannel = (msg.bookingId || msg.channel || '').trim();
+    if (!targetChannel) {
       this.sendJson(ws, {
         type: 'error',
         code: 'MISSING_BOOKING_ID',
-        message: 'Booking ID is required to subscribe.'
+        message: 'Booking ID or channel is required to subscribe.'
       });
       return;
     }
 
-    // Lookup booking from database
+    // 1. Private Driver Channel Subscription: driver:<driverId>
+    if (targetChannel.startsWith('driver:')) {
+      const requestedDriverId = targetChannel.slice(7).trim();
+      const isDriverAuthorized = (meta.user.role === 'admin') ||
+        (meta.user.role === 'driver' && meta.user.driverId === requestedDriverId);
+
+      if (!isDriverAuthorized) {
+        this.sendJson(ws, {
+          type: 'error',
+          code: 'FORBIDDEN',
+          channel: targetChannel,
+          message: 'Access denied: You are not authorized to subscribe to another driver\'s private channel.'
+        });
+        return;
+      }
+
+      if (!this.driverRooms.has(requestedDriverId)) {
+        this.driverRooms.set(requestedDriverId, new Set());
+      }
+      this.driverRooms.get(requestedDriverId).add(ws);
+      meta.subscriptions.add(targetChannel);
+
+      this.sendJson(ws, {
+        type: 'subscribed',
+        channel: targetChannel,
+        driverId: requestedDriverId
+      });
+      return;
+    }
+
+    // 2. Booking Channel Subscription: <bookingId>
+    const bookingId = targetChannel;
     const booking = await queryOne('SELECT id, user_id, customer_phone, assigned_driver_id, status FROM bookings WHERE id = ?', [bookingId]);
     if (!booking) {
       this.sendJson(ws, {
@@ -451,9 +500,28 @@ export class RealtimeServer {
    */
   handleUnsubscribe(ws, msg) {
     const meta = this.socketMeta.get(ws);
-    const bookingId = (msg.bookingId || '').trim();
-    if (!bookingId) return;
+    const targetChannel = (msg.bookingId || msg.channel || '').trim();
+    if (!targetChannel) return;
 
+    if (targetChannel.startsWith('driver:')) {
+      const requestedDriverId = targetChannel.slice(7).trim();
+      if (this.driverRooms.has(requestedDriverId)) {
+        this.driverRooms.get(requestedDriverId).delete(ws);
+        if (this.driverRooms.get(requestedDriverId).size === 0) {
+          this.driverRooms.delete(requestedDriverId);
+        }
+      }
+      if (meta) {
+        meta.subscriptions.delete(targetChannel);
+      }
+      this.sendJson(ws, {
+        type: 'unsubscribed',
+        channel: targetChannel
+      });
+      return;
+    }
+
+    const bookingId = targetChannel;
     if (this.bookingRooms.has(bookingId)) {
       this.bookingRooms.get(bookingId).delete(ws);
       if (this.bookingRooms.get(bookingId).size === 0) {
@@ -480,15 +548,34 @@ export class RealtimeServer {
         clearTimeout(meta.authTimeout);
         meta.authTimeout = null;
       }
-      for (const bookingId of meta.subscriptions) {
-        if (this.bookingRooms.has(bookingId)) {
-          this.bookingRooms.get(bookingId).delete(ws);
-          if (this.bookingRooms.get(bookingId).size === 0) {
-            this.bookingRooms.delete(bookingId);
+      for (const channelOrBookingId of meta.subscriptions) {
+        if (channelOrBookingId.startsWith('driver:')) {
+          const dId = channelOrBookingId.slice(7).trim();
+          if (this.driverRooms.has(dId)) {
+            this.driverRooms.get(dId).delete(ws);
+            if (this.driverRooms.get(dId).size === 0) {
+              this.driverRooms.delete(dId);
+            }
+          }
+        } else {
+          if (this.bookingRooms.has(channelOrBookingId)) {
+            this.bookingRooms.get(channelOrBookingId).delete(ws);
+            if (this.bookingRooms.get(channelOrBookingId).size === 0) {
+              this.bookingRooms.delete(channelOrBookingId);
+            }
           }
         }
       }
       meta.subscriptions.clear();
+
+      if (meta.user?.driverId) {
+        if (this.driverSockets.has(meta.user.driverId)) {
+          this.driverSockets.get(meta.user.driverId).delete(ws);
+          if (this.driverSockets.get(meta.user.driverId).size === 0) {
+            this.driverSockets.delete(meta.user.driverId);
+          }
+        }
+      }
     }
     this.adminSockets.delete(ws);
   }
@@ -574,7 +661,7 @@ export class RealtimeServer {
   /**
    * Publish booking assignment update to authorized subscribers in room
    */
-  async publishBookingAssignmentChange({ bookingId, assignedDriverId = null, assignedDriverName = null, status = null }) {
+  async publishBookingAssignmentChange({ bookingId, assignedDriverId = null, assignedDriverName = null, status = null, timestamp = null }) {
     if (!bookingId) {
       throw new Error('bookingId is required to publish assignment change');
     }
@@ -585,11 +672,12 @@ export class RealtimeServer {
       assignedDriverId: assignedDriverId || null,
       assignedDriverName: assignedDriverName || null,
       status: status || null,
-      timestamp: new Date().toISOString()
+      timestamp: timestamp || new Date().toISOString()
     };
 
     const sockets = this.bookingRooms.get(bookingId);
     let sentCount = 0;
+    const notifiedSockets = new Set();
 
     if (sockets && sockets.size > 0) {
       const socketsToRemove = [];
@@ -613,6 +701,7 @@ export class RealtimeServer {
           }
 
           this.sendJson(ws, eventPayload);
+          notifiedSockets.add(ws);
           sentCount += 1;
         }
       }
@@ -624,13 +713,59 @@ export class RealtimeServer {
           meta.subscriptions.delete(bookingId);
         }
       }
-      if (sockets.size === 0) {
+    }
+
+    // Deliver assignment to the assigned driver's socket(s)
+    if (assignedDriverId) {
+      const driverSockets = this.driverSockets.get(assignedDriverId);
+      if (driverSockets) {
+        for (const driverWs of driverSockets) {
+          if (driverWs.readyState === WebSocket.OPEN && !notifiedSockets.has(driverWs)) {
+            this.sendJson(driverWs, eventPayload);
+            notifiedSockets.add(driverWs);
+            sentCount += 1;
+
+            // Automatically subscribe assigned driver to this booking room for active trips
+            const upperStatus = String(status || '').toUpperCase();
+            if (upperStatus !== 'COMPLETED' && upperStatus !== 'CANCELLED') {
+              if (!this.bookingRooms.has(bookingId)) {
+                this.bookingRooms.set(bookingId, new Set());
+              }
+              this.bookingRooms.get(bookingId).add(driverWs);
+              const meta = this.socketMeta.get(driverWs);
+              if (meta) meta.subscriptions.add(bookingId);
+            }
+          }
+        }
+      }
+      // Also notify any driver private rooms
+      const driverRoomSockets = this.driverRooms.get(assignedDriverId);
+      if (driverRoomSockets) {
+        for (const drWs of driverRoomSockets) {
+          if (drWs.readyState === WebSocket.OPEN && !notifiedSockets.has(drWs)) {
+            this.sendJson(drWs, eventPayload);
+            notifiedSockets.add(drWs);
+            sentCount += 1;
+          }
+        }
+      }
+    }
+
+    // Terminal status cleanup: close room if COMPLETED or CANCELLED
+    const upperStatus = String(status || '').toUpperCase();
+    if (upperStatus === 'COMPLETED' || upperStatus === 'CANCELLED') {
+      if (this.bookingRooms.has(bookingId)) {
+        const roomSockets = this.bookingRooms.get(bookingId);
+        for (const rWs of roomSockets) {
+          const meta = this.socketMeta.get(rWs);
+          if (meta) meta.subscriptions.delete(bookingId);
+        }
         this.bookingRooms.delete(bookingId);
       }
     }
 
     // Also push initial location of newly assigned driver if they already have coordinates in DB
-    if (assignedDriverId) {
+    if (assignedDriverId && upperStatus !== 'COMPLETED' && upperStatus !== 'CANCELLED') {
       const driver = await queryOne(
         'SELECT id, current_latitude, current_longitude, last_location_update FROM drivers WHERE id = ?',
         [assignedDriverId]
@@ -657,8 +792,9 @@ export class RealtimeServer {
 
     // Also dispatch assignment change to connected admins
     for (const adminWs of this.adminSockets) {
-      if (adminWs.readyState === WebSocket.OPEN && (!sockets || !sockets.has(adminWs))) {
+      if (adminWs.readyState === WebSocket.OPEN && !notifiedSockets.has(adminWs)) {
         this.sendJson(adminWs, eventPayload);
+        notifiedSockets.add(adminWs);
         sentCount += 1;
       }
     }
@@ -759,9 +895,9 @@ export async function publishDriverLocation({ driverId, latitude, longitude, tim
  * - If running in serverless mode (Vercel) and REALTIME_SERVICE_URL is set, dispatches via internal HTTP webhook.
  * - Safe & non-blocking: never crashes the caller.
  */
-export async function publishBookingAssignmentChange({ bookingId, assignedDriverId = null, assignedDriverName = null, status = null }) {
+export async function publishBookingAssignmentChange({ bookingId, assignedDriverId = null, assignedDriverName = null, status = null, timestamp = null }) {
   if (globalRealtimeServer) {
-    return globalRealtimeServer.publishBookingAssignmentChange({ bookingId, assignedDriverId, assignedDriverName, status });
+    return globalRealtimeServer.publishBookingAssignmentChange({ bookingId, assignedDriverId, assignedDriverName, status, timestamp });
   }
 
   if (ENV.REALTIME_SERVICE_URL) {
@@ -773,7 +909,7 @@ export async function publishBookingAssignmentChange({ bookingId, assignedDriver
           'Content-Type': 'application/json',
           'X-Internal-Secret': ENV.REALTIME_INTERNAL_SECRET || ''
         },
-        body: JSON.stringify({ bookingId, assignedDriverId, assignedDriverName, status }),
+        body: JSON.stringify({ bookingId, assignedDriverId, assignedDriverName, status, timestamp }),
         signal: AbortSignal.timeout(2500)
       });
 
