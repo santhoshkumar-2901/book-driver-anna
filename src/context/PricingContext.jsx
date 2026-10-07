@@ -11,6 +11,9 @@ export const OBSOLETE_DRIVER_SERVICE_IDS = [
   'driver_outstation_24hr',
   'driver_outstation_46hr',
   'driver_outstation_72hr',
+  'driver_outstation_150km',
+  'driver_outstation_300km',
+  'driver_outstation_500km',
   'driver_airport_drop',
   'driver_night_party'
 ];
@@ -21,9 +24,6 @@ export const DEFAULT_PRICING_MAP = {
   driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 15, unit: 'km', description: 'Distance rate per kilometer for driver services' },
   driver_min_fare: { id: 'driver_min_fare', category: 'driver', name: 'Minimum Fare', price: 150, unit: 'booking', description: 'Minimum charge for distance rides' },
   driver_one_way_city: { id: 'driver_one_way_city', category: 'driver', name: 'One-Way City Drop', price: 299, unit: 'flat', description: 'Point A to Point B drop across Bangalore' },
-  driver_outstation_150km: { id: 'driver_outstation_150km', category: 'driver', name: 'Outstation Driver (Up to 150 km)', price: 1199, unit: 'flat', description: 'One-way intercity drop up to 150 km' },
-  driver_outstation_300km: { id: 'driver_outstation_300km', category: 'driver', name: 'Outstation Driver (Up to 300 km)', price: 1799, unit: 'flat', description: 'One-way intercity drop up to 300 km' },
-  driver_outstation_500km: { id: 'driver_outstation_500km', category: 'driver', name: 'Outstation Driver (Up to 500 km)', price: 2399, unit: 'flat', description: 'One-way intercity drop up to 500 km' },
   driver_monthly: { id: 'driver_monthly', category: 'driver', name: 'Monthly Corporate Driver', price: 18000, unit: '/ month', description: 'Dedicated full-time driver contract with replacements' },
 
   // Fleet Vehicle Rentals

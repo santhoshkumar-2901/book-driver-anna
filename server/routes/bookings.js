@@ -116,15 +116,16 @@ const handleEstimateRequest = async (req, res, next) => {
 
     if (category === 'driver') {
       if (
-        params.driverTripOption === 'round-trip' ||
         params.roundTripDuration ||
-        (typeof params.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(params.outstationPackage))
+        params.driverDuration ||
+        (typeof params.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(params.outstationPackage)) ||
+        (typeof params.outstationPackage === 'string' && /(150|300|500)\s*km/i.test(params.outstationPackage))
       ) {
         return res.status(400).json({
           success: false,
           error: {
             code: 'OBSOLETE_SERVICE',
-            message: 'Time-based hourly driver packages and destination-specific driver services are permanently discontinued. Please select a valid distance-based City Driver or Outstation Driver service.'
+            message: 'Time-based hourly driver packages, duration packages, and fixed tier services are permanently discontinued. Please select a valid distance-based One Way Drop or Round Trip service.'
           }
         });
       }
@@ -133,11 +134,13 @@ const handleEstimateRequest = async (req, res, next) => {
     // Determine if distance pricing should be applied
     const isFareEstimateRoute = req.originalUrl?.includes('fare-estimate') || req.path?.includes('fare-estimate');
     const isDistanceRequested = Boolean(
+      category === 'driver' ||
       params.useDistancePricing === true ||
       params.isDistancePricing === true ||
       params.driverTripOption === 'distance' ||
-      params.bookingType === 'distance' ||
-      (category === 'driver' && isFareEstimateRoute && (!params.driverTripOption || params.driverTripOption === 'one-way' || params.driverTripOption === 'distance'))
+      params.driverTripOption === 'one-way' ||
+      params.driverTripOption === 'round-trip' ||
+      params.bookingType === 'distance'
     );
 
     // 3. Authoritative Fare Calculation on Backend
@@ -161,7 +164,10 @@ const handleEstimateRequest = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        distanceKm: routeData.distanceKm,
+        distanceKm: fareResult.billableDistanceKm ?? routeData.distanceKm,
+        outboundDistanceKm: fareResult.outboundDistanceKm ?? routeData.distanceKm,
+        billableDistanceKm: fareResult.billableDistanceKm ?? routeData.distanceKm,
+        isRoundTrip: fareResult.isRoundTrip || false,
         durationMinutes: routeData.durationMinutes,
         distanceMeters: routeData.distanceMeters,
         durationSeconds: routeData.durationSeconds,
@@ -185,7 +191,10 @@ const handleEstimateRequest = async (req, res, next) => {
         fareBreakdown: fareResult.fareBreakdown || {
           baseFare: fareResult.baseFare ?? fareResult.basePrice,
           pricePerKm: fareResult.pricePerKm ?? 0,
-          distanceKm: routeData.distanceKm,
+          outboundDistanceKm: fareResult.outboundDistanceKm ?? routeData.distanceKm,
+          billableDistanceKm: fareResult.billableDistanceKm ?? routeData.distanceKm,
+          isRoundTrip: fareResult.isRoundTrip || false,
+          distanceKm: fareResult.billableDistanceKm ?? routeData.distanceKm,
           distanceFare: fareResult.distanceFare ?? 0,
           minimumFare: fareResult.minimumFare ?? 0,
           waitingMinutes: 0,

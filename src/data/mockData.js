@@ -40,33 +40,30 @@ export const OUTSTATION_DESTINATIONS = [
 export const BOOK_DRIVER_TRIP_TYPES = [
   {
     id: 'one-way',
-    title: 'City Driver (One Way)',
+    title: 'One Way Drop',
     badge: 'Point A to Point B Drop',
-    subtitle: 'Point A to Point B drop across Bangalore',
-    description: 'Need Anna to drive your car from your location to a specific drop location across Bengaluru, office, or airport?',
-    pricing: 'Starts @ ₹249 flat (or ₹15/km)',
+    subtitle: 'Point A to Point B drop across Bangalore & outstation routes',
+    description: 'Need Anna to drive your car from your location to a specific destination point?',
+    pricing: 'Base Fare + ₹15/km road distance',
     features: [
       'Specific Pickup & Drop Locations',
       'Instant SMS & Live GPS tracking',
-      'No return fare needed for Anna',
+      'Exact road route distance billing',
       'Automatic & Manual car experts'
     ]
   },
   {
-    id: 'outstation',
-    title: 'Outstation Driver',
-    badge: 'Highway & Hill Getaways',
-    subtitle: 'Distance-based outstation trips across South India',
-    description: 'Planning a road trip to Coorg, Nandi Hills, Chikmagalur or Mysore? Book an experienced outstation Anna for safe highway driving.',
-    pricing: 'Starts @ ₹1,199 (150 km)',
-    outstationPackages: [
-      'Up to 150 km', 'Up to 300 km', 'Up to 500 km'
-    ],
+    id: 'round-trip',
+    title: 'Round Trip',
+    badge: 'Return to Pickup',
+    subtitle: 'Pickup → Destination → Return to original pickup',
+    description: 'Planning a trip where Anna drives you to your destination and brings you back to your pickup location?',
+    pricing: 'Base Fare + 2 × Outbound Distance @ ₹15/km',
     features: [
-      'Distance Tiers: Up to 150 km, 300 km, or 500 km',
-      'Ghat road & hill driving specialists',
-      'Includes driver return/food allowance guidelines',
-      'Night allowance included after 10 PM'
+      'Return to original pickup location',
+      'Billable distance = 2 × outbound route distance',
+      'No duration limits or hourly packages',
+      'Automatic & Manual car experts'
     ]
   }
 ];
@@ -79,7 +76,7 @@ export const DRIVER_SERVICES = [
     icon: "Compass",
     tag: "Most Popular in Namma Bengaluru",
     description: "Tired of Bangalore traffic & Silk Board jams? Hire a professional driver for point-to-point city trips and commutes. Sit back, work on your laptop or relax while Anna handles the wheel.",
-    pricing: "Starts @ ₹249 flat (or ₹15/km)",
+    pricing: "Starts @ ₹299 flat (or ₹15/km)",
     features: [
       "Pay for distance traveled",
       "Police verified & background checked",
@@ -87,7 +84,7 @@ export const DRIVER_SERVICES = [
       "Manual & Automatic car experts",
       "Zero hidden charges"
     ],
-    basePrice: 249,
+    basePrice: 299,
     popularUseCases: ["Traffic commute to office", "Shopping in Commercial St", "Hospital visits", "Family errands"]
   },
   {
@@ -97,16 +94,15 @@ export const DRIVER_SERVICES = [
     icon: "Compass",
     tag: "Weekend Getaways",
     description: "Planning a trip to Nandi Hills, Coorg, Wayanad or Mysore? Hire an experienced outstation Anna who knows highway routes, scenic spots, and best roadside tiffin rooms.",
-    pricing: "Starts @ ₹1,199 (150 km)",
+    pricing: "Pure distance pricing (₹15/km)",
     features: [
-      "Distance-based tiers: 150 km, 300 km, 500 km",
+      "Pure road route distance billing",
+      "Available for One-Way Drop & Round Trip",
       "Experienced highway certified drivers",
-      "Night allowance included after 10 PM",
-      "Includes driver food allowance guidelines",
       "Experienced with hilly terrains & ghat sections",
       "Clean driving record verified"
     ],
-    basePrice: 1199,
+    basePrice: 100,
     popularUseCases: ["Coorg Weekend Trip", "Chikmagalur Homestays", "Mysore Expressway Run", "Tirupati Temple Visit"]
   },
   {

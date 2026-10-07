@@ -18,6 +18,9 @@ export const OBSOLETE_DRIVER_SERVICE_IDS = [
   'driver_outstation_24hr',
   'driver_outstation_46hr',
   'driver_outstation_72hr',
+  'driver_outstation_150km',
+  'driver_outstation_300km',
+  'driver_outstation_500km',
   'driver_airport_drop',
   'driver_night_party'
 ];
@@ -55,30 +58,6 @@ export const DEFAULT_PRICING = [
     price: 299,
     unit: 'flat',
     description: 'Point A to Point B drop across Bangalore'
-  },
-  {
-    id: 'driver_outstation_150km',
-    category: 'driver',
-    name: 'Outstation Driver (Up to 150 km)',
-    price: 1199,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 150 km'
-  },
-  {
-    id: 'driver_outstation_300km',
-    category: 'driver',
-    name: 'Outstation Driver (Up to 300 km)',
-    price: 1799,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 300 km'
-  },
-  {
-    id: 'driver_outstation_500km',
-    category: 'driver',
-    name: 'Outstation Driver (Up to 500 km)',
-    price: 2399,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 500 km'
   },
   {
     id: 'driver_monthly',
@@ -244,12 +223,6 @@ export async function ensureServicePricing() {
   }
 
   try {
-    // Proactively remove obsolete time-based and airport-specific tariffs from active service_pricing
-    if (OBSOLETE_DRIVER_SERVICE_IDS.length > 0) {
-      const placeholders = OBSOLETE_DRIVER_SERVICE_IDS.map(() => '?').join(', ');
-      await execute(`DELETE FROM service_pricing WHERE id IN (${placeholders})`, OBSOLETE_DRIVER_SERVICE_IDS).catch(() => {});
-    }
-
     const existing = await queryAll('SELECT id FROM service_pricing');
     const existingIds = new Set((existing || []).map(r => r.id));
 
@@ -375,10 +348,6 @@ export async function updateServicePricing(updates, userId = null, ipAddress = n
  */
 export async function resetServicePricing(userId = null, ipAddress = null) {
   await withTransaction(async (tx) => {
-    if (OBSOLETE_DRIVER_SERVICE_IDS.length > 0) {
-      const placeholders = OBSOLETE_DRIVER_SERVICE_IDS.map(() => '?').join(', ');
-      await tx.execute(`DELETE FROM service_pricing WHERE id IN (${placeholders})`, OBSOLETE_DRIVER_SERVICE_IDS).catch(() => {});
-    }
     for (const item of DEFAULT_PRICING) {
       if (isTiDB) {
         await tx.execute(
@@ -669,7 +638,7 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     dropLocation = '',
     roundTripDuration = null,
     outstationTripType = null,
-    outstationPackage = 'One Way (Up to 150 km)',
+    outstationPackage = null,
     distanceKm = null,
     durationMinutes = null,
     isDistancePricing = false,
@@ -679,17 +648,23 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
 
   // Prohibit and reject obsolete time-based driver packages and airport-specific service overrides
   if (bookingCategory === 'driver') {
-    const isObsoleteOption = driverTripOption === 'round-trip' ||
+    const isObsoleteOption = 
       (typeof roundTripDuration === 'string' && roundTripDuration.trim() !== '') ||
       (typeof bookingDetails.driverDuration === 'string' && bookingDetails.driverDuration.trim() !== '') ||
       bookingDetails.selectedService === 'hourly-driver' ||
       bookingDetails.selectedService === 'night-driver' ||
+      bookingDetails.driverTripOption === 'night-party' ||
+      bookingDetails.driverTripOption === 'hourly' ||
+      bookingDetails.driverTripOption === 'outstation' ||
+      bookingDetails.driverTripOption === 'airport' ||
       (bookingType && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingType)) ||
       (bookingDetails.serviceId && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingDetails.serviceId)) ||
-      (typeof bookingDetails.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(bookingDetails.outstationPackage));
+      (bookingDetails.driverTripOption && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingDetails.driverTripOption)) ||
+      (typeof bookingDetails.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(bookingDetails.outstationPackage)) ||
+      (typeof bookingDetails.outstationPackage === 'string' && /(150|300|500)\s*km/i.test(bookingDetails.outstationPackage));
 
     if (isObsoleteOption) {
-      const err = new Error('Time-based hourly driver packages and destination-specific driver services are permanently discontinued. Please select a valid distance-based City Driver or Outstation Driver service.');
+      const err = new Error('Time-based hourly driver packages, duration packages, and fixed tier services are permanently discontinued. Please select a valid distance-based One Way Drop or Round Trip service.');
       err.code = 'OBSOLETE_SERVICE';
       err.statusCode = 400;
       throw err;
@@ -781,6 +756,8 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     useDistancePricing ||
     isDistancePricing ||
     driverTripOption === 'distance' ||
+    driverTripOption === 'one-way' ||
+    driverTripOption === 'round-trip' ||
     bookingType === 'distance'
   );
 
@@ -788,8 +765,11 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
 
   if (isDistanceBased && distanceKm !== null && distanceKm !== undefined) {
     const numDist = Number(distanceKm);
+    const isRoundTrip = driverTripOption === 'round-trip';
+    const outboundDistanceKm = Number(numDist.toFixed(2));
+    const billableDistanceKm = isRoundTrip ? Number((numDist * 2).toFixed(2)) : outboundDistanceKm;
     const config = resolveDistancePricingConfig(pricingMap);
-    const distanceFare = Number((numDist * config.pricePerKm).toFixed(2));
+    const distanceFare = Number((billableDistanceKm * config.pricePerKm).toFixed(2));
     const subtotal = Number((config.baseFare + distanceFare).toFixed(2));
     let calculatedFare = subtotal;
     const minimumFareApplied = config.minimumFare > 0 && calculatedFare < config.minimumFare;
@@ -810,7 +790,10 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     }
 
     return {
-      distanceKm: Number(numDist.toFixed(2)),
+      distanceKm: billableDistanceKm,
+      outboundDistanceKm,
+      billableDistanceKm,
+      isRoundTrip,
       durationMinutes: durationMinutes !== null && durationMinutes !== undefined ? Math.max(1, Math.round(durationMinutes)) : null,
       baseFare: config.baseFare,
       pricePerKm: config.pricePerKm,
@@ -832,7 +815,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
       fareBreakdown: {
         baseFare: config.baseFare,
         pricePerKm: config.pricePerKm,
-        distanceKm: Number(numDist.toFixed(2)),
+        outboundDistanceKm,
+        billableDistanceKm,
+        isRoundTrip,
         distanceFare,
         minimumFare: config.minimumFare,
         waitingMinutes: waitingMinutesCount,
@@ -847,24 +832,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
   if (driverTripOption === 'one-way') {
     // Normal city drop or distance ride — airports and all destinations use standard pricing
     basePrice = p('driver_one_way_city', 299);
-  } else if (driverTripOption === 'outstation') {
-    if (distanceKm !== null && distanceKm !== undefined && Number(distanceKm) > 0) {
-      const dist = Number(distanceKm);
-      if (dist > 500) {
-        const err = new Error(`Outstation trips currently support routes up to 500 km. Route distance of ${dist.toFixed(1)} km exceeds the maximum supported tier.`);
-        err.code = 'UNSUPPORTED_OUTSTATION_DISTANCE';
-        err.statusCode = 400;
-        throw err;
-      }
-      if (dist <= 150) basePrice = p('driver_outstation_150km', 1199);
-      else if (dist <= 300) basePrice = p('driver_outstation_300km', 1799);
-      else basePrice = p('driver_outstation_500km', 2399);
-    } else {
-      const pkgStr = String(outstationPackage || '');
-      if (pkgStr.includes('300 km')) basePrice = p('driver_outstation_300km', 1799);
-      else if (pkgStr.includes('500 km')) basePrice = p('driver_outstation_500km', 2399);
-      else basePrice = p('driver_outstation_150km', 1199);
-    }
+  } else if (driverTripOption === 'round-trip') {
+    const config = resolveDistancePricingConfig(pricingMap);
+    basePrice = config.minimumFare || config.baseFare || 150;
   } else if (driverTripOption === 'monthly') {
     basePrice = p('driver_monthly', 18000);
   }

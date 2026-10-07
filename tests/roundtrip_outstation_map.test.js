@@ -58,9 +58,10 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.ok(!modalContent.includes("driver_hourly_2hr"));
     });
 
-    test('1.3 Outstation uses distance tiers without duration packages in BookingModal', () => {
-      assert.match(modalContent, /driverTripOption === 'outstation'/, 'Must support outstation driver option');
-      assert.match(modalContent, /Select Distance Tier/, 'Must render distance tier selector');
+    test('1.3 Round Trip uses pure distance without duration or tier packages in BookingModal', () => {
+      assert.match(modalContent, /driverTripOption === 'round-trip'/, 'Must support round-trip driver option');
+      assert.ok(!modalContent.includes("Select Distance Tier"), 'Distance tier selector must be removed');
+      assert.ok(!modalContent.includes("driver_outstation_150km"), 'Outstation tier prices must be removed');
       assert.ok(!modalContent.includes("Outstation Trip Mode"));
       assert.ok(!modalContent.includes("driver_outstation_12hr"));
     });
@@ -202,18 +203,16 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
   });
 
   // =========================================================================
-  // 3. Outstation Map, Routing & Pricing Flow
+  // 3. Round Trip Map, Routing & Distance Fare Flow (Model B)
   // =========================================================================
-  describe('3. Outstation Routing & Fare Integration', () => {
-    test('3.1 Outstation one-way calculates actual road distance and duration (Bangalore to Mysore)', async () => {
+  describe('3. Round Trip Routing & Distance Fare Integration', () => {
+    test('3.1 Round trip calculates road distance and billable distance = 2D (Bangalore to Mysore)', async () => {
       const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingCategory: 'driver',
-          driverTripOption: 'outstation',
-          outstationTripType: 'one-way',
-          outstationPackage: 'One Way (Up to 150 km)',
+          driverTripOption: 'round-trip',
           pickup: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng },
           destination: { latitude: MYSORE_PALACE.lat, longitude: MYSORE_PALACE.lng }
         })
@@ -223,21 +222,21 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       const body = await res.json();
       assert.strictEqual(body.success, true);
       // Bangalore to Mysore road distance is approx 130-160 km
-      assert.ok(body.data.distanceKm >= 100, 'Bangalore to Mysore road distance must be >= 100 km');
-      assert.ok(body.data.durationMinutes >= 120, 'Bangalore to Mysore duration must be >= 120 minutes');
-      // Preserves outstation tier package pricing (1199 + GST)
-      assert.strictEqual(body.data.basePrice, 1199, 'Must retain 150km tier basePrice');
+      assert.ok(body.data.distanceKm >= 100, 'Bangalore to Mysore outbound road distance must be >= 100 km');
+      assert.ok(body.data.outboundDistanceKm >= 100, 'outboundDistanceKm must be >= 100 km');
+      assert.strictEqual(body.data.billableDistanceKm, Number((body.data.outboundDistanceKm * 2).toFixed(2)));
+      // Base fare: 100 + billableDistanceKm * 15
+      const expectedTotal = Number((100 + body.data.billableDistanceKm * 15).toFixed(2));
+      assert.strictEqual(Number(body.data.totalFare.toFixed(2)), expectedTotal);
     });
 
-    test('3.2 Outstation intercity route (Chennai to Pondicherry)', async () => {
+    test('3.2 Round trip intercity route (Chennai to Pondicherry)', async () => {
       const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingCategory: 'driver',
-          driverTripOption: 'outstation',
-          outstationTripType: 'one-way',
-          outstationPackage: 'One Way (Up to 300 km)',
+          driverTripOption: 'round-trip',
           pickup: { latitude: CHENNAI_CENTRAL.lat, longitude: CHENNAI_CENTRAL.lng },
           destination: { latitude: PONDICHERRY_PROMENADE.lat, longitude: PONDICHERRY_PROMENADE.lng }
         })
@@ -245,23 +244,19 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
 
       assert.strictEqual(res.status, 200);
       const body = await res.json();
-      // Chennai to Pondicherry road distance is ~150-180 km
       assert.ok(body.data.distanceKm >= 120, 'Chennai to Pondicherry road distance must be >= 120 km');
-      assert.ok(body.data.durationMinutes >= 150, 'Drive time must be realistic');
+      assert.strictEqual(body.data.billableDistanceKm, Number((body.data.outboundDistanceKm * 2).toFixed(2)));
     });
 
-    test('3.3 Outstation booking creation persists coordinates, distance, and destination spot', async () => {
+    test('3.3 Round trip booking creation persists coordinates, distance_km = billableDistance', async () => {
       const result = await createBooking({
-        customerName: 'Outstation Traveler',
+        customerName: 'RoundTrip Traveler',
         customerPhone: '9888877772',
-        customerEmail: 'outstation@example.com',
+        customerEmail: 'roundtrip@example.com',
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 150 km)',
+        driverTripOption: 'round-trip',
         pickupArea: BANGALORE_INDIRANAGAR.name,
         dropLocation: MYSORE_PALACE.name,
-        outstationDestination: MYSORE_PALACE.name,
         pickupLat: BANGALORE_INDIRANAGAR.lat,
         pickupLng: BANGALORE_INDIRANAGAR.lng,
         destLat: MYSORE_PALACE.lat,
@@ -274,24 +269,24 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.ok(result && result.booking && result.booking.id, 'Booking must be created');
       const stored = await queryOne('SELECT * FROM bookings WHERE id = ?', [result.booking.id]);
       assert.ok(stored, 'Booking must exist in database');
-      assert.strictEqual(stored.trip_type, 'outstation');
+      assert.strictEqual(stored.trip_type, 'round-trip');
       assert.strictEqual(stored.drop_location, MYSORE_PALACE.name);
       assert.ok(stored.pickup_latitude !== null, 'pickup_latitude must be persisted');
       assert.ok(stored.pickup_longitude !== null, 'pickup_longitude must be persisted');
       assert.ok(stored.destination_latitude !== null, 'destination_latitude must be persisted');
       assert.ok(stored.destination_longitude !== null, 'destination_longitude must be persisted');
       assert.ok(stored.distance_km !== null, 'distance_km must be persisted');
-      assert.ok(stored.distance_km >= 100, 'distance_km must reflect road distance');
+      assert.strictEqual(Number(stored.distance_km), result.fareResult.billableDistanceKm);
+      assert.strictEqual(result.fareResult.billableDistanceKm, result.fareResult.outboundDistanceKm * 2);
     });
 
-    test('3.4 Outstation rejects identical pickup and destination coordinates', async () => {
+    test('3.4 Round trip rejects identical pickup and destination coordinates', async () => {
       const res = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingCategory: 'driver',
-          driverTripOption: 'outstation',
-          outstationTripType: 'one-way',
+          driverTripOption: 'round-trip',
           pickup: { latitude: MYSORE_PALACE.lat, longitude: MYSORE_PALACE.lng },
           destination: { latitude: MYSORE_PALACE.lat, longitude: MYSORE_PALACE.lng }
         })
@@ -301,37 +296,30 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.strictEqual(body.error.code, 'SAME_LOCATION');
     });
 
-    test('3.5 Outstation distance tier behavior analysis (80km, 180km, 350km)', () => {
-      // Current behavior test:
-      // When road distance is 80 km (<= 150), resolves 150km tier basePrice 1199
-      const fare80 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 150 km)',
-        distanceKm: 80
+    test('3.5 Obsolete outstation distance tier packages reject with 400 OBSOLETE_SERVICE', () => {
+      assert.throws(() => {
+        calculateAuthoritativeFare({
+          bookingCategory: 'driver',
+          outstationPackage: 'One Way (Up to 150 km)',
+          distanceKm: 80
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-      assert.strictEqual(fare80.basePrice, 1199, '80 km falls within 150 km package');
 
-      // When road distance is 180 km (> 150 and <= 300), resolves 300km tier basePrice 1799
-      const fare180 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 150 km)', // Customer selected 150km package
-        distanceKm: 180
+      assert.throws(() => {
+        calculateAuthoritativeFare({
+          bookingCategory: 'driver',
+          outstationPackage: 'One Way (Up to 300 km)',
+          distanceKm: 180
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-      assert.strictEqual(fare180.basePrice, 1799, 'Backend calculates 300km tier (1799) when route is 180km');
-
-      // When road distance is 350 km (> 300), resolves 500km tier basePrice 2399
-      const fare350 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 300 km)', // Customer selected 300km package
-        distanceKm: 350
-      });
-      assert.strictEqual(fare350.basePrice, 2399, 'Backend calculates 500km tier (2399) when route is 350km');
     });
   });
 

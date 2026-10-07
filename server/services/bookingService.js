@@ -29,7 +29,7 @@ export async function createBooking({
   dropLocation = '',
   roundTripDuration = null,
   outstationTripType = null,
-  outstationPackage = 'One Way (Up to 150 km)',
+  outstationPackage = null,
   outstationDestination = '',
   pickupArea = 'Pickup Location',
   pickupLat = undefined,
@@ -63,12 +63,19 @@ export async function createBooking({
 
   // 1.1 Prohibit and reject obsolete time-based driver packages and services
   if (bookingCategory === 'driver') {
-    const isObsolete = driverTripOption === 'round-trip' ||
+    const isObsolete = 
       (typeof roundTripDuration === 'string' && roundTripDuration.trim() !== '') ||
-      (typeof outstationPackage === 'string' && /(12|24|46|72)hr/i.test(outstationPackage));
+      (typeof driverDuration === 'string' && driverDuration.trim() !== '') ||
+      driverTripOption === 'night-party' ||
+      driverTripOption === 'hourly' ||
+      driverTripOption === 'outstation' ||
+      driverTripOption === 'airport' ||
+      OBSOLETE_DRIVER_SERVICE_IDS.includes(driverTripOption) ||
+      (typeof outstationPackage === 'string' && /(12|24|46|72)hr/i.test(outstationPackage)) ||
+      (typeof outstationPackage === 'string' && /(150|300|500)\s*km/i.test(outstationPackage));
 
     if (isObsolete) {
-      const err = new Error('Time-based hourly driver packages and destination-specific driver services have been retired. Please book a City Driver or distance-based Outstation Driver service.');
+      const err = new Error('Time-based hourly driver packages, duration packages, and fixed tier services have been retired. Please book a One Way Drop or Round Trip service.');
       err.statusCode = 400;
       err.code = 'OBSOLETE_SERVICE';
       throw err;
@@ -178,7 +185,7 @@ export async function createBooking({
         routeErr.statusCode = routeErr.status || 400;
         throw routeErr;
       }
-      if (isDistancePricing || useDistancePricing || driverTripOption === 'distance') {
+      if (isDistancePricing || useDistancePricing || driverTripOption === 'distance' || driverTripOption === 'one-way' || driverTripOption === 'round-trip') {
         routeErr.statusCode = routeErr.status || 502;
         throw routeErr;
       }
@@ -200,8 +207,8 @@ export async function createBooking({
     outstationPackage,
     distanceKm,
     durationMinutes,
-    isDistancePricing: isDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver' && driverTripOption === 'distance'),
-    useDistancePricing: useDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver' && driverTripOption === 'distance')
+    isDistancePricing: isDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver'),
+    useDistancePricing: useDistancePricing || Boolean(validatedPickupLat && validatedDestLat && bookingCategory === 'driver')
   }, pricingData?.map || null);
 
   // 4. Generate Cryptographically Secure Booking ID
@@ -381,7 +388,7 @@ export async function createBooking({
       ipAddress
     });
 
-    return { booking: newBooking, isDuplicate: false };
+    return { booking: newBooking, isDuplicate: false, fareResult };
   });
 }
 

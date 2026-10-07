@@ -189,52 +189,49 @@ export default function ServicesPage({ openBookingModal }) {
               </div>
             </div>
 
-            {/* OUTSTATION DRIVER */}
+            {/* ROUND TRIP DRIVER */}
             <div 
-              onClick={() => handleOpenDriverOptionForm('outstation')}
+              onClick={() => handleOpenDriverOptionForm('round-trip')}
               className="bg-slate-900 border border-slate-800 hover:border-amber-400 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 cursor-pointer group relative overflow-hidden shadow-xl hover:shadow-amber-400/10"
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Compass className="w-3.5 h-3.5" /> Outstation Driver
+                    <Compass className="w-3.5 h-3.5" /> Round Trip
                   </span>
                   <span className="text-amber-400 font-extrabold text-sm font-['Outfit']">
-                    Starts @ {formatPrice('driver_outstation_150km', 1199)}
+                    Starts @ {formatPrice('driver_base_fare', 150)}
                   </span>
                 </div>
 
                 <h3 className="text-2xl font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors">
-                  Outstation Driver
+                  Round Trip
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Hire an expert highway & ghat-road driver Anna for long-distance trips to Mysuru, Coorg, Chikmagalur, Ooty, Chennai, etc.
+                  Have Anna drive you to your destination and return to your pickup location. Pure distance tariff calculated at 2× route distance.
                 </p>
 
                 {/* Option Highlights */}
                 <div className="space-y-2 pt-2 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
-                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Distance Tiers:</div>
-                  <div className="grid grid-cols-3 gap-1.5 pt-1">
-                    {['150 km', '300 km', '500 km'].map((pkg) => (
-                      <span key={pkg} className="bg-slate-900 text-amber-400 border border-amber-400/30 text-center py-1 text-[11px] rounded-lg font-bold">
-                        {pkg}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
+                  <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Features:</div>
+                  <div className="flex items-center gap-2 text-xs text-slate-200">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Includes Return Bus Allowance</span>
+                    <span><strong>Return to Pickup</strong> (Billable at 2× route distance)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-200">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span><strong>City & Outstation</strong> (Automatic road distance calculation)</span>
                   </div>
                 </div>
               </div>
 
               <div className="pt-6 border-t border-slate-800 flex items-center justify-between mt-6">
-                <span className="text-xs text-slate-400 font-medium">Highway & Hills</span>
+                <span className="text-xs text-slate-400 font-medium">Return Journey</span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleOpenDriverOptionForm('outstation'); }}
+                  onClick={(e) => { e.stopPropagation(); handleOpenDriverOptionForm('round-trip'); }}
                   className="py-2.5 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow transition-colors flex items-center gap-1.5"
                 >
-                  <span>Book Outstation</span>
+                  <span>Book Round Trip</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

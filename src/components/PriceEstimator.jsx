@@ -9,7 +9,7 @@ export default function PriceEstimator({ openBookingModal }) {
   
   // Driver estimator state
   const [pickupArea, setPickupArea] = useState('Indiranagar');
-  const [driverServiceType, setDriverServiceType] = useState('city'); // 'city', 'outstation_150', 'outstation_300', 'outstation_500'
+  const [driverTripOption, setDriverTripOption] = useState('one-way'); // 'one-way' or 'round-trip'
 
   // Vehicle estimator state
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_SERVICES[0]);
@@ -21,15 +21,15 @@ export default function PriceEstimator({ openBookingModal }) {
     return getPrice(key, fallback);
   };
 
-  // Driver price calculation using live pricing (distance-based)
+  // Driver price calculation using live pricing (distance-based baseline)
   const calculateDriverFare = () => {
-    let base = getPrice('driver_one_way_city', 299);
-    if (driverServiceType === 'outstation_150') base = getPrice('driver_outstation_150km', 1199);
-    else if (driverServiceType === 'outstation_300') base = getPrice('driver_outstation_300km', 1799);
-    else if (driverServiceType === 'outstation_500') base = getPrice('driver_outstation_500km', 2399);
-
+    const baseFare = getPrice('driver_base_fare', 150);
+    const minFare = getPrice('driver_min_fare', 150);
+    const perKm = getPrice('driver_price_per_km', 15);
+    // Baseline starting fare for preview (exact fare calculated authoritatively via OSRM route in booking window)
+    const base = driverTripOption === 'round-trip' ? Math.max(baseFare * 2, minFare) : Math.max(baseFare, minFare);
     const gst = Math.round(base * 0.05);
-    return { base, gst, total: base + gst };
+    return { base, perKm, gst, total: base + gst };
   };
 
   // Vehicle price calculation using live pricing
@@ -50,11 +50,7 @@ export default function PriceEstimator({ openBookingModal }) {
     if (bookingType === 'driver') {
       openBookingModal('driver', {
         pickupArea,
-        driverTripOption: driverServiceType === 'city' ? 'one-way' : 'outstation',
-        outstationPackage: driverServiceType === 'outstation_300'
-          ? 'One Way (Up to 300 km)'
-          : (driverServiceType === 'outstation_500' ? 'One Way (Up to 500 km)' : 'One Way (Up to 150 km)'),
-        estimatedFare: driverFare.total
+        driverTripOption
       });
     } else {
       openBookingModal('vehicle', {
@@ -140,21 +136,19 @@ export default function PriceEstimator({ openBookingModal }) {
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
                     <SteeringWheel className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Driver Service & Distance Tier</span>
+                    <span>Driver Trip Option</span>
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
-                      { id: 'city', label: 'City Driver', badge: 'Point-to-Point' },
-                      { id: 'outstation_150', label: 'Outstation 150km', badge: 'Mysuru, Hassan' },
-                      { id: 'outstation_300', label: 'Outstation 300km', badge: 'Coorg, Chikmagalur' },
-                      { id: 'outstation_500', label: 'Outstation 500km', badge: 'Wayanad, Ooty' }
+                      { id: 'one-way', label: 'One Way Drop', badge: 'Point A to Point B (Distance Fare)' },
+                      { id: 'round-trip', label: 'Round Trip', badge: 'Return to Pickup (2× Distance Fare)' }
                     ].map((item) => (
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setDriverServiceType(item.id)}
-                        className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                          driverServiceType === item.id
+                        onClick={() => setDriverTripOption(item.id)}
+                        className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                          driverTripOption === item.id
                             ? 'bg-amber-500/10 border-amber-500 text-white font-bold'
                             : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                         }`}

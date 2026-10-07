@@ -125,12 +125,12 @@ export default function HomePage({
 
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
-                  <span>City Driver:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_one_way_city', 299)}</span>
+                  <span>One Way Drop:</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_base_fare', 150)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Outstation Driver:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_outstation_150km', 1199)}</span>
+                  <span>Round Trip:</span>
+                  <span className="font-semibold text-amber-400">2× Route Distance Tariff</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Pricing Model:</span>
