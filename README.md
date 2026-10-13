@@ -10,7 +10,7 @@
 ![Database](https://img.shields.io/badge/DB-TiDB%20Cloud%20%7C%20SQLite-4479A1)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**Live demo:** <https://book-driver-anna.vercel.app>
+**Live website:** <https://bookdriveranna.com>
 
 ---
 
