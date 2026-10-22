@@ -5,7 +5,7 @@ import {
   ChevronRight, RefreshCw, Power, QrCode, Smartphone, Sparkles, Save, Edit2, Copy,
   Navigation, Radio, User
 } from 'lucide-react';
-import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
+import { SteeringWheel, WhatsAppIcon, BrandIcon } from '../components/Icons';
 import useScrollLock from '../utils/useScrollLock';
 import { useDriverLocation } from '../utils/useDriverLocation';
 import { broadcastBookingUpdate, onBookingUpdate } from '../utils/broadcastSync';
@@ -15,7 +15,7 @@ import {
   formatDuty, 
   getDriverDuties 
 } from '../utils/driverDutyHelpers';
-import { SUPPORT_HELPLINE } from '../data/mockData';
+import { SUPPORT_HELPLINE, WHATSAPP_NUMBER } from '../data/mockData';
 import SOSButton from '../components/SOSButton';
 import { isDummyOrDemoUser, isValidUpi } from '../utils/userValidation';
 import { apiClient } from '../services/apiClient';
@@ -667,8 +667,8 @@ export default function DriverPortalPage({
             title="Book Driver Anna — Return to Duties"
             aria-label="Duties and Trips"
           >
-            <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 font-bold shadow-inner shrink-0 group-hover:border-emerald-400/60 transition-colors">
-              <SteeringWheel className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 font-bold shadow-inner shrink-0 group-hover:border-emerald-400/60 transition-colors p-1">
+              <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div className="hidden sm:block min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1388,7 +1388,7 @@ export default function DriverPortalPage({
             </div>
             <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
               <a
-                href={`https://wa.me/${SUPPORT_HELPLINE.replace(/[^0-9]/g, '')}?text=${encodeURIComponent("Hi Dispatch, this is Driver Anna. Need assistance with duty.")}`}
+                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Dispatch, this is Driver Anna. Need assistance with duty.")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg"

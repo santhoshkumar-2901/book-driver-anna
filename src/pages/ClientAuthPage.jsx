@@ -4,7 +4,7 @@ import {
   Eye, EyeOff, ArrowRight, CheckCircle2, AlertCircle, Sparkles,
   LogIn, UserPlus, Check, X
 } from 'lucide-react';
-import { SteeringWheel } from '../components/Icons';
+import { SteeringWheel, BrandIcon } from '../components/Icons';
 import { BANGALORE_AREAS } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 import { useScrollLock } from '../utils/useScrollLock';
@@ -822,8 +822,8 @@ export default function ClientAuthPage({
           onClick={onBackToHome}
           className={`flex items-center gap-2 sm:gap-2.5 min-w-0 ${onBackToHome ? 'cursor-pointer hover:opacity-90' : ''}`}
         >
-          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0">
-            <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 shrink-0 p-1">
+            <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
             <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">

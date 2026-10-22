@@ -16,7 +16,7 @@ import {
   ChevronRight, 
   User 
 } from 'lucide-react';
-import { SteeringWheel } from './Icons';
+import { SteeringWheel, BrandIcon } from './Icons';
 import { useTheme } from '../utils/themeContext';
 import { useUserBookingBadge } from '../utils/useUserBookingBadge';
 
@@ -87,8 +87,8 @@ export default function Navbar({
             onKeyDown={(e) => e.key === 'Enter' && handleNavClick('home')}
             aria-label="Book Driver Anna Home"
           >
-            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-              <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm shrink-0 group-hover:scale-105 transition-transform p-1">
+              <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1">

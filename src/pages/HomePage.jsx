@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
-import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE } from '../data/mockData';
+import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE, WHATSAPP_NUMBER } from '../data/mockData';
 import { usePricing } from '../context/PricingContext';
 
 export default function HomePage({ 
@@ -335,7 +335,7 @@ export default function HomePage({
               <span>Book a Driver</span>
             </button>
             <a
-              href={`https://wa.me/${SUPPORT_HELPLINE.replace(/[^0-9]/g, '')}?text=${encodeURIComponent("Hello Book Driver Anna, I need assistance booking a driver or fleet vehicle.")}`}
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hello Book Driver Anna, I need assistance booking a driver or fleet vehicle.")}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Chat on WhatsApp"

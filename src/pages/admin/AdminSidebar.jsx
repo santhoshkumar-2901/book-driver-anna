@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Car, ShieldCheck, Phone, LayoutDashboard, ChevronRight, GraduationCap, Users, LogOut, ArrowUpRight, Menu, X, Trash2, Tag, MapPin
 } from 'lucide-react';
-import { SteeringWheel } from '../../components/Icons';
+import { SteeringWheel, BrandIcon } from '../../components/Icons';
 
 export default function AdminSidebar({
   activeTab,
@@ -29,8 +29,8 @@ export default function AdminSidebar({
         {/* Sidebar Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20">
-              <Car className="w-6 h-6 stroke-[2.2]" />
+            <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20 p-1">
+              <BrandIcon className="w-6 h-6" />
             </div>
             <div>
               <div className="font-extrabold text-lg text-white font-['Outfit'] leading-none">
@@ -408,8 +408,8 @@ export default function AdminSidebar({
             {/* Drawer Header */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-400/20 shrink-0">
-                  <Car className="w-5 h-5 stroke-[2.2]" />
+                <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-400/20 shrink-0 p-1">
+                  <BrandIcon className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="font-extrabold text-sm text-white font-['Outfit'] leading-tight">
