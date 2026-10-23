@@ -24,6 +24,7 @@ import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import pricingRouter from './routes/pricing.js';
 import locationRouter from './routes/location.js';
+import guestAccessRouter from './routes/guestAccess.js';
 import { ensureServicePricing } from './services/pricingService.js';
 
 export const app = express();
@@ -91,7 +92,7 @@ app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
 // 4. Global API Rate Limiter (enforced on both /api and alias mount paths)
-app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing', '/location'], generalRateLimiter);
+app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing', '/location', '/guest'], generalRateLimiter);
 
 // 5. Minimal Public Healthcheck Endpoint (Zero internal metrics, counts, or configuration disclosure)
 app.get(['/api/health', '/health'], async (req, res) => {
@@ -125,6 +126,8 @@ app.use('/api/pricing', pricingRouter);
 app.use('/pricing', pricingRouter);
 app.use('/api/location', locationRouter);
 app.use('/location', locationRouter);
+app.use('/api/guest', guestAccessRouter);
+app.use('/guest', guestAccessRouter);
 
 // 7. Serve Production Frontend Static Assets (if dist exists)
 if (fs.existsSync(distDir)) {
@@ -138,7 +141,8 @@ if (fs.existsSync(distDir)) {
       req.path.startsWith('/admin') || 
       req.path.startsWith('/chat') ||
       req.path.startsWith('/pricing') ||
-      req.path.startsWith('/location');
+      req.path.startsWith('/location') ||
+      req.path.startsWith('/guest');
 
     if (req.method === 'GET' && !isApiRequest) {
       return res.sendFile(path.join(distDir, 'index.html'));

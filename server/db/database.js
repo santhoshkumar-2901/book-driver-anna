@@ -157,6 +157,24 @@ if (isTiDB) {
     });
 
     tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS guest_access_tokens (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        booking_id VARCHAR(64) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL UNIQUE,
+        secret_version VARCHAR(16) NOT NULL DEFAULT 'v1',
+        purpose VARCHAR(32) NOT NULL DEFAULT 'payment_link',
+        expires_at DATETIME NOT NULL,
+        revoked_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_gat_token_hash (token_hash),
+        INDEX idx_gat_booking_id (booking_id),
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB guest_access_tokens auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         user_id VARCHAR(64) NULL,
@@ -311,6 +329,19 @@ if (isTiDB) {
     console.warn('[DATABASE] SQLite ARRIVED constraint migration note:', migErr.message);
   }
 
+  try {
+    const tableInfo = sqliteDb.prepare("PRAGMA table_info(bookings)").all();
+    const hasPaymentStatus = tableInfo.some(c => (c.name || '').toLowerCase() === 'payment_status');
+    if (!hasPaymentStatus) {
+      sqliteDb.exec("ALTER TABLE bookings ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'UNPAID';");
+      sqliteDb.exec("UPDATE bookings SET payment_status = 'LEGACY_UNVERIFIED' WHERE status = 'COMPLETED' AND payment_status = 'UNPAID';");
+      sqliteDb.exec("CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);");
+    }
+  } catch (migErr) {
+    console.error('[DATABASE] SQLite payment_status migration error:', migErr);
+    throw migErr;
+  }
+
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
 
@@ -366,6 +397,17 @@ export async function ensureDatabaseReady() {
           await tidbConn.execute(m);
         } catch (e) {
           // Column already exists or duplicate column name
+        }
+      }
+
+      try {
+        await tidbConn.execute("ALTER TABLE bookings ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID';");
+        await tidbConn.execute("UPDATE bookings SET payment_status = 'LEGACY_UNVERIFIED' WHERE status = 'COMPLETED' AND payment_status = 'UNPAID';");
+        await tidbConn.execute("CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);");
+      } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060 && !err.message?.includes('Duplicate column')) {
+          console.error('[DATABASE] TiDB payment_status migration error:', err);
+          throw err;
         }
       }
     })().catch((err) => {

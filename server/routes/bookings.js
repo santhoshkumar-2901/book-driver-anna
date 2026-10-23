@@ -256,7 +256,8 @@ router.post('/', bookingRateLimiter, optionalAuth, validateBookingInput, async (
       success: true,
       data: {
         booking: result.booking,
-        isDuplicate: result.isDuplicate
+        isDuplicate: result.isDuplicate,
+        paymentLink: result.paymentLink || null
       }
     });
   } catch (err) {

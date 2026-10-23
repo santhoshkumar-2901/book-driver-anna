@@ -9,6 +9,24 @@ const jwtSecret = (process.env.JWT_SECRET || '').trim();
 const adminSecret = (process.env.ADMIN_REGISTRATION_SECRET || '').trim();
 const databaseUrl = (process.env.NODE_ENV === 'test') ? '' : (process.env.DATABASE_URL || '').trim();
 
+const rawKeyring = (process.env.GUEST_TOKEN_KEYRING || '').trim();
+const activeKeyVersion = (process.env.GUEST_TOKEN_ACTIVE_VERSION || 'v1').trim();
+let guestTokenKeyring = {};
+
+if (rawKeyring) {
+  try {
+    guestTokenKeyring = JSON.parse(rawKeyring);
+  } catch (e) {
+    throw new Error('GUEST_TOKEN_KEYRING must be a valid JSON object string.');
+  }
+} else if (process.env.GUEST_TOKEN_SECRET) {
+  guestTokenKeyring = { [activeKeyVersion]: process.env.GUEST_TOKEN_SECRET.trim() };
+} else if (!isProduction) {
+  guestTokenKeyring = { v1: 'bda-dev-guest-token-secret-key-32chars-minimum!' };
+}
+
+const activeSecret = guestTokenKeyring[activeKeyVersion];
+
 if (isProduction) {
   if (!jwtSecret || jwtSecret.length < 32) {
     throw new Error('JWT_SECRET is required in production and must be at least 32 characters.');
@@ -19,12 +37,18 @@ if (isProduction) {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required in production.');
   }
+  if (!activeSecret || activeSecret.length < 32) {
+    throw new Error('GUEST_TOKEN_KEYRING must define a secret of at least 32 characters for GUEST_TOKEN_ACTIVE_VERSION in production.');
+  }
 } else {
   if (!jwtSecret) {
     throw new Error('JWT_SECRET is required and must be explicitly configured.');
   }
   if (!adminSecret) {
     throw new Error('ADMIN_REGISTRATION_SECRET is required and must be explicitly configured.');
+  }
+  if (!activeSecret || activeSecret.length < 32) {
+    throw new Error(`GUEST_TOKEN_KEYRING missing valid secret (min 32 chars) for active version '${activeKeyVersion}'.`);
   }
 }
 
@@ -39,6 +63,8 @@ export const ENV = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
 
   ADMIN_REGISTRATION_SECRET: adminSecret,
+  GUEST_TOKEN_KEYRING: guestTokenKeyring,
+  GUEST_TOKEN_ACTIVE_VERSION: activeKeyVersion,
 
   CORS_ORIGIN:
     process.env.CORS_ORIGIN ||

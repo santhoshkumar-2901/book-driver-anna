@@ -5,6 +5,7 @@ import { routingService } from './routingService.js';
 import { logAuditEvent } from './auditService.js';
 import { isValidCalendarDate, getTodayIST } from '../middleware/validate.js';
 import { publishBookingAssignmentChange } from './realtimeService.js';
+import { issueInitialGuestTokenTx, recoverTokenForIdempotentRetry } from './guestAccessService.js';
 
 // Valid booking state machine transitions
 const ALLOWED_STATE_TRANSITIONS = {
@@ -98,11 +99,15 @@ export async function createBooking({
     throw err;
   }
 
-  // 2. Idempotency Check: If duplicate request with same key arrives, return existing
+  // 2. Idempotency Check: If duplicate request with same key arrives, return existing with recovered token
   if (idempotencyKey) {
     const existing = await queryOne('SELECT * FROM bookings WHERE idempotency_key = ?', [idempotencyKey]);
     if (existing) {
-      return { booking: existing, isDuplicate: true };
+      let paymentLink = null;
+      try {
+        paymentLink = await recoverTokenForIdempotentRetry(existing.id, idempotencyKey);
+      } catch (e) {}
+      return { booking: existing, isDuplicate: true, paymentLink };
     }
   }
 
@@ -371,11 +376,20 @@ export async function createBooking({
       )) {
         const existing = await queryOne('SELECT * FROM bookings WHERE idempotency_key = ?', [idempotencyKey]);
         if (existing) {
-          return { booking: existing, isDuplicate: true };
+          let paymentLink = null;
+          try {
+            paymentLink = await recoverTokenForIdempotentRetry(existing.id, idempotencyKey);
+          } catch (e) {}
+          return { booking: existing, isDuplicate: true, paymentLink };
         }
       }
       throw insertErr;
     }
+
+    // Issue initial guest access token within the SAME atomic transaction
+    let paymentLink = null;
+    const effectiveKey = idempotencyKey || bookingId;
+    paymentLink = await issueInitialGuestTokenTx(tx, bookingId, effectiveKey);
 
     const newBooking = await tx.queryOne('SELECT * FROM bookings WHERE id = ?', [bookingId]);
 
@@ -388,7 +402,7 @@ export async function createBooking({
       ipAddress
     });
 
-    return { booking: newBooking, isDuplicate: false, fareResult };
+    return { booking: newBooking, isDuplicate: false, fareResult, paymentLink };
   });
 }
 

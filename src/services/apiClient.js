@@ -186,6 +186,10 @@ export const apiClient = {
     request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
   estimateBookingFare: (estimateData, { signal } = {}) =>
     request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
+  getGuestBookingSummary: (token) =>
+    request('/guest/booking-summary', { method: 'POST', body: { token } }),
+  validateGuestToken: (token) =>
+    request('/guest/tokens/validate', { method: 'POST', body: { token } }),
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),
@@ -238,6 +242,8 @@ export const apiClient = {
   getAdminPricing: () => request('/admin/pricing', { method: 'GET' }),
   updateAdminPricing: (items) => request('/admin/pricing', { method: 'PUT', body: { items } }),
   resetAdminPricing: () => request('/admin/pricing/reset', { method: 'POST' }),
+  reissueAdminPaymentLink: (bookingId) =>
+    request(`/admin/bookings/${bookingId}/payment-link/reissue`, { method: 'POST' }),
 
   // 5. Pricing Public Endpoint
   getPublicPricing: () => request('/pricing', { method: 'GET' }),

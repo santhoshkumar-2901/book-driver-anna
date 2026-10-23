@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   time TEXT NOT NULL,
   calculated_fare REAL NOT NULL,
   payment_mode TEXT DEFAULT 'cash',
+  payment_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK(payment_status IN ('UNPAID', 'PENDING', 'PAID', 'SETTLED_LEGACY', 'LEGACY_UNVERIFIED', 'REFUNDED')),
   status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   cancellation_reason TEXT,
   assigned_driver_id TEXT REFERENCES drivers(id) ON DELETE SET NULL,
@@ -67,6 +68,17 @@ CREATE TABLE IF NOT EXISTS bookings (
   idempotency_key TEXT UNIQUE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS guest_access_tokens (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  secret_version TEXT NOT NULL DEFAULT 'v1',
+  purpose TEXT NOT NULL DEFAULT 'payment_link',
+  expires_at DATETIME NOT NULL,
+  revoked_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -107,8 +119,11 @@ CREATE INDEX IF NOT EXISTS idx_drivers_license ON drivers(license_number);
 CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_phone ON bookings(customer_phone);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);
 CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON bookings(date, status);
 CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings(assigned_driver_id, date, time);
+CREATE INDEX IF NOT EXISTS idx_gat_token_hash ON guest_access_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_gat_booking_id ON guest_access_tokens(booking_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_reset_user_id ON password_reset_tokens(user_id);

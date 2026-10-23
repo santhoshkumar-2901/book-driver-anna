@@ -13,6 +13,7 @@ const DriverAuthPage = lazy(() => import('./pages/DriverAuthPage'));
 const DriverPortalPage = lazy(() => import('./pages/DriverPortalPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const GuestPaymentPage = lazy(() => import('./pages/GuestPaymentPage'));
 
 function RouteLoadingFallback() {
   return (
@@ -79,6 +80,10 @@ export function resolveRoute(pathname = '') {
   }
   if (clean === '/contact') {
     return { role: 'client', page: 'contact', authRole: 'user', resetAuth: false };
+  }
+  if (clean.startsWith('/pay/') || clean === '/pay') {
+    const bookingId = clean.replace(/^\/pay\/?/, '');
+    return { role: 'client', page: 'pay', bookingId, authRole: 'user', resetAuth: false };
   }
   if (clean === '/') {
     return { role: 'client', page: 'home', authRole: 'user', resetAuth: false };
@@ -748,6 +753,13 @@ export default function App() {
           {activePage === 'contact' && (
             <ContactPage 
               openBookingModal={openBookingModal} 
+            />
+          )}
+
+          {activePage === 'pay' && (
+            <GuestPaymentPage
+              bookingId={typeof window !== 'undefined' ? window.location.pathname.replace(/^\/pay\/?/, '') : ''}
+              onNavigateHome={() => changePage('home')}
             />
           )}
 

@@ -9,6 +9,7 @@ import { updateBookingStatus } from '../services/bookingService.js';
 import { publishBookingAssignmentChange } from '../services/realtimeService.js';
 import { normalizeExperienceYears } from '../services/authService.js';
 import { getAllPricing, updateServicePricing, resetServicePricing } from '../services/pricingService.js';
+import { reissueAdminPaymentLink } from '../services/guestAccessService.js';
 import { ENV } from '../config/env.js';
 
 const router = Router();
@@ -253,6 +254,29 @@ router.delete('/bookings/:id', async (req, res, next) => {
     res.json({
       success: true,
       message: `Booking ${bookingId} permanently deleted.`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/bookings/:id/payment-link/reissue (Admin-assisted payment link re-issuance)
+router.post('/bookings/:id/payment-link/reissue', async (req, res, next) => {
+  try {
+    const bookingId = req.params.id;
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+    const result = await reissueAdminPaymentLink({
+      bookingId,
+      adminUserId: req.user.id,
+      ipAddress
+    });
+
+    res.json({
+      success: true,
+      data: {
+        paymentLink: result
+      }
     });
   } catch (err) {
     next(err);
