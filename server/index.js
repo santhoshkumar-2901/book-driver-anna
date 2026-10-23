@@ -25,6 +25,7 @@ import chatRouter from './routes/chat.js';
 import pricingRouter from './routes/pricing.js';
 import locationRouter from './routes/location.js';
 import guestAccessRouter from './routes/guestAccess.js';
+import webhooksRouter from './routes/webhooks.js';
 import { ensureServicePricing } from './services/pricingService.js';
 
 export const app = express();
@@ -46,11 +47,22 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://checkout.razorpay.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", "https://*.tile.openstreetmap.org"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*", "https://*.vercel.app", "ws://localhost:*", "ws://127.0.0.1:*", "wss://*.vercel.app"]
+      imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", "https://*.tile.openstreetmap.org", "https://cdn.razorpay.com"],
+      connectSrc: [
+        "'self'",
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "https://*.vercel.app",
+        "ws://localhost:*",
+        "ws://127.0.0.1:*",
+        "wss://*.vercel.app",
+        "https://api.razorpay.com",
+        "https://lumberjack.razorpay.com"
+      ],
+      frameSrc: ["'self'", "https://api.razorpay.com"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -88,11 +100,17 @@ app.use(cors({
 }));
 
 // 3. Body parsers with payload size limits (prevent resource exhaustion)
-app.use(express.json({ limit: '100kb' }));
+// Retains raw request Buffer on req.rawBody for cryptographic webhook signature verification (Razorpay HMAC-SHA256)
+app.use(express.json({
+  limit: '100kb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(cookieParser());
 
 // 4. Global API Rate Limiter (enforced on both /api and alias mount paths)
-app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing', '/location', '/guest'], generalRateLimiter);
+app.use(['/api', '/auth', '/bookings', '/drivers', '/admin', '/chat', '/pricing', '/location', '/guest', '/payments'], generalRateLimiter);
 
 // 5. Minimal Public Healthcheck Endpoint (Zero internal metrics, counts, or configuration disclosure)
 app.get(['/api/health', '/health'], async (req, res) => {
@@ -128,6 +146,10 @@ app.use('/api/location', locationRouter);
 app.use('/location', locationRouter);
 app.use('/api/guest', guestAccessRouter);
 app.use('/guest', guestAccessRouter);
+app.use('/api/payments/razorpay/webhook', webhooksRouter);
+app.use('/payments/razorpay/webhook', webhooksRouter);
+app.use('/api/payments/razorpay', webhooksRouter);
+app.use('/payments/razorpay', webhooksRouter);
 
 // 7. Serve Production Frontend Static Assets (if dist exists)
 if (fs.existsSync(distDir)) {
@@ -142,7 +164,8 @@ if (fs.existsSync(distDir)) {
       req.path.startsWith('/chat') ||
       req.path.startsWith('/pricing') ||
       req.path.startsWith('/location') ||
-      req.path.startsWith('/guest');
+      req.path.startsWith('/guest') ||
+      req.path.startsWith('/payments');
 
     if (req.method === 'GET' && !isApiRequest) {
       return res.sendFile(path.join(distDir, 'index.html'));

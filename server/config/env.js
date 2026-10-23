@@ -52,6 +52,32 @@ if (isProduction) {
   }
 }
 
+// Real Razorpay gateway configuration (fail-closed)
+const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || '').trim();
+const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+const razorpayWebhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+const razorpayEnabledRaw = (process.env.RAZORPAY_ENABLED || '').trim().toLowerCase();
+const isRazorpayExplicitlyEnabled = razorpayEnabledRaw === 'true' || razorpayEnabledRaw === '1';
+
+if (isRazorpayExplicitlyEnabled) {
+  if (!razorpayKeyId || razorpayKeyId.length < 8) {
+    throw new Error('RAZORPAY_KEY_ID is required when RAZORPAY_ENABLED is true.');
+  }
+  if (!razorpayKeySecret || razorpayKeySecret.length < 16) {
+    throw new Error('RAZORPAY_KEY_SECRET is required when RAZORPAY_ENABLED is true (min 16 chars).');
+  }
+  if (!razorpayWebhookSecret || razorpayWebhookSecret.length < 16) {
+    throw new Error('RAZORPAY_WEBHOOK_SECRET is required when RAZORPAY_ENABLED is true (min 16 chars).');
+  }
+}
+
+const isRazorpayConfigValid = Boolean(
+  isRazorpayExplicitlyEnabled &&
+  razorpayKeyId.length >= 8 &&
+  razorpayKeySecret.length >= 16 &&
+  razorpayWebhookSecret.length >= 16
+);
+
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   IS_PRODUCTION: isProduction,
@@ -98,7 +124,42 @@ export const ENV = {
   REALTIME_PORT: parseInt(process.env.REALTIME_PORT || '5001', 10),
   REALTIME_SERVICE_URL: (process.env.REALTIME_SERVICE_URL || '').replace(/\/+$/, ''),
   REALTIME_INTERNAL_SECRET: process.env.REALTIME_INTERNAL_SECRET || '',
+
+  // Real Razorpay Gateway Configuration (Fail-closed: enabled only if explicitly turned on with valid secrets)
+  RAZORPAY_KEY_ID: razorpayKeyId,
+  RAZORPAY_KEY_SECRET: razorpayKeySecret,
+  RAZORPAY_WEBHOOK_SECRET: razorpayWebhookSecret,
+  RAZORPAY_ENABLED: isRazorpayConfigValid,
 };
+
+/**
+ * Strict fail-closed check: enables real Razorpay gateway processing ONLY when
+ * RAZORPAY_ENABLED is explicitly true AND all required keys/secrets are present.
+ * Mere presence of environment variables without RAZORPAY_ENABLED=true will never enable real payments.
+ */
+export function isRazorpayPaymentAllowed() {
+  const enabledRaw = (process.env.RAZORPAY_ENABLED !== undefined ? process.env.RAZORPAY_ENABLED : (ENV.RAZORPAY_ENABLED ? 'true' : '')).trim().toLowerCase();
+  const isExplicitlyEnabled = enabledRaw === 'true' || enabledRaw === '1';
+  const creds = getRazorpayCredentials();
+
+  return Boolean(
+    isExplicitlyEnabled &&
+    creds.keyId.length >= 8 &&
+    creds.keySecret.length >= 16 &&
+    creds.webhookSecret.length >= 16
+  );
+}
+
+/**
+ * Returns active Razorpay credentials from process.env with fallback to initial ENV object.
+ */
+export function getRazorpayCredentials() {
+  return {
+    keyId: (process.env.RAZORPAY_KEY_ID || ENV.RAZORPAY_KEY_ID || '').trim(),
+    keySecret: (process.env.RAZORPAY_KEY_SECRET || ENV.RAZORPAY_KEY_SECRET || '').trim(),
+    webhookSecret: (process.env.RAZORPAY_WEBHOOK_SECRET || ENV.RAZORPAY_WEBHOOK_SECRET || '').trim()
+  };
+}
 
 /**
  * Strict fail-closed check: enables dummy checkout simulation ONLY when

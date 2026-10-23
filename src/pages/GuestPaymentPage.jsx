@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, AlertCircle, Clock, MapPin, Calendar, CheckCircle2, 
-  ArrowLeft, Car, Lock, Sparkles, RefreshCw, FileText, CreditCard, Loader2
+  ArrowLeft, Car, Lock, Sparkles, RefreshCw, FileText, CreditCard, Loader2,
+  AlertTriangle, Info, ShieldAlert
 } from 'lucide-react';
 import { SteeringWheel } from '../components/Icons';
 import { apiClient } from '../services/apiClient';
+import { loadRazorpayCheckoutScript } from '../utils/razorpay';
 import DummyRazorpayModal from '../components/DummyRazorpayModal';
 
 export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigateHome }) {
@@ -13,12 +15,25 @@ export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigate
   const [summary, setSummary] = useState(null);
   const [guestToken, setGuestToken] = useState(null);
 
-  // Simulator Modal State
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
-  const [orderData, setOrderData] = useState(null);
-  const [initiatingOrder, setInitiatingOrder] = useState(false);
-  const [orderError, setOrderError] = useState(null);
+  // Real Razorpay Checkout State
+  const [isRazorpayLoading, setIsRazorpayLoading] = useState(false);
+  const [isCheckoutActive, setIsCheckoutActive] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
+  const [gatewayDisabledNotice, setGatewayDisabledNotice] = useState(null);
+  const [cancellationNotice, setCancellationNotice] = useState(null);
+  const [pendingVerificationData, setPendingVerificationData] = useState(null);
   const [paymentReceipt, setPaymentReceipt] = useState(null);
+
+  // Re-entrancy protection ref (guards against rapid multi-clicks before state flush)
+  const isProcessingRef = useRef(false);
+
+  // Development/Test Environment Simulator State (strictly restricted to DEV)
+  const isDevMode = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [simulatorOrderData, setSimulatorOrderData] = useState(null);
+  const [initiatingSimulator, setInitiatingSimulator] = useState(false);
+  const [simulatorError, setSimulatorError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -89,27 +104,244 @@ export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigate
     }
   };
 
-  const handleLaunchCheckout = async () => {
-    if (!guestToken || initiatingOrder) return;
-    setInitiatingOrder(true);
-    setOrderError(null);
+  /**
+   * Primary Flow: Real Razorpay Standard Checkout
+   */
+  const handleLaunchRazorpayCheckout = async () => {
+    if (!guestToken || isProcessingRef.current || isRazorpayLoading || isVerifyingPayment) {
+      return;
+    }
+
+    isProcessingRef.current = true;
+    setIsRazorpayLoading(true);
+    setCheckoutError(null);
+    setCancellationNotice(null);
+    setGatewayDisabledNotice(null);
+
+    try {
+      // 1. Request server-calculated order from backend using authenticated guest token
+      const idempotencyKey = `idem-rzp-${guestToken.slice(0, 8)}-${Date.now()}`;
+      let orderRes;
+      try {
+        orderRes = await apiClient.createRazorpayGuestOrder(guestToken, idempotencyKey);
+      } catch (apiErr) {
+        // Handle Gateway Disabled (403 GATEWAY_DISABLED) fail-closed response
+        if (apiErr?.code === 'GATEWAY_DISABLED' || apiErr?.code === 'GATEWAY_NOT_CONFIGURED' || apiErr?.status === 403 || apiErr?.status === 503) {
+          setGatewayDisabledNotice(
+            'Online card and UPI payments are temporarily unavailable. You can pay your assigned Driver Anna directly via cash or UPI at the completion of your ride.'
+          );
+          return;
+        }
+        if (apiErr?.code === 'TOKEN_EXPIRED') {
+          setErrorState({
+            code: 'TOKEN_EXPIRED',
+            message: 'This payment link has expired. To settle your outstanding fare, please contact Book Driver Anna support.'
+          });
+          return;
+        }
+        throw apiErr;
+      }
+
+      if (!orderRes?.success || !orderRes?.data) {
+        if (orderRes?.error?.code === 'GATEWAY_DISABLED' || orderRes?.error?.code === 'GATEWAY_NOT_CONFIGURED') {
+          setGatewayDisabledNotice(
+            'Online card and UPI payments are temporarily unavailable. You can pay your assigned Driver Anna directly via cash or UPI at the completion of your ride.'
+          );
+          return;
+        }
+        setCheckoutError(orderRes?.error?.message || 'Failed to initialize payment order with gateway.');
+        return;
+      }
+
+      const orderData = orderRes.data;
+
+      // Handle already succeeded booking
+      if (orderData.isPaid || orderData.alreadySucceeded) {
+        setPaymentReceipt({
+          paymentId: orderData.paymentId || orderData.orderId,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          bookingId: summary?.bookingId
+        });
+        setSummary((prev) => (prev ? { ...prev, isPaid: true, paymentStatus: 'PAID' } : prev));
+        return;
+      }
+
+      // 2. Dynamically load official Razorpay Checkout SDK
+      const scriptReady = await loadRazorpayCheckoutScript();
+      if (!scriptReady || typeof window.Razorpay !== 'function') {
+        setCheckoutError(
+          'Unable to load the secure Razorpay payment gateway script. If you are using an ad-blocker or strict tracking protection, please allow checkout.razorpay.com and try again.'
+        );
+        return;
+      }
+
+      // 3. Configure Razorpay Standard Checkout options with server-supplied attributes
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amountInPaise,
+        currency: orderData.currency || 'INR',
+        name: 'Book Driver Anna',
+        description: `Ride Payment - ${summary?.bookingId || orderData.bookingId}`,
+        image: '/favicon.ico',
+        order_id: orderData.orderId,
+        prefill: {
+          name: summary?.customerName || '',
+          contact: summary?.customerPhone || ''
+        },
+        notes: {
+          bookingId: String(summary?.bookingId || orderData.bookingId),
+          attemptId: orderData.attemptId
+        },
+        theme: {
+          color: '#f59e0b'
+        },
+        modal: {
+          ondismiss: () => {
+            setIsCheckoutActive(false);
+            setIsRazorpayLoading(false);
+            isProcessingRef.current = false;
+            setCancellationNotice('Payment checkout was closed. If your payment did not go through, you can retry whenever you are ready. If funds were deducted or your bank authorization completed, please click "Re-check Payment Status" below to reconcile.');
+          },
+          escape: true,
+          backdropclose: false
+        },
+        handler: async (response) => {
+          setIsCheckoutActive(false);
+          const callbackPayload = {
+            attemptId: orderData.attemptId,
+            orderId: response?.razorpay_order_id || orderData.orderId,
+            paymentId: response?.razorpay_payment_id,
+            signature: response?.razorpay_signature
+          };
+          setPendingVerificationData(callbackPayload);
+          await executeBackendSignatureVerification(callbackPayload);
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on('payment.failed', (failRes) => {
+        const desc = failRes?.error?.description || failRes?.error?.reason || 'Transaction declined or failed at the bank.';
+        setCheckoutError(`Payment Failed: ${desc}`);
+        setIsCheckoutActive(false);
+        setIsRazorpayLoading(false);
+        isProcessingRef.current = false;
+      });
+
+      setIsCheckoutActive(true);
+      rzp.open();
+    } catch (err) {
+      setCheckoutError(err?.message || 'An error occurred while launching payment checkout.');
+    } finally {
+      setIsRazorpayLoading(false);
+      // If modal was not opened (e.g. error happened beforehand), reset lock
+      if (!isCheckoutActive) {
+        isProcessingRef.current = false;
+      }
+    }
+  };
+
+  /**
+   * Authoritative Backend Verification of Checkout Signature
+   */
+  const executeBackendSignatureVerification = async ({ attemptId, orderId, paymentId, signature }) => {
+    if (!guestToken) return;
+
+    setIsVerifyingPayment(true);
+    setCheckoutError(null);
+
+    try {
+      const verifyRes = await apiClient.verifyRazorpayGuestSignature({
+        token: guestToken,
+        attemptId,
+        orderId,
+        paymentId,
+        signature
+      });
+
+      if (verifyRes?.success && verifyRes?.data?.isPaid) {
+        setPaymentReceipt(verifyRes.data);
+        setSummary((prev) => (prev ? { ...prev, isPaid: true, paymentStatus: 'PAID' } : prev));
+        setPendingVerificationData(null);
+        setCheckoutError(null);
+        setCancellationNotice(null);
+      } else {
+        const errorMsg = verifyRes?.error?.message || 'Payment verification failed.';
+        setCheckoutError(`Verification Notice: ${errorMsg}`);
+      }
+    } catch (err) {
+      // Network or gateway error during verification
+      setCheckoutError(
+        `Network issue during verification: ${err?.message || 'Connection interrupted'}. If your account was debited, click "Re-check Payment Status" below to reconcile with the bank.`
+      );
+    } finally {
+      setIsVerifyingPayment(false);
+      isProcessingRef.current = false;
+    }
+  };
+
+  /**
+   * Reconcile/Retry Payment Status
+   */
+  const handleReconcileStatus = async () => {
+    if (isVerifyingPayment || !guestToken || isProcessingRef.current) return;
+
+    isProcessingRef.current = true;
+    setIsVerifyingPayment(true);
+
+    try {
+      if (pendingVerificationData) {
+        await executeBackendSignatureVerification(pendingVerificationData);
+        return;
+      }
+
+      const res = await apiClient.getGuestBookingSummary(guestToken);
+      if (res?.success && res?.data?.isPaid) {
+        setSummary(res.data);
+        setPaymentReceipt({
+          paymentId: res.data.paymentId || res.data.bookingId,
+          amount: res.data.calculatedFare,
+          currency: 'INR',
+          bookingId: res.data.bookingId
+        });
+        setCheckoutError(null);
+        setCancellationNotice(null);
+      } else {
+        setCheckoutError('Payment has not yet been confirmed by the bank or gateway. If you were charged, please allow a few moments for bank reconciliation or contact support.');
+      }
+    } catch (err) {
+      setCheckoutError('Unable to re-check booking status at this time. Please check your network connection.');
+    } finally {
+      setIsVerifyingPayment(false);
+      isProcessingRef.current = false;
+    }
+  };
+
+  /**
+   * Development-Only Phase 3 Simulator Launch
+   */
+  const handleLaunchDevSimulator = async () => {
+    if (!isDevMode || !guestToken || initiatingSimulator) return;
+    setInitiatingSimulator(true);
+    setSimulatorError(null);
 
     try {
       const res = await apiClient.createGuestPaymentOrder(guestToken);
       if (res?.success && res?.data) {
-        setOrderData(res.data);
+        setSimulatorOrderData(res.data);
         setIsSimulatorOpen(true);
       } else {
-        setOrderError(res?.error?.message || 'Failed to initialize test payment order.');
+        setSimulatorError(res?.error?.message || 'Failed to initialize test payment simulator.');
       }
     } catch (err) {
-      setOrderError(err?.message || 'Could not launch payment simulator. Please try again.');
+      setSimulatorError(err?.message || 'Could not launch payment simulator. Please try again.');
     } finally {
-      setInitiatingOrder(false);
+      setInitiatingSimulator(false);
     }
   };
 
-  const handlePaymentSuccess = (result) => {
+  const handleSimulatorSuccess = (result) => {
     setPaymentReceipt(result);
     setIsSimulatorOpen(false);
     setSummary((prev) => (prev ? { ...prev, isPaid: true, paymentStatus: 'PAID' } : prev));
@@ -300,7 +532,7 @@ export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigate
                   )}
                 </div>
 
-                {/* Phase Notice / Action Gate */}
+                {/* Payment Action Section */}
                 {summary.isPaid ? (
                   <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-5 space-y-3">
                     <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-sm">
@@ -317,36 +549,142 @@ export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigate
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {orderError && (
-                      <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-3 text-xs text-rose-300 flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                        <span>{orderError}</span>
+                  <div className="space-y-4">
+                    {/* Gateway Disabled Warning Notice */}
+                    {gatewayDisabledNotice && (
+                      <div className="bg-amber-950/50 border border-amber-800/70 rounded-xl p-4 text-xs text-amber-200 space-y-2 animate-in fade-in">
+                        <div className="flex items-center gap-2 font-bold text-amber-300">
+                          <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
+                          <span>Online Payment Temporarily Unavailable</span>
+                        </div>
+                        <p className="text-slate-300 leading-relaxed">
+                          {gatewayDisabledNotice}
+                        </p>
                       </div>
                     )}
 
+                    {/* Cancellation Feedback Notice */}
+                    {cancellationNotice && (
+                      <div className="bg-slate-800/70 border border-slate-700/70 rounded-xl p-3.5 text-xs text-slate-300 space-y-2">
+                        <div className="flex items-start gap-2.5">
+                          <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="flex-1">{cancellationNotice}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleReconcileStatus}
+                          disabled={isVerifyingPayment || isRazorpayLoading}
+                          className="w-full mt-1 py-1.5 bg-slate-700/80 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingPayment ? 'animate-spin' : ''}`} />
+                          <span>{isVerifyingPayment ? 'Re-checking Payment Status...' : 'Re-check Payment Status'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Error Banner */}
+                    {checkoutError && (
+                      <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-3.5 text-xs text-rose-300 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                          <span className="flex-1">{checkoutError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleReconcileStatus}
+                          disabled={isVerifyingPayment || isRazorpayLoading}
+                          className="w-full mt-1 py-1.5 bg-rose-900/60 hover:bg-rose-900 text-rose-100 font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingPayment ? 'animate-spin' : ''}`} />
+                          <span>{isVerifyingPayment ? 'Re-checking Payment Status...' : 'Re-check Payment Status'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Primary Real Razorpay Checkout CTA */}
                     <button
                       type="button"
-                      onClick={handleLaunchCheckout}
-                      disabled={initiatingOrder}
-                      className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 disabled:opacity-50"
+                      onClick={handleLaunchRazorpayCheckout}
+                      disabled={isRazorpayLoading || isVerifyingPayment || isCheckoutActive || Boolean(gatewayDisabledNotice)}
+                      className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-busy={isRazorpayLoading || isVerifyingPayment}
                     >
-                      {initiatingOrder ? (
+                      {isVerifyingPayment ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Initializing Payment Simulator...</span>
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                          <span>Verifying Payment with Bank...</span>
+                        </>
+                      ) : isRazorpayLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                          <span>Connecting to Secure Gateway...</span>
+                        </>
+                      ) : isCheckoutActive ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                          <span>Checkout in Progress...</span>
+                        </>
+                      ) : gatewayDisabledNotice ? (
+                        <>
+                          <ShieldCheck className="w-4 h-4 text-slate-950" />
+                          <span>Online Payment Unavailable</span>
                         </>
                       ) : (
                         <>
-                          <CreditCard className="w-4 h-4" />
-                          <span>Pay Now — ₹{summary.calculatedFare.toFixed(2)} (Test Simulator)</span>
+                          <CreditCard className="w-4 h-4 text-slate-950" />
+                          <span>Pay Now — ₹{summary.calculatedFare.toFixed(2)} (Razorpay)</span>
                         </>
                       )}
                     </button>
 
-                    <p className="text-[11px] text-center text-slate-400">
-                      🔒 Secure checkout simulator • Verified guest token session
+                    <p className="text-[11px] text-center text-slate-400 flex items-center justify-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-400/80" />
+                      <span>256-bit SSL encrypted • Official Razorpay Standard Checkout</span>
                     </p>
+
+                    {/* Direct Driver Alternative Payment Note */}
+                    <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 text-xs text-slate-400 space-y-1">
+                      <p className="font-semibold text-slate-300">Direct Driver Settlement Option:</p>
+                      <p className="text-[11px]">
+                        Prefer to settle in person? You can also pay your assigned Driver Anna directly via Cash or driver UPI QR code upon safe completion of your trip.
+                      </p>
+                    </div>
+
+                    {/* Development-Only Phase 3 Simulator Section (Strictly hidden in production) */}
+                    {isDevMode && (
+                      <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-amber-400/80 font-bold uppercase tracking-wider">
+                          <span>[DEV ONLY] Test Environment</span>
+                          <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 text-[10px]">
+                            Developer Mode
+                          </span>
+                        </div>
+                        {simulatorError && (
+                          <div className="bg-rose-950/40 border border-rose-800/60 rounded-lg p-2 text-xs text-rose-300 flex items-start gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                            <span>{simulatorError}</span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleLaunchDevSimulator}
+                          disabled={initiatingSimulator}
+                          className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-semibold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {initiatingSimulator ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Launching Dev Simulator...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Launch Phase 3 Payment Simulator (Mock)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -368,14 +706,14 @@ export default function GuestPaymentPage({ bookingId: routeBookingId, onNavigate
         </div>
       </main>
 
-      {/* Simulator Modal */}
-      {isSimulatorOpen && orderData && (
+      {/* Development Simulator Modal */}
+      {isDevMode && isSimulatorOpen && simulatorOrderData && (
         <DummyRazorpayModal
           isOpen={isSimulatorOpen}
           token={guestToken}
-          orderData={orderData}
+          orderData={simulatorOrderData}
           onClose={() => setIsSimulatorOpen(false)}
-          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentSuccess={handleSimulatorSuccess}
         />
       )}
 

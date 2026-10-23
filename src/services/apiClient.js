@@ -7,12 +7,18 @@
  * - Graceful fallback handling
  */
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
-  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api`
-  : '/api';
+function getApiBase() {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+    return `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api`;
+  }
+  if (typeof process !== 'undefined' && process.env?.VITE_API_URL) {
+    return `${process.env.VITE_API_URL.replace(/\/+$/, '')}/api`;
+  }
+  return '/api';
+}
 
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${getApiBase()}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
@@ -186,6 +192,7 @@ export const apiClient = {
     request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
   estimateBookingFare: (estimateData, { signal } = {}) =>
     request('/bookings/fare-estimate', { method: 'POST', body: estimateData, signal }),
+  // Guest Payment Endpoints
   getGuestBookingSummary: (token) =>
     request('/guest/booking-summary', { method: 'POST', body: { token } }),
   validateGuestToken: (token) =>
@@ -196,6 +203,13 @@ export const apiClient = {
     request('/guest/payments/simulate-outcome', { method: 'POST', body: payload }),
   getGuestPaymentAttemptStatus: (token, attemptId) =>
     request('/guest/payments/status', { method: 'POST', body: { token, attemptId } }),
+  createRazorpayGuestOrder: (token, idempotencyKey = null) =>
+    request('/guest/payments/razorpay/create-order', { method: 'POST', body: { token, idempotencyKey } }),
+  verifyRazorpayGuestSignature: ({ token, attemptId, orderId, paymentId, signature }) =>
+    request('/guest/payments/razorpay/verify-signature', {
+      method: 'POST',
+      body: { token, attemptId, orderId, paymentId, signature }
+    }),
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),

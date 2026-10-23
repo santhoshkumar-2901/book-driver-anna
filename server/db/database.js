@@ -216,6 +216,27 @@ if (isTiDB) {
     `).catch(err => {
       console.warn('[DATABASE] TiDB audit_logs auto-init note:', err.message);
     });
+
+    tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS payment_webhook_events (
+        id VARCHAR(128) NOT NULL PRIMARY KEY,
+        event_type VARCHAR(64) NOT NULL,
+        order_id VARCHAR(64) NULL,
+        payment_id VARCHAR(64) NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED',
+        attempts INT NOT NULL DEFAULT 1,
+        claim_token VARCHAR(64) NULL,
+        error_message TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        processed_at DATETIME NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_pwe_order_id (order_id),
+        INDEX idx_pwe_status (status),
+        INDEX idx_pwe_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB payment_webhook_events auto-init note:', err.message);
+    });
   } catch (err) {
     console.error('[DATABASE] Failed to initialize TiDB Cloud connection:', err.message);
     throw err;
@@ -254,6 +275,9 @@ if (isTiDB) {
   }
   sqliteDb.exec('PRAGMA foreign_keys = ON;');
   sqliteDb.exec('PRAGMA synchronous = NORMAL;');
+  try {
+    sqliteDb.exec('PRAGMA busy_timeout = 5000;');
+  } catch (e) {}
 
   // Execute embedded schema to guarantee complete table definitions in all environments
   try {
@@ -400,6 +424,44 @@ if (isTiDB) {
     throw paErr;
   }
 
+  try {
+    const hasWebhookEvents = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='payment_webhook_events'").get();
+    if (!hasWebhookEvents) {
+      sqliteDb.exec(`
+        CREATE TABLE IF NOT EXISTS payment_webhook_events (
+          id TEXT PRIMARY KEY,
+          event_type TEXT NOT NULL,
+          order_id TEXT,
+          payment_id TEXT,
+          status TEXT NOT NULL DEFAULT 'RECEIVED' CHECK(status IN ('RECEIVED', 'PROCESSING', 'PROCESSED', 'IGNORED', 'FAILED')),
+          attempts INTEGER NOT NULL DEFAULT 1,
+          claim_token TEXT,
+          error_message TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          processed_at DATETIME,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pwe_order_id ON payment_webhook_events(order_id);
+        CREATE INDEX IF NOT EXISTS idx_pwe_status ON payment_webhook_events(status);
+        CREATE INDEX IF NOT EXISTS idx_pwe_created_at ON payment_webhook_events(created_at);
+      `);
+    } else {
+      // Idempotent column check for upgrading existing local SQLite databases
+      const tableInfo = sqliteDb.prepare("PRAGMA table_info(payment_webhook_events)").all();
+      const hasUpdatedAt = tableInfo.some(c => (c.name || '').toLowerCase() === 'updated_at');
+      if (!hasUpdatedAt) {
+        sqliteDb.exec("ALTER TABLE payment_webhook_events ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;");
+      }
+      const hasClaimToken = tableInfo.some(c => (c.name || '').toLowerCase() === 'claim_token');
+      if (!hasClaimToken) {
+        sqliteDb.exec("ALTER TABLE payment_webhook_events ADD COLUMN claim_token TEXT;");
+      }
+    }
+  } catch (pweErr) {
+    console.error('[DATABASE] SQLite payment_webhook_events migration error:', pweErr);
+    throw pweErr;
+  }
+
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
 }
 
@@ -468,8 +530,38 @@ export async function ensureDatabaseReady() {
           throw err;
         }
       }
+
+      try {
+        await tidbConn.execute(`
+          CREATE TABLE IF NOT EXISTS payment_webhook_events (
+            id VARCHAR(128) NOT NULL PRIMARY KEY,
+            event_type VARCHAR(64) NOT NULL,
+            order_id VARCHAR(64) NULL,
+            payment_id VARCHAR(64) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED',
+            attempts INT NOT NULL DEFAULT 1,
+            claim_token VARCHAR(64) NULL,
+            error_message TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            processed_at DATETIME NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_pwe_order_id (order_id),
+            INDEX idx_pwe_status (status),
+            INDEX idx_pwe_created_at (created_at)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+        await tidbConn.execute("ALTER TABLE payment_webhook_events ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;").catch(() => {});
+        await tidbConn.execute("ALTER TABLE payment_webhook_events ADD COLUMN claim_token VARCHAR(64) NULL;").catch(() => {});
+      } catch (err) {
+        if (!err.message?.includes('already exists') && err.errno !== 1050) {
+          console.error('[DATABASE] TiDB payment_webhook_events ensure error:', err);
+          throw err;
+        }
+      }
     })().catch((err) => {
-      console.warn('[DATABASE] TiDB schema ensure error:', err.message);
+      tidbInitPromise = null;
+      console.error('[DATABASE] TiDB schema ensure error:', err.message);
+      throw err;
     });
   }
   return tidbInitPromise;

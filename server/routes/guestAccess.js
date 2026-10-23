@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { lookupRateLimiter } from '../middleware/rateLimiter.js';
 import { getSanitizedBookingSummary, validateGuestToken } from '../services/guestAccessService.js';
-import { isDummyPaymentAllowed } from '../config/env.js';
+import { isDummyPaymentAllowed, isRazorpayPaymentAllowed } from '../config/env.js';
 import {
   createGuestPaymentOrder,
   simulateGuestPaymentOutcome,
-  getGuestPaymentAttemptStatus
+  getGuestPaymentAttemptStatus,
+  createRazorpayGuestOrder,
+  verifyRazorpayGuestSignature
 } from '../services/paymentService.js';
 
 const router = Router();
@@ -32,6 +34,23 @@ const requireDummyPaymentAllowed = (req, res, next) => {
       error: {
         code: 'TEST_MODE_DISABLED_IN_ENVIRONMENT',
         message: 'Payment simulation is strictly prohibited in this environment.'
+      }
+    });
+  }
+  next();
+};
+
+/**
+ * Strict fail-closed guard: permits real Razorpay operations ONLY when
+ * explicitly enabled and configured.
+ */
+const requireRazorpayPaymentAllowed = (req, res, next) => {
+  if (!isRazorpayPaymentAllowed()) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'GATEWAY_DISABLED',
+        message: 'Razorpay payment gateway is currently disabled.'
       }
     });
   }
@@ -221,6 +240,81 @@ router.post('/payments/status', requireDummyPaymentAllowed, async (req, res, nex
     res.json({
       success: true,
       data: statusResult
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/guest/payments/razorpay/create-order
+ * Creates real Razorpay order for authenticated guest booking using authoritative fare.
+ */
+router.post('/payments/razorpay/create-order', requireRazorpayPaymentAllowed, async (req, res, next) => {
+  try {
+    const rawToken = req.body?.token || req.headers['x-guest-access-token'];
+    const idempotencyKey = req.body?.idempotencyKey || req.headers['idempotency-key'] || null;
+    const clientAmount = req.body?.amount;
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+    if (!rawToken || typeof rawToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Access token is required.'
+        }
+      });
+    }
+
+    const orderData = await createRazorpayGuestOrder({
+      rawToken: rawToken.trim(),
+      idempotencyKey,
+      clientAmount,
+      ipAddress
+    });
+
+    res.json({
+      success: true,
+      data: orderData
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/guest/payments/razorpay/verify-signature
+ * Verifies Razorpay Checkout callback signature and authoritative payment status before settling.
+ */
+router.post('/payments/razorpay/verify-signature', requireRazorpayPaymentAllowed, async (req, res, next) => {
+  try {
+    const rawToken = req.body?.token || req.headers['x-guest-access-token'];
+    const { attemptId, orderId, paymentId, signature } = req.body || {};
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+
+    if (!rawToken || typeof rawToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Access token is required.'
+        }
+      });
+    }
+
+    const verifyResult = await verifyRazorpayGuestSignature({
+      rawToken: rawToken.trim(),
+      attemptId,
+      orderId,
+      paymentId,
+      signature,
+      ipAddress
+    });
+
+    res.json({
+      success: true,
+      data: verifyResult
     });
   } catch (err) {
     next(err);

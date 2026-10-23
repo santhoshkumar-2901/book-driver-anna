@@ -140,4 +140,23 @@ CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_h
 CREATE INDEX IF NOT EXISTS idx_reset_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_pricing_category ON service_pricing(category);
 
+-- Webhook deduplication and event lifecycle tracking
+CREATE TABLE IF NOT EXISTS payment_webhook_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  order_id TEXT,
+  payment_id TEXT,
+  status TEXT NOT NULL DEFAULT 'RECEIVED' CHECK(status IN ('RECEIVED', 'PROCESSING', 'PROCESSED', 'IGNORED', 'FAILED')),
+  attempts INTEGER NOT NULL DEFAULT 1,
+  claim_token TEXT,
+  error_message TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  processed_at DATETIME,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pwe_order_id ON payment_webhook_events(order_id);
+CREATE INDEX IF NOT EXISTS idx_pwe_status ON payment_webhook_events(status);
+CREATE INDEX IF NOT EXISTS idx_pwe_created_at ON payment_webhook_events(created_at);
+
 
