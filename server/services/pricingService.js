@@ -770,12 +770,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     const billableDistanceKm = isRoundTrip ? Number((numDist * 2).toFixed(2)) : outboundDistanceKm;
     const config = resolveDistancePricingConfig(pricingMap);
     const distanceFare = Number((billableDistanceKm * config.pricePerKm).toFixed(2));
-    const subtotal = Number((config.baseFare + distanceFare).toFixed(2));
+    const minimumFareApplied = config.minimumFare > 0 && distanceFare < config.minimumFare;
+    const subtotal = minimumFareApplied ? config.minimumFare : distanceFare;
     let calculatedFare = subtotal;
-    const minimumFareApplied = config.minimumFare > 0 && calculatedFare < config.minimumFare;
-    if (minimumFareApplied) {
-      calculatedFare = config.minimumFare;
-    }
 
     const waitingMinutesCount = Math.max(0, parseInt(waitingMinutes, 10) || 0);
     const waitingFare = Number((waitingMinutesCount * config.waitingRatePerMinute).toFixed(2));

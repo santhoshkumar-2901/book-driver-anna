@@ -12,6 +12,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
   let adminToken;
   const adminEmail = `admin_fare_${Date.now()}@bookdriveranna.com`;
   const adminPassword = 'AdminFarePass2026!';
+  const futureDate = new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0];
 
   before(async () => {
     const s = await startTestServer();
@@ -77,7 +78,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
   describe('1. Pricing Engine & Mathematical Formulas', () => {
     test('1.1 Base fare, per-km fare and distance calculation (Madurai Example: 4.82 km)', () => {
       // Pickup: Meenakshi Amman Temple (9.9195, 78.1193) -> Drop: Madurai Railway Station (9.9175, 78.1194)
-      // Distance: 4.82 km, Base: 100, Price/km: 15 -> distanceFare = 72.30, total = 172.30
+      // Distance: 4.82 km, Base: 100, Price/km: 15 -> distanceFare = 72.30, floor = 150
       const pricingMap = {
         driver_base_fare: { id: 'driver_base_fare', category: 'driver', name: 'Base Fare', price: 100 },
         driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 15 },
@@ -94,13 +95,13 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
       assert.strictEqual(fare.baseFare, 100, 'Base fare must be 100');
       assert.strictEqual(fare.pricePerKm, 15, 'Price per km must be 15');
       assert.strictEqual(fare.distanceFare, 72.30, 'Distance fare must be 4.82 * 15 = 72.30');
-      assert.strictEqual(fare.subtotal, 172.30, 'Subtotal must be 100 + 72.30 = 172.30');
-      assert.strictEqual(fare.calculatedFare, 172.30, 'Calculated fare must be 172.30');
+      assert.strictEqual(fare.subtotal, 150.00, 'Subtotal must apply minimum fare floor 150');
+      assert.strictEqual(fare.calculatedFare, 150.00, 'Calculated fare must be 150.00');
       assert.strictEqual(fare.currency, 'INR');
     });
 
     test('1.2 Minimum fare application when subtotal is below minimum fare', () => {
-      // Short trip 1.0 km: base 100 + 15 = 115, but minimum fare is 150
+      // Short trip 1.0 km: distance fare = 15 < 150, minimum fare is 150
       const pricingMap = {
         driver_base_fare: { id: 'driver_base_fare', category: 'driver', name: 'Base Fare', price: 100 },
         driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 15 },
@@ -114,17 +115,18 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         durationMinutes: 5
       }, pricingMap);
 
-      assert.strictEqual(fare.subtotal, 115.00);
+      assert.strictEqual(fare.distanceFare, 15.00);
+      assert.strictEqual(fare.subtotal, 150.00);
       assert.strictEqual(fare.minimumFare, 150);
       assert.strictEqual(fare.minimumFareApplied, true);
       assert.strictEqual(fare.calculatedFare, 150.00, 'Calculated fare must be bumped to minimum fare 150');
     });
 
     test('1.3 Changed admin price dynamically updates fare calculation', () => {
-      // Admin changes price from ₹15 to ₹18
+      // Admin changes price from ₹15 to ₹35 to exceed 150 minimum floor
       const updatedPricingMap = {
         driver_base_fare: { id: 'driver_base_fare', category: 'driver', name: 'Base Fare', price: 100 },
-        driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 18 },
+        driver_price_per_km: { id: 'driver_price_per_km', category: 'driver', name: 'Price Per KM', price: 35 },
         driver_min_fare: { id: 'driver_min_fare', category: 'driver', name: 'Minimum Fare', price: 150 }
       };
 
@@ -135,9 +137,9 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         durationMinutes: 15
       }, updatedPricingMap);
 
-      assert.strictEqual(fare.pricePerKm, 18);
-      assert.strictEqual(fare.distanceFare, 86.76, 'Distance fare must be 4.82 * 18 = 86.76');
-      assert.strictEqual(fare.calculatedFare, 186.76, 'Calculated fare must be 100 + 86.76 = 186.76');
+      assert.strictEqual(fare.pricePerKm, 35);
+      assert.strictEqual(fare.distanceFare, 168.7, 'Distance fare must be 4.82 * 35 = 168.70');
+      assert.strictEqual(fare.calculatedFare, 168.7, 'Calculated fare must be 168.70');
     });
 
     test('1.4 Reject invalid distance inputs (NaN, negative, infinite)', () => {
@@ -196,10 +198,10 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
       assert.strictEqual(body.data.baseFare, 100);
       assert.strictEqual(body.data.pricePerKm, 15);
       assert.strictEqual(body.data.distanceFare, 72.30);
-      assert.strictEqual(body.data.calculatedFare, 172.30);
+      assert.strictEqual(body.data.calculatedFare, 150.00);
       assert.strictEqual(body.data.currency, 'INR');
       assert.ok(body.data.fareBreakdown, 'Response must include fareBreakdown object');
-      assert.strictEqual(body.data.fareBreakdown.estimatedTotal, 172.30);
+      assert.strictEqual(body.data.fareBreakdown.estimatedTotal, 150.00);
     });
 
     test('2.2 Successfully estimates fare with flat coordinate parameters', async () => {
@@ -219,7 +221,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
       const body = await res.json();
       assert.strictEqual(body.success, true);
       assert.strictEqual(body.data.distanceKm, 4.82);
-      assert.strictEqual(body.data.calculatedFare, 172.30);
+      assert.strictEqual(body.data.calculatedFare, 150.00);
     });
 
     test('2.3 Rejects invalid coordinates with HTTP 400 INVALID_COORDINATES', async () => {
@@ -282,7 +284,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
   // =========================================================================
   describe('3. Admin Tariff Updates & Historical Price Protection', () => {
     test('3.1 Admin price change via PUT /api/admin/pricing immediately takes effect on new estimates', async () => {
-      // 1. Admin updates Price Per KM from 15 to 18
+      // 1. Admin updates Price Per KM from 15 to 35
       const updateRes = await fetch(`${baseUrl}/api/admin/pricing`, {
         method: 'PUT',
         headers: {
@@ -291,13 +293,13 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         },
         body: JSON.stringify({
           items: [
-            { id: 'driver_price_per_km', price: 18 }
+            { id: 'driver_price_per_km', price: 35 }
           ]
         })
       });
       assert.strictEqual(updateRes.status, 200);
 
-      // 2. Fetch new fare estimate: should automatically use ₹18/km
+      // 2. Fetch new fare estimate: should automatically use ₹35/km
       const estRes = await fetch(`${baseUrl}/api/bookings/fare-estimate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -309,9 +311,9 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
       });
       const estBody = await estRes.json();
       assert.strictEqual(estBody.success, true);
-      assert.strictEqual(estBody.data.pricePerKm, 18, 'Must use updated ₹18/km rate');
-      assert.strictEqual(estBody.data.distanceFare, 86.76);
-      assert.strictEqual(estBody.data.calculatedFare, 186.76);
+      assert.strictEqual(estBody.data.pricePerKm, 35, 'Must use updated ₹35/km rate');
+      assert.strictEqual(estBody.data.distanceFare, 168.7);
+      assert.strictEqual(estBody.data.calculatedFare, 168.7);
 
       // 3. Reset back to ₹15 for remaining test suite
       await updateServicePricing([{ id: 'driver_price_per_km', price: 15 }]);
@@ -331,19 +333,19 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         pickupLng: 78.1193,
         destLat: 9.9175,
         destLng: 78.1194,
-        date: '2026-10-20',
+        date: futureDate,
         time: '10:00 AM'
       });
 
       const bookingA = bookingARes.booking;
       assert.ok(bookingA);
       assert.strictEqual(Number(bookingA.price_per_km), 15);
-      assert.strictEqual(Number(bookingA.calculated_fare), 172.30);
+      assert.strictEqual(Number(bookingA.calculated_fare), 150.00);
 
-      // 2. Admin alters tariff from ₹15 to ₹25
-      await updateServicePricing([{ id: 'driver_price_per_km', price: 25 }]);
+      // 2. Admin alters tariff from ₹15 to ₹35
+      await updateServicePricing([{ id: 'driver_price_per_km', price: 35 }]);
 
-      // 3. Create Booking B with new rate ₹25/km
+      // 3. Create Booking B with new rate ₹35/km
       const bookingBRes = await createBooking({
         customerName: 'Historical Test User B',
         customerPhone: '9876543211',
@@ -354,18 +356,18 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         pickupLng: 78.1193,
         destLat: 9.9175,
         destLng: 78.1194,
-        date: '2026-10-20',
+        date: futureDate,
         time: '11:00 AM'
       });
       const bookingB = bookingBRes.booking;
-      assert.strictEqual(Number(bookingB.price_per_km), 25);
-      // 4.82 * 25 = 120.50 + 100 = 220.50
-      assert.strictEqual(Number(bookingB.calculated_fare), 220.50);
+      assert.strictEqual(Number(bookingB.price_per_km), 35);
+      // 4.82 * 35 = 168.70
+      assert.strictEqual(Number(bookingB.calculated_fare), 168.70);
 
       // 4. Query Booking A from database: MUST NOT CHANGE!
       const freshBookingA = await queryOne('SELECT * FROM bookings WHERE id = ?', [bookingA.id]);
       assert.strictEqual(Number(freshBookingA.price_per_km), 15, 'Booking A price_per_km must still be ₹15');
-      assert.strictEqual(Number(freshBookingA.calculated_fare), 172.30, 'Booking A calculated_fare must still be ₹172.30');
+      assert.strictEqual(Number(freshBookingA.calculated_fare), 150.00, 'Booking A calculated_fare must still be ₹150.00');
 
       // Reset back to 15
       await updateServicePricing([{ id: 'driver_price_per_km', price: 15 }]);
@@ -387,7 +389,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         pickupLng: 78.1193,
         destLat: 9.9175,
         destLng: 78.1194,
-        date: '2026-10-20',
+        date: futureDate,
         time: '02:00 PM',
         // Injected malicious prices:
         base_fare: 0,
@@ -403,8 +405,8 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
 
       const result = await createBooking(maliciousPayload);
       assert.ok(result.booking);
-      // Server must calculate 172.30, ignoring 1
-      assert.strictEqual(Number(result.booking.calculated_fare), 172.30, 'Server authoritative fare must win over client injection');
+      // Server must calculate 150 (minimum floor), ignoring 1
+      assert.strictEqual(Number(result.booking.calculated_fare), 150.00, 'Server authoritative fare must win over client injection');
       assert.strictEqual(Number(result.booking.base_fare), 100, 'Server base fare must win');
       assert.strictEqual(Number(result.booking.price_per_km), 15, 'Server price_per_km must win');
       assert.strictEqual(Number(result.booking.distance_fare), 72.30, 'Server distance_fare must win');
@@ -426,7 +428,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
         pickupLng: 78.1193,
         destLat: 9.9175,
         destLng: 78.1194,
-        date: '2026-10-20',
+        date: futureDate,
         time: '04:00 PM'
       });
 
@@ -442,7 +444,7 @@ describe('Production Fare Estimate & Distance Pricing Test Suite', () => {
       assert.strictEqual(Number(b.waiting_fare), 0, 'waiting_fare must be 0');
       assert.strictEqual(Number(b.night_surcharge), 0, 'night_surcharge must be 0');
       assert.strictEqual(Number(b.discount_amount), 0, 'discount_amount must be 0');
-      assert.strictEqual(Number(b.calculated_fare), 172.30, 'calculated_fare must be 172.30');
+      assert.strictEqual(Number(b.calculated_fare), 150.00, 'calculated_fare must be 150.00');
       assert.strictEqual(b.currency, 'INR', 'currency must be INR');
       assert.strictEqual(Number(b.pricing_version), 1, 'pricing_version must be 1');
     });

@@ -23,13 +23,12 @@ export default function PriceEstimator({ openBookingModal }) {
 
   // Driver price calculation using live pricing (distance-based baseline)
   const calculateDriverFare = () => {
-    const baseFare = getPrice('driver_base_fare', 150);
     const minFare = getPrice('driver_min_fare', 150);
     const perKm = getPrice('driver_price_per_km', 15);
-    // Baseline starting fare for preview (exact fare calculated authoritatively via OSRM route in booking window)
-    const base = driverTripOption === 'round-trip' ? Math.max(baseFare * 2, minFare) : Math.max(baseFare, minFare);
-    const gst = Math.round(base * 0.05);
-    return { base, perKm, gst, total: base + gst };
+    // Baseline starting fare floor for preview (exact fare calculated authoritatively via OSRM route in booking window)
+    const base = minFare;
+    const gst = 0;
+    return { base, perKm, gst, total: base };
   };
 
   // Vehicle price calculation using live pricing

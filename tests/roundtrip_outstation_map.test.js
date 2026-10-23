@@ -21,6 +21,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
   const MYSORE_PALACE = { lat: 12.3051, lng: 76.6551, name: 'Mysore Palace, Mysuru' };
   const CHENNAI_CENTRAL = { lat: 13.0827, lng: 80.2707, name: 'Chennai Central, Chennai' };
   const PONDICHERRY_PROMENADE = { lat: 11.9341, lng: 79.8358, name: 'Promenade Beach, Pondicherry' };
+  const futureDate = new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0];
 
   before(async () => {
     app = express();
@@ -116,7 +117,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           pickupLng: BANGALORE_INDIRANAGAR.lng,
           destLat: BANGALORE_ELECTRONIC_CITY.lat,
           destLng: BANGALORE_ELECTRONIC_CITY.lng,
-          date: '2026-10-15',
+          date: futureDate,
           time: '10:00',
           paymentMode: 'cash'
         });
@@ -175,7 +176,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           pickupLng: BANGALORE_INDIRANAGAR.lng,
           destLat: BANGALORE_INDIRANAGAR.lat,
           destLng: BANGALORE_INDIRANAGAR.lng,
-          date: '2026-10-15',
+          date: futureDate,
           time: '11:00',
           paymentMode: 'cash'
         });
@@ -225,8 +226,8 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.ok(body.data.distanceKm >= 100, 'Bangalore to Mysore outbound road distance must be >= 100 km');
       assert.ok(body.data.outboundDistanceKm >= 100, 'outboundDistanceKm must be >= 100 km');
       assert.strictEqual(body.data.billableDistanceKm, Number((body.data.outboundDistanceKm * 2).toFixed(2)));
-      // Base fare: 100 + billableDistanceKm * 15
-      const expectedTotal = Number((100 + body.data.billableDistanceKm * 15).toFixed(2));
+      // Pure distance fare: billableDistanceKm * 15
+      const expectedTotal = Number(Math.max(150, body.data.billableDistanceKm * 15).toFixed(2));
       assert.strictEqual(Number(body.data.totalFare.toFixed(2)), expectedTotal);
     });
 
@@ -261,7 +262,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         pickupLng: BANGALORE_INDIRANAGAR.lng,
         destLat: MYSORE_PALACE.lat,
         destLng: MYSORE_PALACE.lng,
-        date: '2026-10-15',
+        date: futureDate,
         time: '08:00',
         paymentMode: 'cash'
       });
@@ -359,7 +360,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         distanceKm: 500, // Client tries to spoof 500 km
         calculatedFare: 10, // Client tries to spoof 10 INR fare
         totalFare: 10,
-        date: '2026-10-15',
+        date: futureDate,
         time: '12:00',
         paymentMode: 'cash'
       });
@@ -371,7 +372,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
       assert.ok(stored.distance_km < 100, 'Distance must be authoritative OSRM route distance');
       // Server must have calculated authoritative fare, NOT 10 INR
       assert.notStrictEqual(stored.calculated_fare, 10, 'Server must reject client-supplied fare');
-      assert.ok(stored.calculated_fare >= 200, 'Fare must be authoritative server fare');
+      assert.ok(stored.calculated_fare >= 150, 'Fare must be authoritative server fare');
     });
 
     test('4.3 Invalid, NaN, and Infinity coordinates are rejected with 400', async () => {
@@ -388,7 +389,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           pickupLng: 77.6408,
           destLat: 12.8399,
           destLng: 77.6770,
-          date: '2026-10-15',
+          date: futureDate,
           time: '12:00'
         });
       }, (err) => {
@@ -410,7 +411,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
           pickupLng: Infinity,
           destLat: 12.8399,
           destLng: 77.6770,
-          date: '2026-10-15',
+          date: futureDate,
           time: '12:00'
         });
       }, (err) => {
@@ -447,7 +448,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         vehicleCategory: 'Sedan',
         pickupArea: 'Indiranagar',
         dropLocation: 'Bangalore City',
-        date: '2026-10-15',
+        date: futureDate,
         time: '09:00',
         paymentMode: 'cash'
       });
@@ -463,7 +464,7 @@ describe('Book Driver Anna — Round Trip & Outstation Map Integration Suite', (
         bookingCategory: 'class',
         selectedClassId: 'class-beginner',
         pickupArea: 'Indiranagar',
-        date: '2026-10-15',
+        date: futureDate,
         time: '07:00',
         paymentMode: 'cash'
       });

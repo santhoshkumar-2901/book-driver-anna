@@ -67,7 +67,7 @@ describe('RBAC, Authorization & Ownership Enforcement Tests', () => {
         driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
-        date: '2026-10-12',
+        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         time: '07:30 AM'
       })
     });

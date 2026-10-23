@@ -79,7 +79,7 @@ describe('Phase 5B — Client Idempotency, Mock Data Removal & Rate-Limit Harden
         driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
         dropLocation: 'Whitefield',
-        date: '2026-10-15',
+        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         time: '10:00 AM',
         paymentMode: 'cash',
         idempotencyKey: testIdemKey,

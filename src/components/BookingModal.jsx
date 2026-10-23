@@ -115,6 +115,15 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     if (item?.displayName) {
       setPickupArea(item.displayName.split(',')[0].trim());
     }
+    // Immediately invalidate previous route and fare to prevent displaying outdated fares
+    setRouteData(null);
+    setRouteLoading(false);
+    setRouteError(null);
+    if (routeAbortRef.current) routeAbortRef.current.abort();
+    setFareEstimate(null);
+    setFareLoading(false);
+    setFareError(null);
+    if (fareAbortRef.current) fareAbortRef.current.abort();
   };
 
   const handleClearPickup = () => {
@@ -141,11 +150,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
   const handleDriverTripOptionChange = (newOption) => {
     if (newOption === driverTripOption) return;
-    if (routeAbortRef.current) routeAbortRef.current.abort();
     if (fareAbortRef.current) fareAbortRef.current.abort();
-    setRouteData(null);
-    setRouteLoading(false);
-    setRouteError(null);
     setFareEstimate(null);
     setFareLoading(false);
     setFareError(null);
@@ -158,6 +163,15 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     if (item?.displayName) {
       setDropLocation(item.displayName.split(',')[0].trim());
     }
+    // Immediately invalidate previous route and fare to prevent displaying outdated fares
+    setRouteData(null);
+    setRouteLoading(false);
+    setRouteError(null);
+    if (routeAbortRef.current) routeAbortRef.current.abort();
+    setFareEstimate(null);
+    setFareLoading(false);
+    setFareError(null);
+    if (fareAbortRef.current) fareAbortRef.current.abort();
   };
 
   const handleClearDestination = () => {
@@ -185,6 +199,14 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       });
       setPickupArea(locName);
       setIsEditingPickup(false);
+      setRouteData(null);
+      setRouteLoading(false);
+      setRouteError(null);
+      if (routeAbortRef.current) routeAbortRef.current.abort();
+      setFareEstimate(null);
+      setFareLoading(false);
+      setFareError(null);
+      if (fareAbortRef.current) fareAbortRef.current.abort();
     } else {
       requestLocation();
     }
@@ -486,15 +508,27 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
 
   const fareInfo = calculateTotalFare();
   const authoritativeTotal = fareEstimate?.calculatedFare ?? fareEstimate?.totalFare;
+  const isDriverService = bookingCategory === 'driver';
+  const hasValidLocations = Boolean(
+    pickupLocation && typeof pickupLocation.latitude === 'number' && typeof pickupLocation.longitude === 'number' &&
+    destinationLocation && typeof destinationLocation.latitude === 'number' && typeof destinationLocation.longitude === 'number' &&
+    !(Math.abs(pickupLocation.latitude - destinationLocation.latitude) < 0.0001 && Math.abs(pickupLocation.longitude - destinationLocation.longitude) < 0.0001)
+  );
+  const isFareCalculating = isDriverService && (routeLoading || fareLoading);
+  const hasFareError = isDriverService && Boolean(routeError || fareError);
+  const isFareReady = isDriverService
+    ? Boolean(!isFareCalculating && !hasFareError && routeData && fareEstimate && typeof authoritativeTotal === 'number')
+    : true;
+
   const effectiveBase = (fareEstimate && routeData && typeof (fareEstimate.baseFare ?? fareEstimate.basePrice) === 'number')
     ? (fareEstimate.baseFare ?? fareEstimate.basePrice)
-    : fareInfo.base;
+    : (isDriverService ? null : fareInfo.base);
   const effectiveGst = (fareEstimate && routeData && typeof fareEstimate.gst === 'number')
     ? fareEstimate.gst
-    : fareInfo.gst;
+    : (isDriverService ? null : fareInfo.gst);
   const effectiveTotalFare = (fareEstimate && routeData && typeof authoritativeTotal === 'number')
     ? authoritativeTotal
-    : fareInfo.total;
+    : (isDriverService ? null : fareInfo.total);
 
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
@@ -513,14 +547,30 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
       return;
     }
 
-    if (
-      bookingCategory === 'driver' &&
-      pickupLocation?.latitude !== undefined && destinationLocation?.latitude !== undefined &&
-      Math.abs(pickupLocation.latitude - destinationLocation.latitude) < 0.0001 &&
-      Math.abs(pickupLocation.longitude - destinationLocation.longitude) < 0.0001
-    ) {
-      setFormError('Pickup and destination must be different.');
-      return;
+    if (bookingCategory === 'driver') {
+      if (!pickupLocation || typeof pickupLocation.latitude !== 'number' || typeof pickupLocation.longitude !== 'number') {
+        setFormError('Please select a valid pickup location from the map search.');
+        return;
+      }
+      if (!destinationLocation || typeof destinationLocation.latitude !== 'number' || typeof destinationLocation.longitude !== 'number') {
+        setFormError('Please select a valid destination location from the map search.');
+        return;
+      }
+      if (
+        Math.abs(pickupLocation.latitude - destinationLocation.latitude) < 0.0001 &&
+        Math.abs(pickupLocation.longitude - destinationLocation.longitude) < 0.0001
+      ) {
+        setFormError('Pickup and destination must be different.');
+        return;
+      }
+      if (routeLoading || fareLoading) {
+        setFormError('Please wait while the route and fare are being calculated.');
+        return;
+      }
+      if (routeError || fareError || !routeData || !fareEstimate || typeof authoritativeTotal !== 'number') {
+        setFormError(routeError || fareError || 'Unable to confirm booking without a valid route and fare estimate. Please check your pickup and destination locations.');
+        return;
+      }
     }
 
     const effectivePickupArea = pickupLocation?.displayName || streetAddress || pickupArea || 'Pickup Location';
@@ -937,6 +987,20 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               </div>
 
               {/* OSRM Route & Authoritative Fare Status & Metrics */}
+              {!pickupLocation && !destinationLocation && !routeLoading && (
+                <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center gap-2 text-xs text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Select pickup and destination locations above to view route and calculate fare.</span>
+                </div>
+              )}
+
+              {((pickupLocation && !destinationLocation) || (!pickupLocation && destinationLocation)) && !routeLoading && (
+                <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center gap-2 text-xs text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{!pickupLocation ? 'Select pickup location to calculate route and fare.' : 'Select destination location to calculate route and fare.'}</span>
+                </div>
+              )}
+
               {routeLoading && (
                 <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-xs text-amber-300">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
@@ -1029,13 +1093,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       Fare Breakdown
                     </div>
                     <div className="space-y-1.5 text-slate-300 text-xs">
-                      {typeof (fareEstimate.baseFare ?? fareEstimate.basePrice) === 'number' && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Base fare</span>
-                          <span className="font-mono text-slate-200">₹{Number(fareEstimate.baseFare ?? fareEstimate.basePrice).toFixed(2)}</span>
-                        </div>
-                      )}
-                      {typeof fareEstimate.distanceFare === 'number' && fareEstimate.distanceFare > 0 && (
+                      {typeof fareEstimate.distanceFare === 'number' && (
                         <div className="flex justify-between">
                           <span className="text-slate-400">
                             Distance fare {fareEstimate.pricePerKm ? `(${fareEstimate.billableDistanceKm ?? fareEstimate.distanceKm} km × ₹${fareEstimate.pricePerKm}/km)` : ''}
@@ -1045,7 +1103,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                       )}
                       {fareEstimate.minimumFareApplied && (
                         <div className="flex justify-between text-amber-400 text-[11px]">
-                          <span>Minimum fare adjustment</span>
+                          <span>Minimum fare adjustment (floor)</span>
                           <span className="font-mono">Min ₹{Number(fareEstimate.minimumFare).toFixed(2)}</span>
                         </div>
                       )}
@@ -1470,17 +1528,36 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-bold text-slate-300">Payment Option</span>
               <div className="text-right">
-                <span className="text-sm font-extrabold text-amber-400 font-['Outfit']">
-                  Total ₹{effectiveTotalFare.toLocaleString('en-IN')}
-                </span>
-                {effectiveGst > 0 ? (
-                  <span className="block text-[10px] text-slate-400 font-medium">
-                    (₹{effectiveBase.toLocaleString('en-IN')} base + ₹{effectiveGst.toLocaleString('en-IN')} 5% GST)
-                  </span>
+                {isDriverService && !isFareReady ? (
+                  isFareCalculating ? (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold justify-end">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      <span>Calculating fare...</span>
+                    </div>
+                  ) : hasFareError ? (
+                    <div className="text-xs text-amber-400 font-medium">
+                      {routeError || fareError || 'Route calculation failed'}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-400 font-medium">
+                      Select pickup & destination to calculate fare
+                    </div>
+                  )
                 ) : (
-                  <span className="block text-[10px] text-emerald-400 font-medium">
-                    (All-Inclusive Package)
-                  </span>
+                  <>
+                    <span className="text-sm font-extrabold text-amber-400 font-['Outfit']">
+                      Total ₹{effectiveTotalFare.toLocaleString('en-IN')}
+                    </span>
+                    {effectiveGst > 0 ? (
+                      <span className="block text-[10px] text-slate-400 font-medium">
+                        (₹{effectiveBase.toLocaleString('en-IN')} base + ₹{effectiveGst.toLocaleString('en-IN')} 5% GST)
+                      </span>
+                    ) : (
+                      <span className="block text-[10px] text-emerald-400 font-medium">
+                        (All-Inclusive Package)
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1517,7 +1594,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
           {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (isDriverService && (!isFareReady || isFareCalculating))}
             className="btn-primary w-full py-3.5 text-sm sm:text-base justify-center min-h-[48px] touch-manipulation disabled:opacity-50"
           >
             {isSubmitting ? (
@@ -1525,6 +1602,18 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
                 <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Confirming Booking...</span>
               </>
+            ) : isDriverService && !isFareReady ? (
+              isFareCalculating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin shrink-0 text-slate-950" />
+                  <span className="truncate">Calculating Fare...</span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-5 h-5 shrink-0 text-slate-950" />
+                  <span className="truncate">Select Locations to Book Driver</span>
+                </>
+              )
             ) : (
               <>
                 <ShieldCheck className="w-5 h-5 shrink-0" />

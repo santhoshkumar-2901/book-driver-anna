@@ -42,7 +42,7 @@ describe('Booking Isolation: Demo Users vs New Users', () => {
         driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
-        date: '2026-10-15',
+        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         time: '06:30 AM'
       })
     });
@@ -147,7 +147,7 @@ describe('Booking Isolation: Demo Users vs New Users', () => {
         driverTripOption: 'one-way',
         pickupArea: 'Indiranagar',
         dropLocation: 'Whitefield',
-        date: '2026-10-15',
+        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         time: '10:00 AM'
       })
     });

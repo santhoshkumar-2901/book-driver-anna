@@ -86,10 +86,10 @@ describe('Model B — Pure Distance-Based Round Trip & Service Decommission Veri
       // Defined billing assumption for round trip = 2 * 20 km = 40 km
       assert.strictEqual(fare.billableDistanceKm, 40.0);
       assert.strictEqual(fare.isRoundTrip, true);
-      // Base fare 100 + (40 km * 15/km = 600) = 700
+      // Pure distance: 40 km * 15/km = 600
       assert.strictEqual(fare.baseFare, 100);
       assert.strictEqual(fare.distanceFare, 600);
-      assert.strictEqual(fare.totalFare, 700);
+      assert.strictEqual(fare.totalFare, 600);
     });
 
     test('2.2 One Way Drop accepts pure distance-based requests with billableDistance = D', () => {
@@ -104,10 +104,10 @@ describe('Model B — Pure Distance-Based Round Trip & Service Decommission Veri
       assert.strictEqual(fare.outboundDistanceKm, 20.0);
       assert.strictEqual(fare.billableDistanceKm, 20.0);
       assert.strictEqual(fare.isRoundTrip, false);
-      // Base fare 100 + (20 km * 15/km = 300) = 400
+      // Pure distance: 20 km * 15/km = 300
       assert.strictEqual(fare.baseFare, 100);
       assert.strictEqual(fare.distanceFare, 300);
-      assert.strictEqual(fare.totalFare, 400);
+      assert.strictEqual(fare.totalFare, 300);
     });
 
     test('2.3 Minimum fare applies to round trip if billable amount is below min fare', () => {
@@ -211,8 +211,8 @@ describe('Model B — Pure Distance-Based Round Trip & Service Decommission Veri
         dropLocation: 'Kempegowda International Airport (BLR T1/T2)',
         distanceKm: 38.0
       });
-      // 100 + 38 * 15 = 670 base fare, NOT 899 fixed
-      assert.strictEqual(fare.totalFare, 670);
+      // Pure distance: 38 * 15 = 570, NOT 899 fixed
+      assert.strictEqual(fare.totalFare, 570);
       assert.notStrictEqual(fare.totalFare, 899, 'Airport destination must never trigger legacy fixed tariff');
     });
   });

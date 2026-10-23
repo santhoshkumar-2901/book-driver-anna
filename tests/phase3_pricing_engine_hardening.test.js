@@ -174,7 +174,7 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
     });
 
     test('3.2 Short route below minimum fare applies minimum fare', () => {
-      // 2 km: base (100) + distance (2 * 15 = 30) = 130 < minimum (150) -> final fare = 150
+      // 2 km: distance (2 * 15 = 30) < minimum (150) -> final fare = 150
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'distance',
@@ -182,14 +182,14 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
         isDistancePricing: true
       });
       assert.strictEqual(fare.distanceFare, 30);
-      assert.strictEqual(fare.subtotal, 130);
+      assert.strictEqual(fare.subtotal, 150);
       assert.strictEqual(fare.minimumFareApplied, true);
       assert.strictEqual(fare.calculatedFare, 150);
       assert.strictEqual(fare.totalFare, 150);
     });
 
-    test('3.3 Normal route above minimum fare applies base + distance fare', () => {
-      // 10 km: base (100) + distance (10 * 15 = 150) = 250 > minimum (150) -> final fare = 250
+    test('3.3 Normal route equal to or above minimum fare applies pure distance fare', () => {
+      // 10 km: distance (10 * 15 = 150) >= minimum (150) -> final fare = 150
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'distance',
@@ -198,12 +198,12 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
       });
       assert.strictEqual(fare.distanceFare, 150);
       assert.strictEqual(fare.minimumFareApplied, false);
-      assert.strictEqual(fare.calculatedFare, 250);
-      assert.strictEqual(fare.totalFare, 250);
+      assert.strictEqual(fare.calculatedFare, 150);
+      assert.strictEqual(fare.totalFare, 150);
     });
 
-    test('3.4 Handles fractional/decimal distances precisely', () => {
-      // 7.45 km: base (100) + distance (7.45 * 15 = 111.75) = 211.75
+    test('3.4 Handles fractional/decimal distances precisely and applies floor', () => {
+      // 7.45 km: distance (7.45 * 15 = 111.75) < 150 -> 150
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'distance',
@@ -211,7 +211,8 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
         isDistancePricing: true
       });
       assert.strictEqual(fare.distanceFare, 111.75);
-      assert.strictEqual(fare.calculatedFare, 211.75);
+      assert.strictEqual(fare.calculatedFare, 150);
+      assert.strictEqual(fare.minimumFareApplied, true);
     });
 
     test('3.5 Missing required pricing configuration throws MISSING_PRICING_CONFIG', () => {
@@ -257,10 +258,10 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
       assert.strictEqual(fare.outboundDistanceKm, 20);
       assert.strictEqual(fare.billableDistanceKm, 40);
       assert.strictEqual(fare.isRoundTrip, true);
-      // 100 base + 40 * 15 = 700
+      // 40 * 15 = 600
       assert.strictEqual(fare.baseFare, 100);
       assert.strictEqual(fare.distanceFare, 600);
-      assert.strictEqual(fare.totalFare, 700);
+      assert.strictEqual(fare.totalFare, 600);
     });
 
     test('4.2 One Way calculates outbound distance D and billable distance D', () => {
@@ -272,10 +273,10 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
       assert.strictEqual(fare.outboundDistanceKm, 20);
       assert.strictEqual(fare.billableDistanceKm, 20);
       assert.strictEqual(fare.isRoundTrip, false);
-      // 100 base + 20 * 15 = 400
+      // 20 * 15 = 300
       assert.strictEqual(fare.baseFare, 100);
       assert.strictEqual(fare.distanceFare, 300);
-      assert.strictEqual(fare.totalFare, 400);
+      assert.strictEqual(fare.totalFare, 300);
     });
 
     test('4.3 Obsolete outstation distance tier packages reject with 400 OBSOLETE_SERVICE', () => {
@@ -406,12 +407,12 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
       });
 
       // Must calculate based on real route distance (350 * 2 = 700 km billable)
-      // Base: 100 + 700 * 15 = 10600
+      // Pure distance: 700 * 15 = 10500
       assert.strictEqual(fare.outboundDistanceKm, 350);
       assert.strictEqual(fare.billableDistanceKm, 700);
       assert.strictEqual(fare.baseFare, 100);
       assert.strictEqual(fare.distanceFare, 10500);
-      assert.strictEqual(fare.totalFare, 10600);
+      assert.strictEqual(fare.totalFare, 10500);
     });
   });
 

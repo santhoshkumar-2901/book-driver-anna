@@ -11,6 +11,8 @@ import { RealtimeServer, setGlobalRealtimeServer, publishDriverLocation, publish
 import { queryOne, execute } from '../server/db/database.js';
 import { ENV } from '../server/config/env.js';
 
+const futureDate = new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0];
+
 // Helper to create test JWT tokens
 function makeToken(user) {
   return jwt.sign(
@@ -202,7 +204,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'MG Road',
-        date: '2026-10-15',
+        date: futureDate,
         time: '10:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -281,7 +283,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
           customerPhone: customerUser1.phone,
           pickupArea: 'Indiranagar',
           dropLocation: 'Airport',
-          date: '2026-10-16',
+          date: futureDate,
           time: '11:00',
           bookingCategory: 'driver',
           driverTripOption: 'one-way',
@@ -310,7 +312,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Whitefield',
-        date: '2026-10-17',
+        date: futureDate,
         time: '14:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -400,7 +402,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Airport',
-        date: '2026-10-18',
+        date: futureDate,
         time: '09:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -420,7 +422,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Koramangala',
-        date: '2026-10-18',
+        date: futureDate,
         time: '12:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -471,7 +473,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Koramangala',
         dropLocation: 'Indiranagar',
-        date: '2026-10-18',
+        date: futureDate,
         time: '15:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -522,7 +524,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Whitefield',
-        date: '2026-10-19',
+        date: futureDate,
         time: '10:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -614,7 +616,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Bellandur',
-        date: '2026-10-20',
+        date: futureDate,
         time: '14:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
@@ -745,7 +747,7 @@ describe('Phase 12 — Driver Assignment & Live Tracking Integration Suite', () 
         customerPhone: customerUser1.phone,
         pickupArea: 'Indiranagar',
         dropLocation: 'Airport',
-        date: '2026-10-21',
+        date: futureDate,
         time: '10:00',
         bookingCategory: 'driver',
         driverTripOption: 'one-way'
