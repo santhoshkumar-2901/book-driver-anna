@@ -281,21 +281,7 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
       }
     };
 
-    // If customer is not logged in, prompt login/signup on confirm enrollment
-    if (!clientUser && onRequireAuth) {
-      onRequireAuth(enrollmentData, (updatedUser) => {
-        finalizeEnrollmentSubmit({
-          ...enrollmentData,
-          userId: updatedUser?.id || null,
-          fullName: enrollmentData.fullName || updatedUser?.name || '',
-          mobileNumber: enrollmentData.mobileNumber || updatedUser?.phone || '',
-          emailAddress: enrollmentData.emailAddress || updatedUser?.email || ''
-        });
-      });
-      handleClose();
-      return;
-    }
-
+    // Finalize enrollment directly for guest submission
     finalizeEnrollmentSubmit(enrollmentData);
   };
 

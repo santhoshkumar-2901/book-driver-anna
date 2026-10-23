@@ -70,18 +70,7 @@ export function resolveRoute(pathname = '') {
   if (clean === '/driver') {
     return { role: 'driver', page: 'driver-login', authRole: 'driver', resetAuth: true };
   }
-  if (clean === '/signup') {
-    return { role: 'client', page: 'signup', authRole: 'user', resetAuth: true };
-  }
-  if (clean === '/login' || clean === '/client-auth') {
-    return { role: 'client', page: 'login', authRole: 'user', resetAuth: true };
-  }
-  if (clean === '/forgot-password') {
-    return { role: 'client', page: 'forgot-password', authRole: 'user', resetAuth: true };
-  }
-  if (clean === '/reset-password') {
-    return { role: 'client', page: 'reset-password', authRole: 'user', resetAuth: true };
-  }
+
   if (clean === '/services') {
     return { role: 'client', page: 'services', authRole: 'user', resetAuth: false };
   }
@@ -270,24 +259,7 @@ export default function App() {
     } else if (newPage === 'driver-portal') {
       setSelectedRole('driver');
       window.history.pushState({}, '', '/driver/portal');
-    } else if (newPage === 'signup') {
-      setSelectedRole('user');
-      window.history.pushState({}, '', '/signup');
-      setAuthSessionKey(k => k + 1);
-    } else if (newPage === 'login') {
-      setSelectedRole('user');
-      window.history.pushState({}, '', '/login');
-      setAuthSessionKey(k => k + 1);
-    } else if (newPage === 'forgot-password') {
-      setSelectedRole('user');
-      window.history.pushState({}, '', '/forgot-password');
-      setAuthSessionKey(k => k + 1);
-    } else if (newPage === 'reset-password') {
-      setSelectedRole('user');
-      if (!window.location.pathname.startsWith('/reset-password')) {
-        window.history.pushState({}, '', '/reset-password');
-      }
-      setAuthSessionKey(k => k + 1);
+
     } else if (newPage === 'services') {
       window.history.pushState({}, '', '/services');
     } else if (newPage === 'about') {
@@ -301,107 +273,14 @@ export default function App() {
     }
   };
 
-  // State to prompt auth after customer completes booking while unauthenticated
-  const [isPostBookingPromptOpen, setIsPostBookingPromptOpen] = useState(false);
-  const [postBookingPromptInfo, setPostBookingPromptInfo] = useState(null);
-  const [pendingBookingSubmission, setPendingBookingSubmission] = useState(null);
+
 
   const handleClientLoginSuccess = async (userData) => {
     setClientUser(userData);
-    setSelectedRole('user');
-    setAuthSessionKey(k => k + 1);
-    setIsPostBookingPromptOpen(false);
-
-    // If customer was in the middle of confirming a booking or enrollment, finalize it now!
-    if (pendingBookingSubmission) {
-      const submission = pendingBookingSubmission;
-      setPendingBookingSubmission(null);
-
-      if (submission.kind === 'booking') {
-        const b = submission.bookingDetails;
-        const apiPayload = b.rawPayload ? {
-          ...b.rawPayload,
-          customerName: userData.name || b.customerName,
-          customerPhone: userData.phone || b.customerPhone,
-          customerEmail: userData.email || b.customerEmail
-        } : {
-          customerName: userData.name || b.customerName,
-          customerPhone: userData.phone || b.customerPhone,
-          customerEmail: userData.email || b.customerEmail,
-          bookingCategory: b.bookingType || 'driver',
-          selectedClassId: b.selectedClassId,
-          vehicleCategory: b.vehicleCategory,
-          driverTripOption: b.driverTripOption,
-          dropLocation: b.dropLocation,
-          roundTripDuration: b.roundTripDuration,
-          outstationTripType: b.outstationTripType,
-          outstationPackage: b.outstationPackage,
-          outstationDestination: b.outstationDestination,
-          pickupArea: b.pickupArea,
-          date: new Date().toISOString().split('T')[0],
-          time: b.bookingTime || '09:00 AM',
-          paymentMode: b.paymentMode || 'cash'
-        };
-
-        // Create booking in backend database now that client is authenticated
-        let serverBooking = null;
-        const idemKey = b.idempotencyKey || null;
-        try {
-          const res = await apiClient.createBooking(apiPayload, idemKey);
-          if (res && res.data && res.data.booking) {
-            serverBooking = res.data.booking;
-          }
-        } catch (err) {
-          console.error('[AUTH LOGIN] Backend booking creation failed:', err.message);
-        }
-
-        if (!serverBooking) {
-          alert('Booking could not be confirmed by the server. Please try booking again.');
-          return;
-        }
-
-        const finalBooking = {
-          ...b,
-          id: serverBooking.id,
-          bookingId: serverBooking.id,
-          userId: userData.id || null,
-          customerName: userData.name || b.customerName,
-          customerPhone: userData.phone || b.customerPhone,
-          customerEmail: userData.email || b.customerEmail,
-          totalFare: serverBooking.calculated_fare,
-          fare: serverBooking.calculated_fare,
-          status: 'Pending'
-        };
-
-        // Close the booking modal, return to home, and complete the booking
-        setIsBookingModalOpen(false);
-        changePage('home');
-        handleBookingComplete(finalBooking);
-      } else if (submission.kind === 'enrollment') {
-        if (submission.callback) {
-          submission.callback(userData);
-        }
-        changePage('home');
-        const classPass = {
-          bookingId: submission.enrollmentData.enrollmentId,
-          bookingType: 'class',
-          serviceName: `Car Driving Academy Enrollment (${submission.enrollmentData.gearPreference || 'Manual'})`,
-          category: 'Driving Class',
-          tripSummary: `${submission.enrollmentData.gearPreference || 'Comprehensive'} Driving Course • Slot: ${submission.enrollmentData.preferredTime || 'Morning'}`,
-          pickupArea: submission.enrollmentData.pickupLocation || submission.enrollmentData.address || 'Bengaluru',
-          customerName: userData.name || submission.enrollmentData.fullName,
-          customerPhone: userData.phone || submission.enrollmentData.mobileNumber,
-          customerEmail: userData.email || submission.enrollmentData.emailAddress,
-          date: submission.enrollmentData.preferredStartDate || new Date().toISOString().split('T')[0],
-          time: submission.enrollmentData.preferredTime === 'Morning' ? '07:00 AM' : (submission.enrollmentData.preferredTime === 'Afternoon' ? '02:00 PM' : '06:00 PM'),
-          totalFare: 5999,
-          status: 'Pending',
-          assignedAnna: 'Syed Nizamuddin (Certified Driving Instructor Anna)'
-        };
-        setActiveBookingPass(classPass);
-      }
-    } else if (activePage === 'login' || activePage === 'signup') {
-      changePage('home');
+    let serverBooking = null;
+    if (!serverBooking) {
+      alert('Booking could not be confirmed by the server. Please try booking again.');
+      return;
     }
   };
 
@@ -669,76 +548,12 @@ export default function App() {
     setIsBookingModalOpen(true);
   };
 
-  // Prompt login or signup after customer books while unauthenticated
-  const handleRequireAuthForBooking = (bookingDetails) => {
-    // Explicitly close the booking modal so it is NOT open or scrolling behind the prompt!
-    setIsBookingModalOpen(false);
-
-    const serviceTitle = bookingDetails.bookingType === 'class'
-      ? 'Driving Class'
-      : bookingDetails.bookingType === 'vehicle'
-      ? 'Rental Vehicle'
-      : 'Personal Driver Anna';
-
-    setPendingBookingSubmission({
-      kind: 'booking',
-      serviceTitle,
-      bookingDetails: {
-        ...bookingDetails,
-        status: 'Confirmed'
-      }
-    });
-    setPostBookingPromptInfo({
-      bookingId: bookingDetails.bookingId,
-      serviceTitle,
-      customerName: bookingDetails.customerName
-    });
-    setIsPostBookingPromptOpen(true);
-  };
-
-  const handleRequireAuthForEnrollment = (enrollmentData, callback) => {
-    // Explicitly close the enrollment modal so it is NOT open or scrolling behind the prompt!
-    setIsEnrollmentModalOpen(false);
-
-    setPendingBookingSubmission({
-      kind: 'enrollment',
-      serviceTitle: 'Driving Class Enrollment',
-      enrollmentData,
-      callback
-    });
-    setPostBookingPromptInfo({
-      bookingId: enrollmentData.enrollmentId,
-      serviceTitle: 'Driving Class Enrollment',
-      customerName: enrollmentData.fullName
-    });
-    setIsPostBookingPromptOpen(true);
-  };
-
-  const handleChooseLoginAfterBooking = () => {
-    setIsPostBookingPromptOpen(false);
-    changePage('login');
-  };
-
-  const handleChooseSignupAfterBooking = () => {
-    setIsPostBookingPromptOpen(false);
-    changePage('signup');
-  };
-
-  const handleClosePostBookingPrompt = () => {
-    setIsPostBookingPromptOpen(false);
-    setPendingBookingSubmission(null);
-    setPostBookingPromptInfo(null);
-  };
-
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated drivers away from auth pages
   useEffect(() => {
-    if (clientUser && (activePage === 'login' || activePage === 'signup' || activePage === 'forgot-password')) {
-      changePage('home');
-    }
     if (driverUser && (activePage === 'driver-login' || activePage === 'driver-signup')) {
       changePage('driver-portal');
     }
-  }, [clientUser, driverUser, activePage]);
+  }, [driverUser, activePage]);
 
   // Handle client booking submission and update Admin Orders in real time via localStorage & CustomEvent
   const handleBookingComplete = (bookingDetails) => {
@@ -857,7 +672,7 @@ export default function App() {
         <Suspense fallback={<RouteLoadingFallback />}>
           <AdminPage 
             key={`admin-page-${authSessionKey}`}
-            onReturnToClient={() => changePage(clientUser ? 'home' : 'login')} 
+            onReturnToClient={() => changePage('home')}
           />
         </Suspense>
       </div>
@@ -892,49 +707,7 @@ export default function App() {
     );
   }
 
-  // 4. Client Auth Pages (/login, /signup, /client-auth, /forgot-password)
-  if (activePage === 'login' || activePage === 'signup' || activePage === 'client-auth' || activePage === 'forgot-password') {
-    return (
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <ClientAuthPage 
-          key={`${activePage}-${authSessionKey}`}
-          initialMode={activePage === 'signup' ? 'signup' : (activePage === 'forgot-password' ? 'forgot-password' : 'login')}
-          onLoginSuccess={handleClientLoginSuccess}
-          onSwitchMode={(mode) => changePage(mode === 'signup' ? 'signup' : (mode === 'forgot-password' ? 'forgot-password' : 'login'))}
-          onBackToHome={() => changePage('home')}
-          bookingBanner={
-            pendingBookingSubmission?.serviceTitle || null
-          }
-          prefillData={
-            pendingBookingSubmission?.bookingDetails
-              ? {
-                  name: pendingBookingSubmission.bookingDetails.customerName,
-                  phone: pendingBookingSubmission.bookingDetails.customerPhone,
-                  email: pendingBookingSubmission.bookingDetails.customerEmail,
-                  area: pendingBookingSubmission.bookingDetails.pickupArea
-                }
-              : pendingBookingSubmission?.enrollmentData
-              ? {
-                  name: pendingBookingSubmission.enrollmentData.fullName,
-                  phone: pendingBookingSubmission.enrollmentData.mobileNumber,
-                  email: pendingBookingSubmission.enrollmentData.emailAddress,
-                  area: pendingBookingSubmission.enrollmentData.pickupLocation
-                }
-              : {}
-          }
-        />
-      </Suspense>
-    );
-  }
 
-  // 5. Dedicated Reset Password Page (/reset-password?token=...)
-  if (activePage === 'reset-password') {
-    return (
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <ResetPasswordPage onNavigate={(page) => changePage(page)} />
-      </Suspense>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
@@ -945,13 +718,6 @@ export default function App() {
         setActivePage={changePage} 
         openBookingModal={openBookingModal} 
         openCancelModal={openCancelModal}
-        clientUser={clientUser}
-        onLogout={handleClientLogout}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        hasActiveBookingBadge={hasActiveBookingBadge}
-        onOpenAuth={(mode = 'login') => {
-          changePage(mode === 'signup' ? 'signup' : 'login');
-        }}
       />
 
       {/* Main Dynamic View */}
@@ -1014,7 +780,6 @@ export default function App() {
         initialData={bookingModalData}
         onBookingComplete={handleBookingComplete}
         onOpenEnrollmentModal={openEnrollmentModal}
-        onRequireAuth={handleRequireAuthForBooking}
       />
 
       {/* Professional Car Driving Class Enrollment Modal */}
@@ -1023,7 +788,6 @@ export default function App() {
         onClose={() => setIsEnrollmentModalOpen(false)}
         initialData={enrollmentModalData}
         clientUser={clientUser}
-        onRequireAuth={handleRequireAuthForEnrollment}
       />
 
       {/* Booking Success Confirmation Modal */}
@@ -1114,14 +878,7 @@ export default function App() {
         }}
       />
 
-      {/* Post-Booking Modal: Prompt Customer to Login or Sign Up and go to responsible page */}
-      <PostBookingAuthPromptModal
-        isOpen={isPostBookingPromptOpen}
-        bookingInfo={postBookingPromptInfo}
-        onChooseLogin={handleChooseLoginAfterBooking}
-        onChooseSignup={handleChooseSignupAfterBooking}
-        onClose={handleClosePostBookingPrompt}
-      />
+
 
     </div>
   );

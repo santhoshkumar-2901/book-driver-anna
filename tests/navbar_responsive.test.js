@@ -37,19 +37,15 @@ describe('Navbar Device Responsiveness & Adaptive Navigation Suite', () => {
     assert.match(content, /ChevronRight/, 'Should display navigation arrow indicators');
   });
 
-  test('5. Unauthenticated mobile layout adapts auth buttons to prevent viewport overflow', () => {
+  test('5. Customer auth buttons (Login/Signup) are removed from desktop and mobile drawer', () => {
     const content = fs.readFileSync(navbarPath, 'utf8');
-    // Compact Login visible on small devices, Signup on sm+ screens
-    assert.match(content, /hidden sm:inline-flex btn-primary/, 'Signup button in top navbar should hide on extra small phones to prevent overflow');
-    // Both Login and Signup available inside mobile drawer
-    assert.match(content, /Log In/, 'Drawer must offer full Log In button');
-    assert.match(content, /Sign Up/, 'Drawer must offer full Sign Up button');
+    assert.doesNotMatch(content, /Log In|Login/, 'Navbar must not contain customer login buttons');
+    assert.doesNotMatch(content, /Sign Up|Signup/, 'Navbar must not contain customer signup buttons');
   });
 
-  test('6. Authenticated mobile drawer renders profile badge and trip access', () => {
+  test('6. Customer profile and logout controls are removed from mobile drawer', () => {
     const content = fs.readFileSync(navbarPath, 'utf8');
-    assert.match(content, /My Profile & Ride History/, 'Mobile menu must include link to customer profile');
-    assert.match(content, /onLogout/, 'Mobile menu must include logout button');
+    assert.doesNotMatch(content, /My Profile & Ride History/, 'Navbar must not contain customer profile controls');
   });
 
   test('7. Desktop navbar renders links on lg+ and does not include Rent Vehicle button', () => {

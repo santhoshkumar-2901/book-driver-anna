@@ -15,14 +15,16 @@ describe('Production 404 Not Found Page & Routing Suite', () => {
   const resolveRoute = new Function(`${resolveRouteFnCode}; return resolveRoute;`)();
 
   test('1. resolveRoute routes unmapped URLs to not-found page instead of redirecting to home', () => {
-    // Required test cases from prompt:
+    // Required test cases from prompt plus retired customer auth routes:
     const invalidRoutes = [
       '/lkxnklxbcjmxblk',
       '/random-page',
       '/does-not-exist',
       '/anything',
       '/nested/unknown/route',
-      '/some/bogus/path/here'
+      '/some/bogus/path/here',
+      '/login',
+      '/signup'
     ];
 
     for (const route of invalidRoutes) {
@@ -47,9 +49,7 @@ describe('Production 404 Not Found Page & Routing Suite', () => {
       { path: '/driver', expectedPage: 'driver-login' },
       { path: '/driver/login', expectedPage: 'driver-login' },
       { path: '/driver/signup', expectedPage: 'driver-signup' },
-      { path: '/driver/portal', expectedPage: 'driver-portal' },
-      { path: '/login', expectedPage: 'login' },
-      { path: '/signup', expectedPage: 'signup' }
+      { path: '/driver/portal', expectedPage: 'driver-portal' }
     ];
 
     for (const { path: routePath, expectedPage } of validRoutes) {

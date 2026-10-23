@@ -272,20 +272,14 @@ describe('User Profile Red Dot Badge for Active Bookings Suite', () => {
     const userModalCode = fs.readFileSync(path.resolve('src/components/UserProfileModal.jsx'), 'utf8');
     const appCode = fs.readFileSync(path.resolve('src/App.jsx'), 'utf8');
 
-    // Navbar imports useUserBookingBadge
-    assert.match(navbarCode, /useUserBookingBadge/, 'Navbar must import or use useUserBookingBadge');
-    assert.match(navbarCode, /data-testid="profile-booking-dot"/, 'Navbar must include testid for desktop red dot badge');
-    assert.match(navbarCode, /data-testid="mobile-profile-booking-dot"/, 'Navbar must include testid for mobile red dot badge');
-    assert.match(navbarCode, /bg-red-500/, 'Navbar red dot must use vibrant red styling');
-    assert.match(navbarCode, /rounded-full/, 'Navbar red dot must be circular');
+    // Customer profile controls and red dot badge are cleanly removed from Navbar in Phase 1
+    assert.doesNotMatch(navbarCode, /data-testid="profile-booking-dot"/, 'Navbar must not include customer profile red dot badge');
+    assert.doesNotMatch(navbarCode, /data-testid="mobile-profile-booking-dot"/, 'Navbar must not include mobile profile red dot badge');
 
     // UserProfileModal contains red dot on avatar and My Bookings tab
     assert.match(userModalCode, /data-testid="modal-profile-booking-dot"/, 'UserProfileModal must include red dot on modal profile avatar');
     assert.match(userModalCode, /data-testid="modal-bookings-tab-dot"/, 'UserProfileModal must include red dot on My Bookings tab');
 
-    // App.jsx wires useUserBookingBadge and propagates hasActiveBookingBadge
-    assert.match(appCode, /useUserBookingBadge\(clientUser\)/, 'App.jsx must invoke useUserBookingBadge hook');
-    assert.match(appCode, /hasActiveBookingBadge={hasActiveBookingBadge}/, 'App.jsx must pass hasActiveBookingBadge to components');
     assert.match(appCode, /bda_payment_completed/, 'App.jsx must dispatch bda_payment_completed on payment success');
   });
 

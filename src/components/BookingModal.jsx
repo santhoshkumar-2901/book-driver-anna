@@ -664,15 +664,7 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     bookingDetails.idempotencyKey = currentIdempotencyKey;
     payloadForApi.idempotencyKey = currentIdempotencyKey;
 
-    // If client is not logged in, do NOT create server booking yet. Intercept and prompt login/signup!
-    if (!clientUser && onRequireAuth) {
-      onRequireAuth(bookingDetails);
-      setIsSubmitting(false);
-      onClose();
-      return;
-    }
-
-    // Client IS logged in: call backend API for authoritative booking creation and slot locking
+    // Submit guest booking directly to backend API for authoritative booking creation and slot locking
     setIsSubmitting(true);
     setFormError('');
     try {

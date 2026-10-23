@@ -3,9 +3,6 @@ import {
   Menu, 
   X, 
   MapPin, 
-  LogOut, 
-  LogIn, 
-  UserPlus, 
   Sun, 
   Moon, 
   Home, 
@@ -13,12 +10,10 @@ import {
   Info, 
   PhoneCall, 
   ShieldCheck, 
-  ChevronRight, 
-  User 
+  ChevronRight
 } from 'lucide-react';
 import { SteeringWheel, BrandIcon } from './Icons';
 import { useTheme } from '../utils/themeContext';
-import { useUserBookingBadge } from '../utils/useUserBookingBadge';
 
 export default function Navbar({
   activePage,
@@ -33,8 +28,6 @@ export default function Navbar({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme, isDark } = useTheme();
-  const internalBadge = useUserBookingBadge(clientUser);
-  const hasActiveBookingBadge = externalBadge !== undefined ? externalBadge : internalBadge;
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -126,64 +119,7 @@ export default function Navbar({
           {/* Action Items (Right Side): Adaptive for all screen sizes */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
 
-            {/* Authenticated Client User Pill */}
-            {clientUser ? (
-              <div className="flex items-center gap-1 sm:gap-1.5 pl-1 sm:pl-2 border-l border-slate-800">
-                <button
-                  type="button"
-                  onClick={onOpenProfile}
-                  className="flex items-center gap-1.5 sm:gap-2 py-1.5 px-2 sm:px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-colors cursor-pointer min-h-[44px]"
-                  title={`Account: ${clientUser.name} (${clientUser.phone})`}
-                  aria-label={`Open account profile for ${clientUser.name}`}
-                >
-                  <div className="relative">
-                    <div className="w-6 h-6 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
-                      {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                    {/* Small red dot on user profile: only shows when booking is pending or confirmed, disappears after paid */}
-                    {hasActiveBookingBadge && (
-                      <span 
-                        data-testid="profile-booking-dot"
-                        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-sm shadow-red-500/50" 
-                        title="You have an active booking pending or confirmed"
-                      />
-                    )}
-                  </div>
-                  <span className="hidden sm:inline-block text-xs font-semibold text-slate-200 max-w-[80px] md:max-w-[110px] truncate">
-                    {clientUser.name ? clientUser.name.split(' ')[0] : 'Account'}
-                  </span>
-                </button>
-                <button
-                  onClick={onLogout}
-                  title="Logout"
-                  className="p-2 sm:p-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  aria-label="Logout"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              /* Unauthenticated Auth Buttons */
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* On small phones, show compact Login button; on tablets/desktops show both Login & Signup */}
-                <button
-                  type="button"
-                  onClick={() => onOpenAuth && onOpenAuth('login')}
-                  className="flex items-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-lg text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[44px]"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="inline">Login</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuth && onOpenAuth('signup')}
-                  className="hidden sm:inline-flex btn-primary py-2 px-3 sm:px-3.5 text-xs items-center gap-1.5 min-h-[44px]"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Signup</span>
-                </button>
-              </div>
-            )}
+
 
             {/* Theme Toggle Button (Icon-Only as verified by tests) */}
             <button
@@ -260,85 +196,7 @@ export default function Navbar({
               })}
             </div>
 
-            {/* User Account / Auth Section in Mobile Drawer */}
-            {clientUser ? (
-              <div className="pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-slate-800 border border-amber-500/40 text-amber-400 font-bold text-sm flex items-center justify-center shrink-0">
-                        {clientUser.name ? clientUser.name.charAt(0).toUpperCase() : 'U'}
-                      </div>
-                      {/* Small red dot on mobile user profile avatar */}
-                      {hasActiveBookingBadge && (
-                        <span 
-                          data-testid="mobile-profile-booking-dot"
-                          className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse shadow-sm shadow-red-500/50" 
-                          title="You have an active booking pending or confirmed"
-                        />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-100 text-sm truncate">{clientUser.name}</div>
-                      <div className="text-xs text-slate-400 truncate">{clientUser.phone}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      onLogout();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="btn-danger py-1.5 px-3 text-xs shrink-0"
-                    aria-label="Log out of account"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenProfile) onOpenProfile();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="btn-secondary w-full py-2.5 text-xs flex items-center justify-center gap-2 relative"
-                >
-                  <User className="w-4 h-4 text-amber-500" />
-                  <span>My Profile & Ride History</span>
-                  {hasActiveBookingBadge && (
-                    <span 
-                      data-testid="mobile-profile-button-dot"
-                      className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" 
-                    />
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenAuth) onOpenAuth('login');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer min-h-[44px] touch-manipulation"
-                >
-                  <LogIn className="w-4 h-4 text-amber-500" />
-                  <span>Log In</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenAuth) onOpenAuth('signup');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="btn-primary py-2.5 px-3 text-xs flex items-center justify-center gap-2 min-h-[44px] touch-manipulation"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Sign Up</span>
-                </button>
-              </div>
-            )}
+
 
             {/* Quick Booking CTA */}
             <div className="pt-3 border-t border-slate-800/80 flex flex-col gap-2">
