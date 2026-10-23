@@ -99,3 +99,15 @@ export const ENV = {
   REALTIME_SERVICE_URL: (process.env.REALTIME_SERVICE_URL || '').replace(/\/+$/, ''),
   REALTIME_INTERNAL_SECRET: process.env.REALTIME_INTERNAL_SECRET || '',
 };
+
+/**
+ * Strict fail-closed check: enables dummy checkout simulation ONLY when
+ * NODE_ENV is explicitly 'development' or 'test' AND IS_PRODUCTION is false.
+ * Missing, empty, staging, production, or unknown environments permanently fail closed.
+ */
+export function isDummyPaymentAllowed() {
+  const env = (process.env.NODE_ENV || '').trim().toLowerCase();
+  const isExplicitDevOrTest = env === 'development' || env === 'test';
+  const isProdFlag = Boolean(ENV.IS_PRODUCTION);
+  return isExplicitDevOrTest && !isProdFlag;
+}

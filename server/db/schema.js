@@ -81,6 +81,25 @@ CREATE TABLE IF NOT EXISTS guest_access_tokens (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS payment_attempts (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  token_id TEXT REFERENCES guest_access_tokens(id) ON DELETE SET NULL,
+  order_id TEXT NOT NULL UNIQUE,
+  amount REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'INR',
+  status TEXT NOT NULL DEFAULT 'CREATED' CHECK(status IN ('CREATED', 'PROCESSING', 'PENDING', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
+  idempotency_key TEXT UNIQUE,
+  payment_method TEXT,
+  gateway_provider TEXT NOT NULL DEFAULT 'DUMMY_RAZORPAY_TEST',
+  gateway_payment_id TEXT,
+  error_code TEXT,
+  error_description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT,

@@ -190,6 +190,12 @@ export const apiClient = {
     request('/guest/booking-summary', { method: 'POST', body: { token } }),
   validateGuestToken: (token) =>
     request('/guest/tokens/validate', { method: 'POST', body: { token } }),
+  createGuestPaymentOrder: (token, idempotencyKey = null) =>
+    request('/guest/payments/create-order', { method: 'POST', body: { token, idempotencyKey } }),
+  simulateGuestPaymentOutcome: (payload) =>
+    request('/guest/payments/simulate-outcome', { method: 'POST', body: payload }),
+  getGuestPaymentAttemptStatus: (token, attemptId) =>
+    request('/guest/payments/status', { method: 'POST', body: { token, attemptId } }),
 
   // 3. Driver Endpoints
   getDrivers: () => request('/drivers', { method: 'GET' }),

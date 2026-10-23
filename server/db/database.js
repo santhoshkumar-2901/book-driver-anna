@@ -175,6 +175,33 @@ if (isTiDB) {
     });
 
     tidbConn.execute(`
+      CREATE TABLE IF NOT EXISTS payment_attempts (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        booking_id VARCHAR(64) NOT NULL,
+        token_id VARCHAR(64) NULL,
+        order_id VARCHAR(64) NOT NULL UNIQUE,
+        amount DECIMAL(10, 2) NOT NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'INR',
+        status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+        idempotency_key VARCHAR(128) NULL UNIQUE,
+        payment_method VARCHAR(32) NULL,
+        gateway_provider VARCHAR(32) NOT NULL DEFAULT 'DUMMY_RAZORPAY_TEST',
+        gateway_payment_id VARCHAR(64) NULL,
+        error_code VARCHAR(64) NULL,
+        error_description TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pa_booking_id (booking_id),
+        INDEX idx_pa_order_id (order_id),
+        INDEX idx_pa_status (status),
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+        FOREIGN KEY (token_id) REFERENCES guest_access_tokens(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => {
+      console.warn('[DATABASE] TiDB payment_attempts auto-init note:', err.message);
+    });
+
+    tidbConn.execute(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         user_id VARCHAR(64) NULL,
@@ -340,6 +367,37 @@ if (isTiDB) {
   } catch (migErr) {
     console.error('[DATABASE] SQLite payment_status migration error:', migErr);
     throw migErr;
+  }
+
+  try {
+    const hasPaymentAttempts = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='payment_attempts'").get();
+    if (!hasPaymentAttempts) {
+      sqliteDb.exec(`
+        CREATE TABLE IF NOT EXISTS payment_attempts (
+          id TEXT PRIMARY KEY,
+          booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+          token_id TEXT REFERENCES guest_access_tokens(id) ON DELETE SET NULL,
+          order_id TEXT NOT NULL UNIQUE,
+          amount REAL NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'INR',
+          status TEXT NOT NULL DEFAULT 'CREATED' CHECK(status IN ('CREATED', 'PROCESSING', 'PENDING', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
+          idempotency_key TEXT UNIQUE,
+          payment_method TEXT,
+          gateway_provider TEXT NOT NULL DEFAULT 'DUMMY_RAZORPAY_TEST',
+          gateway_payment_id TEXT,
+          error_code TEXT,
+          error_description TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pa_booking_id ON payment_attempts(booking_id);
+        CREATE INDEX IF NOT EXISTS idx_pa_order_id ON payment_attempts(order_id);
+        CREATE INDEX IF NOT EXISTS idx_pa_status ON payment_attempts(status);
+      `);
+    }
+  } catch (paErr) {
+    console.error('[DATABASE] SQLite payment_attempts migration error:', paErr);
+    throw paErr;
   }
 
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
