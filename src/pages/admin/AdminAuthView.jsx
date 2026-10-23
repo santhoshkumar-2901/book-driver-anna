@@ -2,6 +2,7 @@ import React from 'react';
 import { 
   Car, ShieldCheck, AlertCircle, Mail, Lock, Eye, EyeOff, ArrowRight 
 } from 'lucide-react';
+import { BrandIcon } from '../../components/Icons';
 
 export default function AdminAuthView({
   isAuthSubmitting = false,
@@ -29,8 +30,8 @@ export default function AdminAuthView({
       {/* Top Header Bar */}
       <header className="max-w-5xl mx-auto w-full flex flex-row items-center justify-between gap-4 border-b border-slate-800 pb-3 sm:pb-4 relative z-10 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20 shrink-0">
-            <Car className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-400/20 shrink-0 p-1">
+            <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <span className="font-extrabold text-lg sm:text-xl text-white font-['Outfit']">
             Book Driver <span className="text-amber-400">Anna</span>

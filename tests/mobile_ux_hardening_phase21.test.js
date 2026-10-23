@@ -79,9 +79,9 @@ describe('Phase 21: Mobile UX Hardening Suite', () => {
     assert.match(content, /flex flex-wrap items-center justify-between gap-2/, 'One Way header must wrap on narrow screens');
   });
 
-  test('10. BookingModal Outstation package header uses flex-wrap to prevent text clipping', () => {
+  test('10. BookingModal trip locations header uses flex-wrap to prevent text clipping', () => {
     const content = fs.readFileSync(bookingModalPath, 'utf8');
-    assert.match(content, /flex flex-wrap items-center justify-between gap-1/, 'Outstation header must wrap cleanly on narrow screens');
+    assert.match(content, /flex flex-wrap items-center justify-between gap-2/, 'Trip locations header must wrap cleanly on narrow screens');
   });
 
   test('11. BookingModal payment method options stack cleanly and enforce min 48px height', () => {

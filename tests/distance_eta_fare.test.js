@@ -28,7 +28,7 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
   // =========================================================================
   describe('1. Authoritative Pricing Engine Unit Tests', () => {
     test('1. Valid route distance produces expected fare using existing pricing rules', () => {
-      // Driver one-way city drop with route distance
+      // Driver one-way city drop with route distance (8.43 km -> 100 + 8.43*15 = 226.45)
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'one-way',
@@ -37,49 +37,38 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
         durationMinutes: 22
       });
 
-      assert.strictEqual(fare.basePrice, 299, 'City drop base fare must be 299');
-      assert.strictEqual(fare.gst, Math.round(299 * 0.05), 'GST must be 5% rounded');
-      assert.strictEqual(fare.totalFare, 299 + Math.round(299 * 0.05));
+      assert.strictEqual(fare.baseFare, 100);
+      assert.strictEqual(fare.pricePerKm, 15);
+      assert.strictEqual(fare.distanceFare, 126.45);
+      assert.strictEqual(fare.totalFare, 226.45);
       assert.strictEqual(fare.distanceKm, 8.43);
       assert.strictEqual(fare.durationMinutes, 22);
     });
 
     test('2. Correct service pricing is selected for different services', () => {
-      // Airport drop
+      // Airport is a normal destination and uses distance pricing (34.5 km -> 100 + 34.5*15 = 617.5)
       const airportFare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'one-way',
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
         distanceKm: 34.5
       });
-      assert.strictEqual(airportFare.basePrice, 899, 'Airport drop base fare must be 899');
+      assert.strictEqual(airportFare.baseFare, 100);
+      assert.strictEqual(airportFare.totalFare, 617.5);
 
-      // Outstation 150km tier
-      const outstation150 = calculateAuthoritativeFare({
+      // Round trip pure distance tariff (Model B: 2D)
+      const roundTripFare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 120
+        driverTripOption: 'round-trip',
+        distanceKm: 25.0
       });
-      assert.strictEqual(outstation150.basePrice, 1199, 'Outstation <= 150km base fare must be 1199');
-
-      // Outstation 300km tier
-      const outstation300 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 250
-      });
-      assert.strictEqual(outstation300.basePrice, 1799, 'Outstation <= 300km base fare must be 1799');
-
-      // Outstation 500km tier
-      const outstation500 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 420
-      });
-      assert.strictEqual(outstation500.basePrice, 2399, 'Outstation > 300km base fare must be 2399');
+      assert.strictEqual(roundTripFare.outboundDistanceKm, 25.0);
+      assert.strictEqual(roundTripFare.billableDistanceKm, 50.0);
+      assert.strictEqual(roundTripFare.isRoundTrip, true);
+      // 100 base + 50 * 15 = 850
+      assert.strictEqual(roundTripFare.baseFare, 100);
+      assert.strictEqual(roundTripFare.distanceFare, 750);
+      assert.strictEqual(roundTripFare.totalFare, 850);
 
       // Vehicle daily rate
       const vehicleFare = calculateAuthoritativeFare({
@@ -106,20 +95,20 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
         dropLocation: 'MG Road, Bengaluru',
         distanceKm: 1.2
       });
-      assert.strictEqual(shortTripFare.basePrice, 299, 'Short trip must respect 299 minimum/base fare');
-      assert.strictEqual(shortTripFare.totalFare, 314);
+      assert.strictEqual(shortTripFare.minimumFareApplied, true);
+      assert.strictEqual(shortTripFare.totalFare, 150);
     });
 
-    test('4. Existing rounding behavior remains integer-rounded for currency consistency', () => {
+    test('4. Existing rounding behavior maintains 2 decimal precision for currency consistency', () => {
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
         driverTripOption: 'one-way',
         dropLocation: 'Indiranagar',
         distanceKm: 5.67
       });
-      assert.ok(Number.isInteger(fare.basePrice), 'Base price must be an integer');
-      assert.ok(Number.isInteger(fare.gst), 'GST must be an integer');
-      assert.ok(Number.isInteger(fare.totalFare), 'Total fare must be an integer');
+      assert.strictEqual(fare.baseFare, 100);
+      assert.strictEqual(fare.distanceFare, 85.05);
+      assert.strictEqual(fare.totalFare, 185.05);
     });
 
     test('5. Missing pricing configuration is handled safely', () => {
@@ -196,10 +185,10 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
       assert.strictEqual(body.success, true);
       assert.strictEqual(body.data.distanceKm, 8.43);
       assert.strictEqual(body.data.durationMinutes, 22);
-      assert.strictEqual(body.data.basePrice, 299);
-      assert.strictEqual(body.data.gst, 15);
-      assert.strictEqual(body.data.estimatedFare, 314);
-      assert.strictEqual(body.data.totalFare, 314);
+      assert.strictEqual(body.data.baseFare, 100);
+      assert.strictEqual(body.data.pricePerKm, 15);
+      assert.strictEqual(body.data.distanceFare, 126.45);
+      assert.strictEqual(body.data.totalFare, 226.45);
       assert.strictEqual(body.data.currency, 'INR');
     });
 
@@ -289,9 +278,9 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
 
       const result = await createBooking(maliciousPayload);
       assert.ok(result.booking, 'Booking must be created');
-      // For Airport Drop, base fare is 899, GST 45, total 944.
+      // For route 8.43 km, base fare 100 + 8.43 * 15 = 226.45
       // Must NOT be the client-submitted 10!
-      assert.strictEqual(result.booking.calculated_fare, 944, 'Server authoritative fare must win over client fare');
+      assert.strictEqual(result.booking.calculated_fare, 226.45, 'Server authoritative fare must win over client fare');
     });
 
     test('14. Client-provided distance cannot override authoritative distance', async () => {
@@ -299,9 +288,7 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
         customerName: 'Distance Tamperer',
         customerPhone: '9876543210',
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 150 km)',
+        driverTripOption: 'round-trip',
         pickupArea: 'Indiranagar',
         pickupLat: 12.9716,
         pickupLng: 77.5946,
@@ -314,8 +301,8 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
 
       const result = await createBooking(maliciousDistancePayload);
       assert.ok(result.booking);
-      // Backend independently recalculates route: cached distance is 8.43 km -> Tier <= 150km -> 1199 + 5% = 1259
-      assert.strictEqual(result.booking.calculated_fare, 1259);
+      // Backend independently recalculates route: cached distance is 8.43 km -> billable distance is 16.86 km -> fare is 100 + 16.86*15 = 352.9
+      assert.strictEqual(result.booking.calculated_fare, 352.9);
     });
 
     test('15. Artificially high client fare is ignored and recalculated to authoritative price', async () => {
@@ -336,7 +323,7 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
       };
 
       const result = await createBooking(inflatedPayload);
-      assert.strictEqual(result.booking.calculated_fare, 314, 'Backend must compute exact 314 tariff, ignoring 99999');
+      assert.strictEqual(result.booking.calculated_fare, 226.45, 'Backend must compute exact 226.45 tariff, ignoring 99999');
     });
 
     test('16. Artificially low client fare (₹0 or ₹1) is ignored and server tariff wins', async () => {
@@ -357,13 +344,13 @@ describe('Phase 7 — Distance, ETA & Authoritative Fare Integration Suite', () 
       };
 
       const result = await createBooking(zeroPayload);
-      assert.strictEqual(result.booking.calculated_fare, 314);
+      assert.strictEqual(result.booking.calculated_fare, 226.45);
     });
 
     test('17. Booking in database receives the authoritative server-calculated fare', async () => {
       const booking = await queryOne('SELECT * FROM bookings WHERE customer_name = ? ORDER BY created_at DESC', ['Zero Fare Tester']);
       assert.ok(booking);
-      assert.strictEqual(booking.calculated_fare, 314, 'Database record must store authoritative 314 fare');
+      assert.strictEqual(booking.calculated_fare, 226.45, 'Database record must store authoritative 226.45 fare');
     });
   });
 

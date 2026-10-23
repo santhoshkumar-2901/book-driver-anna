@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { SteeringWheel, WhatsAppIcon } from '../components/Icons';
 import PriceEstimator from '../components/PriceEstimator';
-import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE } from '../data/mockData';
+import { LOCAL_STATS, OUTSTATION_DESTINATIONS, SUPPORT_HELPLINE, WHATSAPP_NUMBER } from '../data/mockData';
 import { usePricing } from '../context/PricingContext';
 
 export default function HomePage({ 
@@ -119,22 +119,22 @@ export default function HomePage({
                   On-Demand Driver Anna
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Hire an acting driver for your personal vehicle. Ideal for traffic commutes, airport drops, party returns, or outstation tours.
+                  Hire an acting driver for your personal vehicle. Ideal for traffic commutes, corporate travel, or outstation road trips.
                 </p>
               </div>
 
               <div className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center justify-between">
-                  <span>Hourly In-City:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_hourly_2hr', 199)} / 2 hrs</span>
+                  <span>One Way Drop:</span>
+                  <span className="font-semibold text-white">From {formatPrice('driver_base_fare', 150)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Airport Transfer:</span>
-                  <span className="font-semibold text-white">{formatPrice('driver_airport_drop', 899)} flat</span>
+                  <span>Round Trip:</span>
+                  <span className="font-semibold text-amber-400">2× Route Distance Tariff</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Outstation Driver:</span>
-                  <span className="font-semibold text-white">From {formatPrice('driver_outstation_12hr', 1199)} / day</span>
+                  <span>Pricing Model:</span>
+                  <span className="font-semibold text-amber-400">Route Distance Based</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Gear Compatibility:</span>
@@ -335,7 +335,7 @@ export default function HomePage({
               <span>Book a Driver</span>
             </button>
             <a
-              href={`https://wa.me/${SUPPORT_HELPLINE.replace(/[^0-9]/g, '')}?text=${encodeURIComponent("Hello Book Driver Anna, I need assistance booking a driver or fleet vehicle.")}`}
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hello Book Driver Anna, I need assistance booking a driver or fleet vehicle.")}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Chat on WhatsApp"

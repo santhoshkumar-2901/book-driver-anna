@@ -1,6 +1,6 @@
 import React from 'react';
 import { Car, CheckCircle2, MapPin, ArrowRight, UserPlus, Sparkles } from 'lucide-react';
-import { SteeringWheel } from './Icons';
+import { SteeringWheel, BrandIcon } from './Icons';
 
 export default function RoleSelectGate({ onSelectRole }) {
   return (
@@ -15,8 +15,8 @@ export default function RoleSelectGate({ onSelectRole }) {
       {/* Top Header Bar */}
       <header className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-center sm:justify-start shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 shrink-0">
-            <Car className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 shrink-0 p-1">
+            <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
             <div className="font-extrabold text-base sm:text-xl text-white font-['Outfit'] tracking-tight leading-none">

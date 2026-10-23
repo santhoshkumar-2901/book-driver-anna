@@ -743,9 +743,10 @@ describe('Phase 8 — Database Coordinate Persistence Suite', () => {
         dropLocation: 'City Drop',
         distanceKm: 10
       });
-      assert.strictEqual(fare1.basePrice, 299);
-      assert.strictEqual(fare1.gst, 15);
-      assert.strictEqual(fare1.totalFare, 314);
+      // 100 base + 10 * 15 = 250
+      assert.strictEqual(fare1.baseFare, 100);
+      assert.strictEqual(fare1.distanceFare, 150);
+      assert.strictEqual(fare1.totalFare, 250);
 
       const fareAirport = calculateAuthoritativeFare({
         bookingCategory: 'driver',
@@ -753,7 +754,9 @@ describe('Phase 8 — Database Coordinate Persistence Suite', () => {
         dropLocation: 'Kempegowda Intl Airport (BLR T1/T2)',
         distanceKm: 35
       });
-      assert.strictEqual(fareAirport.basePrice, 899);
+      // Airport is a normal destination without special airport tariff: 100 + 35 * 15 = 625
+      assert.strictEqual(fareAirport.baseFare, 100);
+      assert.strictEqual(fareAirport.totalFare, 625);
     });
 
     test('27. Strict Phase 8 Boundary: ZERO driver GPS or realtime tracking columns added', () => {

@@ -9,8 +9,7 @@ export default function PriceEstimator({ openBookingModal }) {
   
   // Driver estimator state
   const [pickupArea, setPickupArea] = useState('Indiranagar');
-  const [driverDuration, setDriverDuration] = useState('4'); // hours
-  const [driverTripCategory, setDriverTripCategory] = useState('hourly'); // 'hourly', 'night', 'outstation'
+  const [driverTripOption, setDriverTripOption] = useState('one-way'); // 'one-way' or 'round-trip'
 
   // Vehicle estimator state
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_SERVICES[0]);
@@ -22,19 +21,15 @@ export default function PriceEstimator({ openBookingModal }) {
     return getPrice(key, fallback);
   };
 
-  // Driver price calculation using live pricing
+  // Driver price calculation using live pricing (distance-based baseline)
   const calculateDriverFare = () => {
-    let base = getPrice('driver_hourly_2hr', 199);
-    if (driverDuration === '2') base = getPrice('driver_hourly_2hr', 199);
-    else if (driverDuration === '4') base = getPrice('driver_hourly_4hr', 349);
-    else if (driverDuration === '8') base = getPrice('driver_hourly_8hr', 599);
-    else if (driverDuration === '12') base = getPrice('driver_hourly_12hr', 899);
-
-    if (driverTripCategory === 'night') base = getPrice('driver_night_party', 399);
-    if (driverTripCategory === 'outstation') base = getPrice('driver_outstation_12hr', 1199);
-
+    const baseFare = getPrice('driver_base_fare', 150);
+    const minFare = getPrice('driver_min_fare', 150);
+    const perKm = getPrice('driver_price_per_km', 15);
+    // Baseline starting fare for preview (exact fare calculated authoritatively via OSRM route in booking window)
+    const base = driverTripOption === 'round-trip' ? Math.max(baseFare * 2, minFare) : Math.max(baseFare, minFare);
     const gst = Math.round(base * 0.05);
-    return { base, gst, total: base + gst };
+    return { base, perKm, gst, total: base + gst };
   };
 
   // Vehicle price calculation using live pricing
@@ -55,8 +50,7 @@ export default function PriceEstimator({ openBookingModal }) {
     if (bookingType === 'driver') {
       openBookingModal('driver', {
         pickupArea,
-        driverDuration,
-        estimatedFare: driverFare.total
+        driverTripOption
       });
     } else {
       openBookingModal('vehicle', {
@@ -141,22 +135,20 @@ export default function PriceEstimator({ openBookingModal }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Booking Duration</span>
+                    <SteeringWheel className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Driver Trip Option</span>
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
-                      { hours: '2', label: '2 Hours', badge: 'City Commute' },
-                      { hours: '4', label: '4 Hours', badge: 'Shopping / Errands' },
-                      { hours: '8', label: '8 Hours', badge: 'Full Day Duty' },
-                      { hours: '12', label: '12 Hours', badge: 'Extended' }
+                      { id: 'one-way', label: 'One Way Drop', badge: 'Point A to Point B (Distance Fare)' },
+                      { id: 'round-trip', label: 'Round Trip', badge: 'Return to Pickup (2× Distance Fare)' }
                     ].map((item) => (
                       <button
-                        key={item.hours}
+                        key={item.id}
                         type="button"
-                        onClick={() => setDriverDuration(item.hours)}
-                        className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                          driverDuration === item.hours
+                        onClick={() => setDriverTripOption(item.id)}
+                        className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                          driverTripOption === item.id
                             ? 'bg-amber-500/10 border-amber-500 text-white font-bold'
                             : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                         }`}

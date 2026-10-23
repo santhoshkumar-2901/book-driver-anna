@@ -40,8 +40,8 @@ export default function ContactPage({ openBookingModal }) {
       a: "Our drivers are stationed across 25+ local hubs (Indiranagar, Koramangala, Whitefield, HSR, Hebbal). Typical dispatch time is between 15 to 20 minutes from booking confirmation."
     },
     {
-      q: "Can I book a driver for late-night party returns in Indiranagar / Koramangala?",
-      a: "Yes. Our Night Party Driver service operates 24x7. Drivers undergo breathalyzer verification before taking the wheel of your vehicle."
+      q: "Can I book a driver for late-night commutes in Indiranagar / Koramangala?",
+      a: "Yes. Our City Driver service operates 24x7 with distance-based pricing. Drivers undergo breathalyzer verification before taking the wheel of your vehicle."
     },
     {
       q: "Are fuel and toll charges included in vehicle rentals?",
@@ -158,7 +158,7 @@ export default function ContactPage({ openBookingModal }) {
                   className="input-base"
                 >
                   <option value="General Inquiry">General Booking Inquiry</option>
-                  <option value="Book Driver">Hourly / Outstation Driver Request</option>
+                  <option value="Book Driver">City / Outstation Driver Request</option>
                   <option value="Book Vehicle">Fleet Rental Inquiry</option>
                   <option value="Driving Class">Driving Academy Enrollment</option>
                   <option value="Corporate">Monthly / Corporate Contract</option>

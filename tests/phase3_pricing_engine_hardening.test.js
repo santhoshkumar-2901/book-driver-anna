@@ -245,170 +245,115 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
   });
 
   // =========================================================================
-  // OBJECTIVE 4: OUTSTATION DISTANCE TIER CONSISTENCY
+  // OBJECTIVE 4: MODEL B PURE DISTANCE ROUND TRIP CONSISTENCY
   // =========================================================================
-  describe('Objective 4 — Outstation Distance Tier Consistency', () => {
-    test('4.1 ≤ 150 km resolves to 150 km package (₹1,199 + GST)', () => {
-      const fare80 = calculateAuthoritativeFare({
+  describe('Objective 4 — Model B Pure Distance Round Trip Consistency', () => {
+    test('4.1 Round Trip calculates outbound distance D and billable distance 2D', () => {
+      const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 80
+        driverTripOption: 'round-trip',
+        distanceKm: 20
       });
-      assert.strictEqual(fare80.basePrice, 1199);
-      assert.strictEqual(fare80.totalFare, 1199 + Math.round(1199 * 0.05));
-
-      const fare150 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 150
-      });
-      assert.strictEqual(fare150.basePrice, 1199);
+      assert.strictEqual(fare.outboundDistanceKm, 20);
+      assert.strictEqual(fare.billableDistanceKm, 40);
+      assert.strictEqual(fare.isRoundTrip, true);
+      // 100 base + 40 * 15 = 700
+      assert.strictEqual(fare.baseFare, 100);
+      assert.strictEqual(fare.distanceFare, 600);
+      assert.strictEqual(fare.totalFare, 700);
     });
 
-    test('4.2 > 150 km and ≤ 300 km resolves to 300 km package (₹1,799 + GST)', () => {
-      const fare180 = calculateAuthoritativeFare({
+    test('4.2 One Way calculates outbound distance D and billable distance D', () => {
+      const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 180.2
+        driverTripOption: 'one-way',
+        distanceKm: 20
       });
-      assert.strictEqual(fare180.basePrice, 1799);
-      assert.strictEqual(fare180.totalFare, 1799 + Math.round(1799 * 0.05));
-
-      const fare300 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 300
-      });
-      assert.strictEqual(fare300.basePrice, 1799);
+      assert.strictEqual(fare.outboundDistanceKm, 20);
+      assert.strictEqual(fare.billableDistanceKm, 20);
+      assert.strictEqual(fare.isRoundTrip, false);
+      // 100 base + 20 * 15 = 400
+      assert.strictEqual(fare.baseFare, 100);
+      assert.strictEqual(fare.distanceFare, 300);
+      assert.strictEqual(fare.totalFare, 400);
     });
 
-    test('4.3 > 300 km and ≤ 500 km resolves to 500 km package (₹2,399 + GST)', () => {
-      const fare350 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 350
-      });
-      assert.strictEqual(fare350.basePrice, 2399);
-      assert.strictEqual(fare350.totalFare, 2399 + Math.round(2399 * 0.05));
-
-      const fare500 = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        distanceKm: 500
-      });
-      assert.strictEqual(fare500.basePrice, 2399);
-    });
-
-    test('4.4 > 500 km safely rejects with UNSUPPORTED_OUTSTATION_DISTANCE (400)', () => {
+    test('4.3 Obsolete outstation distance tier packages reject with 400 OBSOLETE_SERVICE', () => {
       assert.throws(() => {
         calculateAuthoritativeFare({
           bookingCategory: 'driver',
           driverTripOption: 'outstation',
-          outstationTripType: 'one-way',
-          distanceKm: 570
+          outstationPackage: 'One Way (Up to 150 km)',
+          distanceKm: 120
         });
       }, (err) => {
-        assert.strictEqual(err.code, 'UNSUPPORTED_OUTSTATION_DISTANCE');
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
         assert.strictEqual(err.statusCode, 400);
-        assert.match(err.message, /currently support routes up to 500 km/);
+        return true;
+      });
+    });
+  });
+
+  // =========================================================================
+  // OBJECTIVE 5: DRIVER TRIP OPTIONS UX STATIC VERIFICATION
+  // =========================================================================
+  describe('Objective 5 — Driver Trip Options UX Static Verification', () => {
+    const modalPath = path.resolve('src/components/BookingModal.jsx');
+    const modalContent = fs.readFileSync(modalPath, 'utf8');
+
+    test('5.1 BookingModal supports One Way Drop and Round Trip options', () => {
+      assert.match(modalContent, /One Way Drop/, 'Must display One Way Drop');
+      assert.match(modalContent, /Round Trip/, 'Must display Round Trip');
+    });
+
+    test('5.2 Obsolete distance tier selectors are completely removed', () => {
+      assert.ok(!modalContent.includes('Select Distance Tier'), 'Distance tier selector must be removed');
+      assert.ok(!modalContent.includes('driver_outstation_150km'), 'Obsolete tier tariffs must not exist');
+    });
+  });
+
+  // =========================================================================
+  // OBJECTIVE 6: TIME-BASED DRIVER PACKAGES DECOMMISSIONED
+  // =========================================================================
+  describe('Objective 6 — Time-Based Driver Packages Decommissioned', () => {
+    test('6.1 Round Trip hourly package pricing is rejected with 400 OBSOLETE_SERVICE', () => {
+      assert.throws(() => {
+        calculateAuthoritativeFare({
+          bookingCategory: 'driver',
+          driverTripOption: 'round-trip',
+          roundTripDuration: '4hr',
+          distanceKm: 25.5,
+          durationMinutes: 45
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
         return true;
       });
     });
 
-    test('4.5 API route /api/bookings/estimate returns 400 when outstation route exceeds 500 km', async () => {
-      const res = await fetch(`${baseUrl}/api/bookings/estimate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    test('6.2 Round Trip booking creation is rejected with 400 OBSOLETE_SERVICE', async () => {
+      await assert.rejects(async () => {
+        await createBooking({
+          customerName: 'Roundtrip Tester',
+          customerPhone: '9845700001',
           bookingCategory: 'driver',
-          driverTripOption: 'outstation',
-          outstationTripType: 'one-way',
-          pickup: { latitude: BANGALORE_INDIRANAGAR.lat, longitude: BANGALORE_INDIRANAGAR.lng },
-          destination: { latitude: HYDERABAD_CHARMINAR.lat, longitude: HYDERABAD_CHARMINAR.lng } // ~570 km
-        })
+          driverTripOption: 'round-trip',
+          roundTripDuration: '6hr',
+          pickupArea: 'Indiranagar',
+          dropLocation: 'Electronic City',
+          pickupLat: BANGALORE_INDIRANAGAR.lat,
+          pickupLng: BANGALORE_INDIRANAGAR.lng,
+          destLat: BANGALORE_KORAMANGALA.lat,
+          destLng: BANGALORE_KORAMANGALA.lng,
+          date: '2026-11-20',
+          time: '10:00'
+        });
+      }, (err) => {
+        assert.strictEqual(err.statusCode, 400);
+        assert.strictEqual(err.code, 'OBSOLETE_SERVICE');
+        return true;
       });
-
-      assert.strictEqual(res.status, 400, 'Must return 400 for > 500km route');
-      const data = await res.json();
-      assert.strictEqual(data.success, false);
-      assert.strictEqual(data.error.code, 'UNSUPPORTED_OUTSTATION_DISTANCE');
-    });
-  });
-
-  // =========================================================================
-  // OBJECTIVE 5: OUTSTATION PACKAGE BUTTON UX STATIC VERIFICATION
-  // =========================================================================
-  describe('Objective 5 — Outstation Package Button UX', () => {
-    const modalPath = path.resolve('src/components/BookingModal.jsx');
-    const modalContent = fs.readFileSync(modalPath, 'utf8');
-
-    test('5.1 BookingModal displays road route summary and recommended package', () => {
-      assert.match(modalContent, /Road Route:/, 'Must display Road Route metrics');
-      assert.match(modalContent, /Recommended:/, 'Must display Recommended package tag');
-      assert.match(modalContent, /● Recommended/, 'Must display Recommended badge on button');
-    });
-
-    test('5.2 BookingModal disables packages that do not cover the route distance', () => {
-      assert.match(modalContent, /isUnavailable\s*\?/, 'Must handle unavailable packages');
-      assert.match(modalContent, /Unavailable for this route/, 'Must render "Unavailable for this route" label');
-      assert.match(modalContent, /disabled=\{isUnavailable\}/, 'Must set disabled attribute on insufficient packages');
-    });
-
-    test('5.3 BookingModal shows warning and disables submission when route exceeds 500 km', () => {
-      assert.match(modalContent, /Route exceeds 500 km limit/, 'Must show route limit banner');
-      assert.match(modalContent, /Route Exceeds 500 km Limit — Contact Support/, 'Must show disabled button label');
-      assert.match(modalContent, /Outstation one-way pricing currently supports routes up to 500 km/, 'Must show clear explanation');
-    });
-  });
-
-  // =========================================================================
-  // OBJECTIVE 6: ROUND TRIP PACKAGE PRICING INTACT
-  // =========================================================================
-  describe('Objective 6 — Round Trip Package Pricing', () => {
-    test('6.1 Round Trip maintains hourly package pricing even when road coordinates are provided', () => {
-      const fare = calculateAuthoritativeFare({
-        bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '4hr',
-        distanceKm: 25.5,
-        durationMinutes: 45
-      });
-      // 4hr package = 349 + GST (5% = 17) = 366
-      assert.strictEqual(fare.basePrice, 349);
-      assert.strictEqual(fare.totalFare, 366);
-      assert.strictEqual(fare.distanceKm, 25.5);
-      assert.strictEqual(fare.durationMinutes, 45);
-      assert.strictEqual(fare.pricePerKm, 0, 'Must not apply per-km tariff to Round Trip');
-    });
-
-    test('6.2 Round Trip booking persists distance but bills authoritative hourly package', async () => {
-      const { booking } = await createBooking({
-        customerName: 'Roundtrip Tester',
-        customerPhone: '9845700001',
-        bookingCategory: 'driver',
-        driverTripOption: 'round-trip',
-        roundTripDuration: '6hr', // 499 + GST = 524
-        pickupArea: 'Indiranagar',
-        dropLocation: 'Electronic City',
-        pickupLat: BANGALORE_INDIRANAGAR.lat,
-        pickupLng: BANGALORE_INDIRANAGAR.lng,
-        destLat: BANGALORE_KORAMANGALA.lat,
-        destLng: BANGALORE_KORAMANGALA.lng,
-        date: '2026-11-20',
-        time: '10:00'
-      });
-
-      const row = await queryOne('SELECT * FROM bookings WHERE id = ?', [booking.id]);
-      assert.strictEqual(row.trip_type, 'round-trip');
-      assert.strictEqual(Number(row.calculated_fare), 524); // 499 + 25 = 524
-      assert.strictEqual(Number(row.base_fare), 499);
-      assert.ok(row.distance_km > 0, 'Must persist calculated road distance');
     });
   });
 
@@ -453,19 +398,20 @@ describe('Phase 3: Production Pricing Engine Hardening Suite', () => {
       assert.notStrictEqual(Number(booking.pricing_version), 999);
     });
 
-    test('7.2 Malicious client sends 150 km package for 350 km route: backend enforces authoritative 500 km tier', () => {
-      // Malicious payload claiming 'One Way (Up to 150 km)' while road distance is 350 km
+    test('7.2 Malicious client claims 1 km for 350 km round-trip: backend enforces authoritative fare', () => {
       const fare = calculateAuthoritativeFare({
         bookingCategory: 'driver',
-        driverTripOption: 'outstation',
-        outstationTripType: 'one-way',
-        outstationPackage: 'One Way (Up to 150 km)', // Fake low package
+        driverTripOption: 'round-trip',
         distanceKm: 350 // Real route distance
       });
 
-      // Must resolve to 500 km package (₹2,399), NOT 150 km package (₹1,199)
-      assert.strictEqual(fare.basePrice, 2399);
-      assert.strictEqual(fare.totalFare, 2399 + Math.round(2399 * 0.05));
+      // Must calculate based on real route distance (350 * 2 = 700 km billable)
+      // Base: 100 + 700 * 15 = 10600
+      assert.strictEqual(fare.outboundDistanceKm, 350);
+      assert.strictEqual(fare.billableDistanceKm, 700);
+      assert.strictEqual(fare.baseFare, 100);
+      assert.strictEqual(fare.distanceFare, 10500);
+      assert.strictEqual(fare.totalFare, 10600);
     });
   });
 

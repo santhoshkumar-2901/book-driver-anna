@@ -3,7 +3,7 @@ import {
   Car, ShieldCheck, CheckCircle2, MapPin, ArrowRight, LogIn, UserPlus,
   Sparkles, Lock, Phone, User, Eye, EyeOff, AlertCircle, Award, Check, QrCode
 } from 'lucide-react';
-import { SteeringWheel } from '../components/Icons';
+import { SteeringWheel, BrandIcon } from '../components/Icons';
 import { BANGALORE_AREAS, DEFAULT_REGISTERED_DRIVERS, SUPPORT_HELPLINE } from '../data/mockData';
 import { apiClient } from '../services/apiClient';
 
@@ -244,8 +244,8 @@ export default function DriverAuthPage({
       {/* Top Header Bar */}
       <header className="relative z-10 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-3 pb-1 flex items-center justify-between shrink-0 gap-2">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20 shrink-0">
-            <SteeringWheel className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20 shrink-0 p-1">
+            <BrandIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
             <div className="font-extrabold text-sm sm:text-lg md:text-xl text-white font-['Outfit'] tracking-tight leading-none truncate">

@@ -402,27 +402,32 @@ describe('Phase 3A Security & Business-Logic Hardening Suite', () => {
   // --------------------------------------------------------------------------
   test('4.1 updateServicePricing rejects NaN, Infinity, -Infinity, and negative numbers with 400', async () => {
     await assert.rejects(async () => {
-      await updateServicePricing([{ id: 'driver_hourly_2hr', price: Infinity }]);
+      await updateServicePricing([{ id: 'driver_one_way_city', price: Infinity }]);
     }, (err) => err.statusCode === 400, 'Infinity must be rejected');
 
     await assert.rejects(async () => {
-      await updateServicePricing([{ id: 'driver_hourly_2hr', price: -100 }]);
+      await updateServicePricing([{ id: 'driver_one_way_city', price: -100 }]);
     }, (err) => err.statusCode === 400, 'Negative price must be rejected');
 
     await assert.rejects(async () => {
-      await updateServicePricing([{ id: 'driver_hourly_2hr', price: NaN }]);
+      await updateServicePricing([{ id: 'driver_one_way_city', price: NaN }]);
     }, (err) => err.statusCode === 400, 'NaN must be rejected');
 
     await assert.rejects(async () => {
-      await updateServicePricing([{ id: 'driver_hourly_2hr', price: -Infinity }]);
+      await updateServicePricing([{ id: 'driver_one_way_city', price: -Infinity }]);
     }, (err) => err.statusCode === 400, '-Infinity must be rejected');
+
+    await assert.rejects(async () => {
+      await updateServicePricing([{ id: 'driver_hourly_2hr', price: 199 }]);
+    }, (err) => err.statusCode === 400 && err.code === 'OBSOLETE_SERVICE', 'Obsolete service must be rejected with 400 OBSOLETE_SERVICE');
   });
 
   test('4.2 resetServicePricing executes valid SQL and restores defaults without syntax error', async () => {
     const pricing = await resetServicePricing();
     assert.ok(pricing.list.length > 0, 'Must successfully return default pricing items');
-    const hourly2hr = pricing.map['driver_hourly_2hr'];
-    assert.strictEqual(hourly2hr.price, 199, 'Hourly 2hr must be restored to default 199');
+    const cityDriver = pricing.map['driver_one_way_city'];
+    assert.strictEqual(cityDriver.price, 299, 'City driver must be restored to default 299');
+    assert.strictEqual(pricing.map['driver_hourly_2hr'], undefined, 'Obsolete driver_hourly_2hr must not be restored');
   });
 
   // --------------------------------------------------------------------------

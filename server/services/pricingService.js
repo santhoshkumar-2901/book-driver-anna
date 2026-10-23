@@ -8,48 +8,25 @@ import { logAuditEvent } from './auditService.js';
  * and validated authoritatively by this service using live database tariffs.
  */
 
+export const OBSOLETE_DRIVER_SERVICE_IDS = [
+  'driver_hourly_2hr',
+  'driver_hourly_4hr',
+  'driver_hourly_6hr',
+  'driver_hourly_8hr',
+  'driver_hourly_12hr',
+  'driver_outstation_12hr',
+  'driver_outstation_24hr',
+  'driver_outstation_46hr',
+  'driver_outstation_72hr',
+  'driver_outstation_150km',
+  'driver_outstation_300km',
+  'driver_outstation_500km',
+  'driver_airport_drop',
+  'driver_night_party'
+];
+
 export const DEFAULT_PRICING = [
-  // 1. DRIVER SERVICES
-  {
-    id: 'driver_hourly_2hr',
-    category: 'driver',
-    name: 'In-City Hourly Driver (2 Hours)',
-    price: 199,
-    unit: '/ 2 hrs',
-    description: 'Minimum 2-hour in-city acting driver package'
-  },
-  {
-    id: 'driver_hourly_4hr',
-    category: 'driver',
-    name: 'In-City Hourly Driver (4 Hours)',
-    price: 349,
-    unit: '/ 4 hrs',
-    description: '4-hour city errand, shopping & commute package'
-  },
-  {
-    id: 'driver_hourly_6hr',
-    category: 'driver',
-    name: 'In-City Hourly Driver (6 Hours)',
-    price: 499,
-    unit: '/ 6 hrs',
-    description: '6-hour flexible city travel and business commute package'
-  },
-  {
-    id: 'driver_hourly_8hr',
-    category: 'driver',
-    name: 'In-City Hourly Driver (8 Hours)',
-    price: 599,
-    unit: '/ 8 hrs',
-    description: '8-hour full day in-city driver package'
-  },
-  {
-    id: 'driver_hourly_12hr',
-    category: 'driver',
-    name: 'In-City Hourly Driver (12 Hours)',
-    price: 899,
-    unit: '/ 12 hrs',
-    description: '12-hour extended city driving package'
-  },
+  // 1. DRIVER SERVICES (Distance-Based & Corporate Monthly)
   {
     id: 'driver_base_fare',
     category: 'driver',
@@ -81,78 +58,6 @@ export const DEFAULT_PRICING = [
     price: 299,
     unit: 'flat',
     description: 'Point A to Point B drop across Bangalore'
-  },
-  {
-    id: 'driver_airport_drop',
-    category: 'driver',
-    name: 'Kempegowda Airport (BLR T1/T2) Drop',
-    price: 899,
-    unit: 'flat',
-    description: 'Dedicated airport drop with zero return fare'
-  },
-  {
-    id: 'driver_night_party',
-    category: 'driver',
-    name: 'Night Party Driver',
-    price: 399,
-    unit: '/ trip',
-    description: 'Late-night safe ride home from Indiranagar/Koramangala'
-  },
-  {
-    id: 'driver_outstation_12hr',
-    category: 'driver',
-    name: 'Outstation Driver (Round Trip 12hr)',
-    price: 1199,
-    unit: '/ 12 hrs',
-    description: 'Day getaway highway driver to Nandi Hills, Mysore, etc.'
-  },
-  {
-    id: 'driver_outstation_24hr',
-    category: 'driver',
-    name: 'Outstation Driver (Round Trip 24hr)',
-    price: 1999,
-    unit: '/ day',
-    description: 'Weekend road trip driver package'
-  },
-  {
-    id: 'driver_outstation_46hr',
-    category: 'driver',
-    name: 'Outstation Driver (Round Trip 46hr)',
-    price: 3899,
-    unit: '/ 46 hrs',
-    description: 'Multi-day long getaway driver'
-  },
-  {
-    id: 'driver_outstation_72hr',
-    category: 'driver',
-    name: 'Outstation Driver (Round Trip 72hr)',
-    price: 5799,
-    unit: '/ 72 hrs',
-    description: 'Extended vacation tour driver'
-  },
-  {
-    id: 'driver_outstation_150km',
-    category: 'driver',
-    name: 'Outstation Driver One-Way (Up to 150 km)',
-    price: 1199,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 150 km'
-  },
-  {
-    id: 'driver_outstation_300km',
-    category: 'driver',
-    name: 'Outstation Driver One-Way (Up to 300 km)',
-    price: 1799,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 300 km'
-  },
-  {
-    id: 'driver_outstation_500km',
-    category: 'driver',
-    name: 'Outstation Driver One-Way (Up to 500 km)',
-    price: 2399,
-    unit: 'flat',
-    description: 'One-way intercity drop up to 500 km'
   },
   {
     id: 'driver_monthly',
@@ -350,6 +255,7 @@ export async function getAllPricing() {
 
     const map = {};
     for (const row of rows) {
+      if (OBSOLETE_DRIVER_SERVICE_IDS.includes(row.id)) continue;
       map[row.id] = {
         id: row.id,
         category: row.category,
@@ -363,7 +269,7 @@ export async function getAllPricing() {
 
     // Merge any missing default keys
     for (const [key, defaultItem] of Object.entries(DEFAULT_MAP)) {
-      if (!map[key]) {
+      if (!map[key] && !OBSOLETE_DRIVER_SERVICE_IDS.includes(key)) {
         map[key] = { ...defaultItem };
       }
     }
@@ -396,6 +302,12 @@ export async function updateServicePricing(updates, userId = null, ipAddress = n
   }
 
   for (const item of itemsToUpdate) {
+    if (OBSOLETE_DRIVER_SERVICE_IDS.includes(item.id)) {
+      throw Object.assign(new Error(`Service tariff '${item.id}' is obsolete and can no longer be updated.`), {
+        statusCode: 400,
+        code: 'OBSOLETE_SERVICE'
+      });
+    }
     if (item.price === null || item.price === undefined || item.price === '') {
       throw Object.assign(new Error(`Invalid price for item '${item.id}'. Price must be a finite non-negative number.`), { statusCode: 400 });
     }
@@ -724,15 +636,40 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     vehicleCategory = 'Sedan',
     driverTripOption = 'one-way',
     dropLocation = '',
-    roundTripDuration = '4hr',
-    outstationTripType = 'round-trip',
-    outstationPackage = 'Round trip 24hr',
+    roundTripDuration = null,
+    outstationTripType = null,
+    outstationPackage = null,
     distanceKm = null,
     durationMinutes = null,
     isDistancePricing = false,
     useDistancePricing = false,
     waitingMinutes = 0
   } = bookingDetails;
+
+  // Prohibit and reject obsolete time-based driver packages and airport-specific service overrides
+  if (bookingCategory === 'driver') {
+    const isObsoleteOption = 
+      (typeof roundTripDuration === 'string' && roundTripDuration.trim() !== '') ||
+      (typeof bookingDetails.driverDuration === 'string' && bookingDetails.driverDuration.trim() !== '') ||
+      bookingDetails.selectedService === 'hourly-driver' ||
+      bookingDetails.selectedService === 'night-driver' ||
+      bookingDetails.driverTripOption === 'night-party' ||
+      bookingDetails.driverTripOption === 'hourly' ||
+      bookingDetails.driverTripOption === 'outstation' ||
+      bookingDetails.driverTripOption === 'airport' ||
+      (bookingType && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingType)) ||
+      (bookingDetails.serviceId && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingDetails.serviceId)) ||
+      (bookingDetails.driverTripOption && OBSOLETE_DRIVER_SERVICE_IDS.includes(bookingDetails.driverTripOption)) ||
+      (typeof bookingDetails.outstationPackage === 'string' && /(12|24|46|72)hr/i.test(bookingDetails.outstationPackage)) ||
+      (typeof bookingDetails.outstationPackage === 'string' && /(150|300|500)\s*km/i.test(bookingDetails.outstationPackage));
+
+    if (isObsoleteOption) {
+      const err = new Error('Time-based hourly driver packages, duration packages, and fixed tier services are permanently discontinued. Please select a valid distance-based One Way Drop or Round Trip service.');
+      err.code = 'OBSOLETE_SERVICE';
+      err.statusCode = 400;
+      throw err;
+    }
+  }
 
   // Validate distanceKm if supplied
   if (distanceKm !== null && distanceKm !== undefined) {
@@ -819,6 +756,8 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     useDistancePricing ||
     isDistancePricing ||
     driverTripOption === 'distance' ||
+    driverTripOption === 'one-way' ||
+    driverTripOption === 'round-trip' ||
     bookingType === 'distance'
   );
 
@@ -826,8 +765,11 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
 
   if (isDistanceBased && distanceKm !== null && distanceKm !== undefined) {
     const numDist = Number(distanceKm);
+    const isRoundTrip = driverTripOption === 'round-trip';
+    const outboundDistanceKm = Number(numDist.toFixed(2));
+    const billableDistanceKm = isRoundTrip ? Number((numDist * 2).toFixed(2)) : outboundDistanceKm;
     const config = resolveDistancePricingConfig(pricingMap);
-    const distanceFare = Number((numDist * config.pricePerKm).toFixed(2));
+    const distanceFare = Number((billableDistanceKm * config.pricePerKm).toFixed(2));
     const subtotal = Number((config.baseFare + distanceFare).toFixed(2));
     let calculatedFare = subtotal;
     const minimumFareApplied = config.minimumFare > 0 && calculatedFare < config.minimumFare;
@@ -848,7 +790,10 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
     }
 
     return {
-      distanceKm: Number(numDist.toFixed(2)),
+      distanceKm: billableDistanceKm,
+      outboundDistanceKm,
+      billableDistanceKm,
+      isRoundTrip,
       durationMinutes: durationMinutes !== null && durationMinutes !== undefined ? Math.max(1, Math.round(durationMinutes)) : null,
       baseFare: config.baseFare,
       pricePerKm: config.pricePerKm,
@@ -870,7 +815,9 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
       fareBreakdown: {
         baseFare: config.baseFare,
         pricePerKm: config.pricePerKm,
-        distanceKm: Number(numDist.toFixed(2)),
+        outboundDistanceKm,
+        billableDistanceKm,
+        isRoundTrip,
         distanceFare,
         minimumFare: config.minimumFare,
         waitingMinutes: waitingMinutesCount,
@@ -883,42 +830,13 @@ export function calculateAuthoritativeFare(bookingDetails, pricingMap = null) {
   }
 
   if (driverTripOption === 'one-way') {
-    // Airport drops have premium highway toll / distance tier
-    const isAirport = typeof dropLocation === 'string' && dropLocation.toLowerCase().includes('airport');
-    basePrice = isAirport ? p('driver_airport_drop', 899) : p('driver_one_way_city', 299);
+    // Normal city drop or distance ride — airports and all destinations use standard pricing
+    basePrice = p('driver_one_way_city', 299);
   } else if (driverTripOption === 'round-trip') {
-    if (roundTripDuration.includes('2hr')) basePrice = p('driver_hourly_2hr', 199);
-    else if (roundTripDuration.includes('4hr')) basePrice = p('driver_hourly_4hr', 349);
-    else if (roundTripDuration.includes('6hr')) basePrice = p('driver_hourly_6hr', 499);
-    else if (roundTripDuration.includes('8hr')) basePrice = p('driver_hourly_8hr', 599);
-    else if (roundTripDuration.includes('12hr')) basePrice = p('driver_hourly_12hr', 899);
-    else basePrice = p('driver_hourly_4hr', 349);
-  } else if (driverTripOption === 'outstation') {
-    if (outstationTripType === 'one-way') {
-      if (distanceKm !== null && distanceKm !== undefined && Number(distanceKm) > 0) {
-        const dist = Number(distanceKm);
-        if (dist > 500) {
-          const err = new Error(`Outstation one-way trips currently support routes up to 500 km. Route distance of ${dist.toFixed(1)} km exceeds the maximum supported tier.`);
-          err.code = 'UNSUPPORTED_OUTSTATION_DISTANCE';
-          err.statusCode = 400;
-          throw err;
-        }
-        if (dist <= 150) basePrice = p('driver_outstation_150km', 1199);
-        else if (dist <= 300) basePrice = p('driver_outstation_300km', 1799);
-        else basePrice = p('driver_outstation_500km', 2399);
-      } else {
-        if (outstationPackage.includes('150 km')) basePrice = p('driver_outstation_150km', 1199);
-        else if (outstationPackage.includes('300 km')) basePrice = p('driver_outstation_300km', 1799);
-        else if (outstationPackage.includes('500 km')) basePrice = p('driver_outstation_500km', 2399);
-        else basePrice = p('driver_outstation_150km', 1499);
-      }
-    } else {
-      if (outstationPackage.includes('12hr')) basePrice = p('driver_outstation_12hr', 1199);
-      else if (outstationPackage.includes('24hr')) basePrice = p('driver_outstation_24hr', 1999);
-      else if (outstationPackage.includes('46hr')) basePrice = p('driver_outstation_46hr', 3899);
-      else if (outstationPackage.includes('72hr')) basePrice = p('driver_outstation_72hr', 5799);
-      else basePrice = p('driver_outstation_24hr', 1999);
-    }
+    const config = resolveDistancePricingConfig(pricingMap);
+    basePrice = config.minimumFare || config.baseFare || 150;
+  } else if (driverTripOption === 'monthly') {
+    basePrice = p('driver_monthly', 18000);
   }
 
   const gst = Math.round(basePrice * 0.05);
