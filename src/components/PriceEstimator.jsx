@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SteeringWheel } from './Icons';
 import { Car, Clock, ShieldCheck, MapPin, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { BANGALORE_AREAS, VEHICLE_SERVICES } from '../data/mockData';
+import { BANGALORE_AREAS, VEHICLE_SERVICES, createVehiclePlaceholder } from '../data/mockData';
 import { usePricing } from '../context/PricingContext';
 
 export default function PriceEstimator({ openBookingModal }) {
@@ -199,7 +199,15 @@ export default function PriceEstimator({ openBookingModal }) {
                         }`}
                       >
                         <div className="w-12 h-10 rounded-md overflow-hidden bg-slate-900 shrink-0">
-                          <img src={veh.image} alt={veh.name} className="w-full h-full object-cover" />
+                          <img
+                            src={veh.image}
+                            alt={veh.name}
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = createVehiclePlaceholder(veh.name, veh.category);
+                            }}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <div className="overflow-hidden">
                           <div className="text-xs font-semibold truncate text-white">{veh.name}</div>

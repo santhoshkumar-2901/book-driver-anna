@@ -741,6 +741,7 @@ export default function App() {
           {activePage === 'services' && (
             <ServicesPage 
               openBookingModal={openBookingModal} 
+              clientUser={clientUser}
             />
           )}
 

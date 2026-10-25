@@ -127,15 +127,15 @@ export const DRIVER_SERVICES = [
   }
 ];
 
-// Clean vehicle illustration placeholder (TODO: replace with actual fleet photography)
-const createVehiclePlaceholder = (title, category) => `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="760" height="410" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="50%" y="45%" text-anchor="middle" fill="%23f59e0b" font-family="sans-serif" font-size="28" font-weight="bold">${category}</text><text x="50%" y="58%" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="16">${encodeURIComponent(title)}</text><text x="50%" y="70%" text-anchor="middle" fill="%2364748b" font-family="sans-serif" font-size="12">Fleet Vehicle</text></svg>`;
+// Clean vehicle illustration fallback placeholder
+export const createVehiclePlaceholder = (title, category) => `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="760" height="410" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="50%" y="45%" text-anchor="middle" fill="%23f59e0b" font-family="sans-serif" font-size="28" font-weight="bold">${category}</text><text x="50%" y="58%" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="16">${encodeURIComponent(title)}</text><text x="50%" y="70%" text-anchor="middle" fill="%2364748b" font-family="sans-serif" font-size="12">Fleet Vehicle</text></svg>`;
 
 export const VEHICLE_SERVICES = [
   {
     id: "veh-sedan",
     category: "Sedan",
     name: "Sedan (Maruti Dzire / Honda City / Etios)",
-    image: createVehiclePlaceholder("Maruti Dzire / Honda City / Etios", "Sedan"),
+    image: "/images/vehicles/sedan.webp",
     badge: "Comfortable 4 Seater",
     type: "Driver + Car",
     seats: 4,
@@ -151,7 +151,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-suv",
     category: "SUV",
     name: "SUV (Toyota Innova Crysta / Ertiga)",
-    image: createVehiclePlaceholder("Toyota Innova Crysta / Ertiga", "SUV"),
+    image: "/images/vehicles/suv.webp",
     badge: "Spacious 6-7 Seater",
     type: "Driver + Vehicle",
     seats: 7,
@@ -167,7 +167,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-12seater",
     category: "12 Seater",
     name: "12 Seater Luxury Tempo Traveller",
-    image: createVehiclePlaceholder("Luxury Tempo Traveller", "12 Seater"),
+    image: "/images/vehicles/tempo-12seater.webp",
     badge: "Group Travel 12 Seater",
     type: "Driver + Vehicle",
     seats: 12,
@@ -183,7 +183,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-24seater",
     category: "24 Seater",
     name: "24 Seater Executive Mini Bus",
-    image: createVehiclePlaceholder("Executive Mini Bus", "24 Seater"),
+    image: "/images/vehicles/minibus-24seater.webp",
     badge: "Executive 24 Seater",
     type: "Driver + Bus",
     seats: 24,
@@ -199,7 +199,7 @@ export const VEHICLE_SERVICES = [
     id: "veh-32seater",
     category: "32 Seater",
     name: "32 Seater Luxury Coach Bus",
-    image: createVehiclePlaceholder("Luxury Coach Bus", "32 Seater"),
+    image: "/images/vehicles/coach-32seater.webp",
     badge: "VIP Luxury 32 Seater",
     type: "Driver + Luxury Coach",
     seats: 32,

@@ -8,8 +8,8 @@ import DateInput from './DateInput';
 import { toDDMMYYYY, toYYYYMMDD } from '../utils/dateUtils';
 import { useScrollLock } from '../utils/useScrollLock';
 
-export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollmentSuccess, initialData = {}, clientUser = null, onRequireAuth }) {
-  useScrollLock(isOpen);
+export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollmentSuccess, initialData = {}, clientUser = null, onRequireAuth, inline = false }) {
+  useScrollLock(inline ? false : isOpen);
   // 1. Personal Information State
   const [fullName, setFullName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -51,13 +51,21 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
 
   // Pre-fill initial data if passed
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || inline) {
       if (initialData.gearPreference) setGearPreference(initialData.gearPreference);
       if (initialData.preferredTime) setPreferredTime(initialData.preferredTime);
+      if (initialData.fullName) setFullName(initialData.fullName);
+      else if (clientUser?.name && !fullName) setFullName(clientUser.name);
+      if (initialData.mobileNumber) setMobileNumber(initialData.mobileNumber);
+      else if (clientUser?.phone && !mobileNumber) setMobileNumber(clientUser.phone);
+      if (initialData.email || initialData.emailAddress) setEmailAddress(initialData.email || initialData.emailAddress);
+      else if (clientUser?.email && !emailAddress) setEmailAddress(clientUser.email);
+      if (initialData.address) setAddress(initialData.address);
+      else if (clientUser?.area && !address) setAddress(`${clientUser.area}, Bengaluru`);
       setIsSubmitted(false);
       setErrors({});
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, inline, initialData, clientUser]);
 
   // Reset form
   const resetForm = () => {
@@ -230,9 +238,15 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
     e.preventDefault();
 
     if (!validateForm()) {
-      // Scroll modal to top of form
+      // Scroll modal or page to top of form
       const formEl = document.getElementById('driving-enrollment-form');
-      if (formEl) formEl.scrollTo({ top: 0, behavior: 'smooth' });
+      if (formEl) {
+        if (inline) {
+          formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          formEl.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
       return;
     }
 
@@ -285,40 +299,37 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
     finalizeEnrollmentSubmit(enrollmentData);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !inline) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
-        onClick={handleClose}
-      />
-
-      {/* Modal Container */}
-      <div className="relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200 my-auto flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
+  const cardContent = (
+    <div className={`relative bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full overflow-hidden shadow-2xl z-10 flex flex-col ${
+      inline
+        ? 'border-slate-800'
+        : 'max-w-3xl my-auto animate-in zoom-in-95 duration-200 max-h-[92dvh] sm:max-h-[90vh]'
+    }`}>
         
-        {/* =====================================================================
-            HEADER BAR
-           ===================================================================== */}
-        <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 px-3.5 sm:px-6 py-3 sm:py-4 text-slate-950 flex items-center justify-between shrink-0 shadow-md gap-2">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 bg-slate-950 text-amber-400 rounded-xl sm:rounded-2xl shadow-inner shrink-0">
-              <SteeringWheel className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-extrabold text-sm sm:text-xl font-['Outfit'] leading-tight tracking-tight truncate">
-                Car Driving Class Enrollment Form
-              </h2>
-              <p className="text-[10px] sm:text-xs font-semibold text-slate-900/85 flex items-center gap-1 sm:gap-1.5 truncate">
-                <span>Driving Academy</span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-0.5">
-                  <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Certified Instructors
-                </span>
-              </p>
-            </div>
+      {/* =====================================================================
+          HEADER BAR
+         ===================================================================== */}
+      <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 px-3.5 sm:px-6 py-3 sm:py-4 text-slate-950 flex items-center justify-between shrink-0 shadow-md gap-2">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="p-2 sm:p-2.5 bg-slate-950 text-amber-400 rounded-xl sm:rounded-2xl shadow-inner shrink-0">
+            <SteeringWheel className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
+          <div className="min-w-0">
+            <h2 className="font-extrabold text-sm sm:text-xl font-['Outfit'] leading-tight tracking-tight truncate">
+              Car Driving Class Enrollment Form
+            </h2>
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-900/85 flex items-center gap-1 sm:gap-1.5 truncate">
+              <span>Driving Academy</span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-0.5">
+                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Certified Instructors
+              </span>
+            </p>
+          </div>
+        </div>
+        {!inline && (
           <button
             onClick={handleClose}
             className="p-1 sm:p-1.5 rounded-xl bg-slate-950/15 hover:bg-slate-950/30 text-slate-950 transition-colors shrink-0"
@@ -326,13 +337,16 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
           >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* =====================================================================
-            SUCCESS CONFIRMATION SCREEN
-           ===================================================================== */}
-        {isSubmitted ? (
-          <div className="p-6 sm:p-10 space-y-6 text-center overflow-y-auto flex-1 animate-in fade-in zoom-in-95 duration-300">
+      {/* =====================================================================
+          SUCCESS CONFIRMATION SCREEN
+         ===================================================================== */}
+      {isSubmitted ? (
+        <div className={`p-6 sm:p-10 space-y-6 text-center flex-1 animate-in fade-in zoom-in-95 duration-300 ${
+          inline ? '' : 'overflow-y-auto'
+        }`}>
             <div className="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-xl text-emerald-400">
               <CheckCircle2 className="w-12 h-12 animate-bounce" />
             </div>
@@ -397,7 +411,7 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
                 onClick={handleClose}
                 className="w-full py-3 px-6 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-400/20 transition-all flex items-center justify-center gap-2"
               >
-                <span>Done / Back to Home</span>
+                <span>{inline ? 'Enroll Another Candidate' : 'Done / Back to Home'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -487,8 +501,11 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
               ENROLLMENT FORM
              ===================================================================== */
           <form 
+            id="driving-enrollment-form"
             onSubmit={handleSubmit} 
-            className="p-4 sm:p-8 space-y-6 sm:space-y-8 overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar flex-1 text-slate-100"
+            className={`p-4 sm:p-8 space-y-6 sm:space-y-8 flex-1 text-slate-100 ${
+              inline ? '' : 'overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar'
+            }`}
           >
 
             {/* Validation Error Alert Banner if form has errors */}
@@ -1023,6 +1040,22 @@ export default function DrivingClassEnrollmentModal({ isOpen, onClose, onEnrollm
         )}
 
       </div>
+  );
+
+  if (inline) {
+    return cardContent;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
+        onClick={handleClose}
+      />
+
+      {/* Modal Container */}
+      {cardContent}
     </div>
   );
 }

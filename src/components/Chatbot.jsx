@@ -148,18 +148,26 @@ export default function Chatbot({ openBookingModal }) {
         <div className="relative group">
           {/* Welcome Tooltip Callout */}
           {notificationBubble && (
-            <div className="absolute bottom-16 right-0 mb-2 w-60 sm:w-64 max-w-[calc(100vw-2.5rem)] p-3 bg-slate-900/95 border border-amber-500/40 rounded-2xl shadow-2xl text-xs text-slate-200 backdrop-blur-md animate-bounce">
-              <div className="flex items-start gap-2">
-                <span className="text-lg">🚗</span>
-                <div>
-                  <p className="font-bold text-amber-400">Ask Anna AI!</p>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Need driver fares, airport drops, or outstation packages? Click to chat!</p>
+            <div
+              onClick={() => setIsOpen(true)}
+              className="absolute bottom-full right-0 mb-3 w-[min(calc(100vw-2rem),16rem)] sm:w-64 p-3 sm:p-3.5 bg-slate-900/95 border border-amber-500/40 rounded-2xl shadow-2xl text-xs text-slate-200 backdrop-blur-md animate-bounce cursor-pointer hover:border-amber-400 transition-colors"
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="text-lg shrink-0 select-none">🚗</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-amber-400 text-xs">Ask Anna AI!</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
+                    Need driver fares, airport drops, or outstation packages? Click to chat!
+                  </p>
                 </div>
-                <button 
+                <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); setNotificationBubble(false); }}
-                  className="text-slate-400 hover:text-white ml-auto"
+                  className="p-1 -mr-1 -mt-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/80 transition-colors shrink-0"
+                  aria-label="Close notification"
+                  title="Dismiss notification"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
