@@ -1,5 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 import {
   isTiDB,
   ensureDatabaseReady,
@@ -10,11 +11,14 @@ import {
   TIDB_TABLE_DDLS,
   TIDB_COLUMN_MIGRATIONS,
   TIDB_INDEX_CREATIONS,
+  migrateSQLiteGuestAccessTokens,
   _resetTiDBInitForTesting,
   _setTiDBConnForTesting,
   queryOne,
   execute
 } from '../server/db/database.js';
+import { createBooking } from '../server/services/bookingService.js';
+import { validateGuestToken } from '../server/services/guestAccessService.js';
 
 describe('Phase 5B — TiDB Initialization Race & Schema Hardening Suite', () => {
   afterEach(() => {
@@ -96,6 +100,15 @@ describe('Phase 5B — TiDB Initialization Race & Schema Hardening Suite', () =>
         !fnString.includes("payment_status = 'PAID'"),
         'Backfill query must NEVER automatically classify historical bookings as PAID'
       );
+    });
+
+    test('1.5 TIDB_COLUMN_MIGRATIONS includes guest_access_tokens.secret_version column migration', () => {
+      const found = TIDB_COLUMN_MIGRATIONS.some(sql =>
+        sql.includes('ALTER TABLE guest_access_tokens ADD COLUMN secret_version') &&
+        sql.includes('VARCHAR(16)') &&
+        sql.includes("DEFAULT 'v1'")
+      );
+      assert.ok(found, 'TIDB_COLUMN_MIGRATIONS must include guest_access_tokens.secret_version migration');
     });
   });
 
@@ -300,6 +313,30 @@ describe('Phase 5B — TiDB Initialization Race & Schema Hardening Suite', () =>
         'Unrelated error must be surfaced immediately'
       );
     });
+
+    test('5.3 guest_access_tokens.secret_version migration is executed and duplicate-column errors are safely ignored', async () => {
+      const executed = [];
+      const mockConn = {
+        execute: async (sql) => {
+          executed.push(sql);
+          if (sql.includes('ALTER TABLE guest_access_tokens ADD COLUMN secret_version')) {
+            const err = new Error("Duplicate column name 'secret_version'");
+            err.code = 'ER_DUP_FIELDNAME';
+            err.errno = 1060;
+            throw err;
+          }
+          return [];
+        }
+      };
+
+      _setTiDBConnForTesting(mockConn);
+      await assert.doesNotReject(async () => {
+        await ensureDatabaseReady();
+      });
+
+      const ranGatMigration = executed.some(sql => sql.includes('ALTER TABLE guest_access_tokens ADD COLUMN secret_version'));
+      assert.ok(ranGatMigration, 'initializeTiDBSchema must execute secret_version migration for guest_access_tokens');
+    });
   });
 
   // =========================================================================
@@ -314,6 +351,94 @@ describe('Phase 5B — TiDB Initialization Race & Schema Hardening Suite', () =>
       const row = await queryOne('SELECT 1 as num');
       assert.ok(row, 'SQLite queryOne must return result');
       assert.strictEqual(row.num, 1);
+    });
+
+    test('6.2 SQLite migrateSQLiteGuestAccessTokens adds secret_version to existing table, preserves existing data, and is idempotent', () => {
+      const memDb = new DatabaseSync(':memory:');
+
+      // Create legacy guest_access_tokens WITHOUT secret_version
+      memDb.exec(`
+        CREATE TABLE guest_access_tokens (
+          id TEXT PRIMARY KEY,
+          booking_id TEXT NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          purpose TEXT NOT NULL DEFAULT 'payment_link',
+          expires_at DATETIME NOT NULL,
+          revoked_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Insert existing legacy token record
+      memDb.prepare(`
+        INSERT INTO guest_access_tokens (id, booking_id, token_hash, purpose, expires_at)
+        VALUES ('GAT-LEGACY-001', 'BKG-001', 'legacy_hash_abc123', 'payment_link', '2026-12-31 23:59:59')
+      `).run();
+
+      // Verify column does not exist prior to migration
+      let tableInfo = memDb.prepare("PRAGMA table_info(guest_access_tokens)").all();
+      assert.strictEqual(tableInfo.some(c => c.name === 'secret_version'), false);
+
+      // Run migration
+      migrateSQLiteGuestAccessTokens(memDb);
+
+      // Verify column exists after migration
+      tableInfo = memDb.prepare("PRAGMA table_info(guest_access_tokens)").all();
+      assert.strictEqual(tableInfo.some(c => c.name === 'secret_version'), true);
+
+      // Verify existing legacy record preserved and populated with default 'v1'
+      const legacyRow = memDb.prepare("SELECT * FROM guest_access_tokens WHERE id = 'GAT-LEGACY-001'").get();
+      assert.ok(legacyRow);
+      assert.strictEqual(legacyRow.id, 'GAT-LEGACY-001');
+      assert.strictEqual(legacyRow.booking_id, 'BKG-001');
+      assert.strictEqual(legacyRow.token_hash, 'legacy_hash_abc123');
+      assert.strictEqual(legacyRow.secret_version, 'v1');
+
+      // Verify repeated migration does not throw or fail (idempotency)
+      assert.doesNotThrow(() => {
+        migrateSQLiteGuestAccessTokens(memDb);
+      });
+      memDb.close();
+    });
+
+    test('6.3 Guest booking creation persists token with secret_version', async () => {
+      _setTiDBConnForTesting(null);
+      _resetTiDBInitForTesting();
+
+      const bookingResult = await createBooking({
+        customerName: 'Secret Version Customer',
+        customerPhone: '9876543210',
+        bookingCategory: 'driver',
+        driverTripOption: 'one-way',
+        pickupArea: 'Indiranagar 100ft Road',
+        dropLocation: 'Whitefield ITPL',
+        pickupLat: 12.9716,
+        pickupLng: 77.5946,
+        destLat: 12.9850,
+        destLng: 77.7300,
+        date: '2026-10-31',
+        time: '10:00 AM',
+        paymentMode: 'cash',
+        idempotencyKey: `idem-sec-ver-${Date.now()}`
+      });
+
+      assert.ok(bookingResult);
+      assert.ok(bookingResult.booking);
+      assert.ok(bookingResult.paymentLink);
+      assert.ok(bookingResult.paymentLink.token);
+      assert.match(bookingResult.paymentLink.url, /\/pay\//);
+
+      // Verify in database that secret_version is 'v1'
+      const tokenRecord = await queryOne(
+        'SELECT * FROM guest_access_tokens WHERE booking_id = ?',
+        [bookingResult.booking.id]
+      );
+      assert.ok(tokenRecord, 'Token record must exist in database');
+      assert.strictEqual(tokenRecord.secret_version, 'v1', 'Token record secret_version must be v1');
+
+      // Verify token validates
+      const validation = await validateGuestToken(bookingResult.paymentLink.token);
+      assert.strictEqual(validation.valid, true);
     });
   });
 });

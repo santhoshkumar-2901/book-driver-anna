@@ -244,7 +244,29 @@ if (isTiDB) {
     throw pweErr;
   }
 
+  try {
+    migrateSQLiteGuestAccessTokens(sqliteDb);
+  } catch (gatErr) {
+    console.error('[DATABASE] SQLite guest_access_tokens migration error:', gatErr);
+    throw gatErr;
+  }
+
   console.log(`[DATABASE] Connected to SQLite at ${dbFilePath} (foreign keys enabled)`);
+}
+
+/**
+ * Idempotently adds secret_version column to guest_access_tokens for existing SQLite databases.
+ */
+export function migrateSQLiteGuestAccessTokens(dbInstance = sqliteDb) {
+  if (!dbInstance) return;
+  const hasGuestAccessTokens = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='guest_access_tokens'").get();
+  if (hasGuestAccessTokens) {
+    const tableInfo = dbInstance.prepare("PRAGMA table_info(guest_access_tokens)").all();
+    const hasSecretVersion = tableInfo.some(c => (c.name || '').toLowerCase() === 'secret_version');
+    if (!hasSecretVersion) {
+      dbInstance.exec("ALTER TABLE guest_access_tokens ADD COLUMN secret_version TEXT NOT NULL DEFAULT 'v1';");
+    }
+  }
 }
 
 /**
@@ -477,7 +499,8 @@ export const TIDB_COLUMN_MIGRATIONS = [
   'ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;',
   "ALTER TABLE bookings ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID';",
   'ALTER TABLE payment_webhook_events ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;',
-  'ALTER TABLE payment_webhook_events ADD COLUMN claim_token VARCHAR(64) NULL;'
+  'ALTER TABLE payment_webhook_events ADD COLUMN claim_token VARCHAR(64) NULL;',
+  "ALTER TABLE guest_access_tokens ADD COLUMN secret_version VARCHAR(16) NOT NULL DEFAULT 'v1';"
 ];
 
 export const TIDB_INDEX_CREATIONS = [
