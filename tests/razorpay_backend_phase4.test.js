@@ -189,6 +189,7 @@ describe('Phase 4: Backend Razorpay Integration Suite', () => {
       assert.strictEqual(capturedOutboundRequest.options.method, 'POST');
       assert.strictEqual(capturedOutboundRequest.body.amount, 75050);
       assert.strictEqual(capturedOutboundRequest.body.currency, 'INR');
+      assert.strictEqual(capturedOutboundRequest.body.payment_capture, 1, 'Order creation must specify auto-capture');
       const authHeader = capturedOutboundRequest.options.headers.Authorization;
       assert.ok(authHeader.startsWith('Basic '), 'Must use Basic Authentication');
 
@@ -778,6 +779,59 @@ describe('Phase 4: Backend Razorpay Integration Suite', () => {
       assert.strictEqual(rejectRes.status, 400);
       const rejectJson = await rejectRes.json();
       assert.strictEqual(rejectJson.error.code, 'INVALID_EVENT_ID');
+    });
+
+    test('4.7 order.paid webhook event processes successfully with order entity fallback', async () => {
+      const { bookingId } = await createTestBookingWithToken(650);
+      const attemptId = 'PAY-ATT-' + randomHex();
+      const orderId = 'order_' + randomHex();
+      const eventId = 'evt_' + randomHex();
+
+      await execute(`
+        INSERT INTO payment_attempts (id, booking_id, order_id, amount, currency, status, gateway_provider)
+        VALUES (?, ?, ?, 650, 'INR', 'CREATED', 'RAZORPAY')
+      `, [attemptId, bookingId, orderId]);
+
+      // Webhook payload containing only order entity (as delivered by Razorpay for order.paid)
+      const rawPayload = JSON.stringify({
+        entity: 'event',
+        event: 'order.paid',
+        created_at: 1700000000,
+        payload: {
+          order: {
+            entity: {
+              id: orderId,
+              entity: 'order',
+              amount: 65000,
+              amount_paid: 65000,
+              currency: 'INR',
+              status: 'paid'
+            }
+          }
+        }
+      });
+      const signature = crypto.createHmac('sha256', TEST_WEBHOOK_SECRET).update(rawPayload).digest('hex');
+
+      const res = await fetch(`${baseUrl}/api/payments/razorpay/webhook`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-razorpay-signature': signature,
+          'x-razorpay-event-id': eventId
+        },
+        body: rawPayload
+      });
+
+      assert.strictEqual(res.status, 200);
+      const json = await res.json();
+      assert.strictEqual(json.data.status, 'PROCESSED');
+      assert.strictEqual(json.data.eventType, 'order.paid');
+
+      const booking = await queryOne('SELECT payment_status FROM bookings WHERE id = ?', [bookingId]);
+      assert.strictEqual(booking.payment_status, 'PAID');
+
+      const attempt = await queryOne('SELECT status FROM payment_attempts WHERE id = ?', [attemptId]);
+      assert.strictEqual(attempt.status, 'SUCCEEDED');
     });
   });
 

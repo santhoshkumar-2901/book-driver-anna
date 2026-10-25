@@ -647,6 +647,7 @@ export async function createRazorpayGuestOrder({
       amount: amountInPaise,
       currency: 'INR',
       receipt: attemptId,
+      payment_capture: 1,
       notes: {
         bookingId: String(booking.b_id),
         attemptId
@@ -1196,12 +1197,16 @@ export async function processRazorpayWebhook({
     }
 
     // payment.captured or order.paid
-    if (!paymentEntity) {
+    if (!paymentEntity && !orderEntity) {
+      throw new Error(`Webhook payload missing payment and order entities for ${eventType}`);
+    }
+
+    if (eventType === 'payment.captured' && !paymentEntity) {
       throw new Error(`Webhook payload missing payment entity for ${eventType}`);
     }
 
     if (!orderId) {
-      throw new Error(`Webhook payment entity missing order_id for ${eventType}`);
+      throw new Error(`Webhook entity missing order_id for ${eventType}`);
     }
 
     const attempt = await queryOne('SELECT * FROM payment_attempts WHERE order_id = ?', [orderId]);
@@ -1210,17 +1215,24 @@ export async function processRazorpayWebhook({
     }
 
     const amountInPaise = Math.round(Number(attempt.amount) * 100);
-    if (paymentEntity.amount !== amountInPaise) {
-      throw new Error(`Webhook payment amount ${paymentEntity.amount} does not match expected attempt amount ${amountInPaise}`);
+    const eventAmount = paymentEntity ? paymentEntity.amount : (orderEntity?.amount_paid || orderEntity?.amount);
+    if (eventAmount !== amountInPaise) {
+      throw new Error(`Webhook payment amount ${eventAmount} does not match expected attempt amount ${amountInPaise}`);
     }
 
-    if (paymentEntity.currency !== 'INR') {
-      throw new Error(`Webhook currency ${paymentEntity.currency} is not INR`);
+    const eventCurrency = paymentEntity?.currency || orderEntity?.currency || 'INR';
+    if (eventCurrency !== 'INR') {
+      throw new Error(`Webhook currency ${eventCurrency} is not INR`);
     }
 
-    if (paymentEntity.status !== 'captured') {
+    if (paymentEntity && paymentEntity.status !== 'captured') {
       throw new Error(`Webhook payment status is '${paymentEntity.status}', expected 'captured'`);
+    } else if (!paymentEntity && orderEntity && orderEntity.status !== 'paid') {
+      throw new Error(`Webhook order status is '${orderEntity.status}', expected 'paid'`);
     }
+
+    const resolvedPaymentId = paymentEntity?.id || null;
+    const resolvedPaymentMethod = paymentEntity?.method || 'razorpay';
 
     // Single-settlement transaction with lease fencing check
     await withTransaction(async (tx) => {
@@ -1257,7 +1269,7 @@ export async function processRazorpayWebhook({
               payment_method = COALESCE(payment_method, ?),
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ? AND status IN ('CREATED', 'PROCESSING', 'PENDING')
-        `, [paymentEntity.id, paymentEntity.method || 'razorpay', attempt.id]);
+        `, [resolvedPaymentId, resolvedPaymentMethod, attempt.id]);
 
         return;
       }
@@ -1278,7 +1290,7 @@ export async function processRazorpayWebhook({
               payment_method = COALESCE(payment_method, ?),
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ? AND status IN ('CREATED', 'PROCESSING', 'PENDING')
-        `, [paymentEntity.id, paymentEntity.method || 'razorpay', attempt.id]);
+        `, [resolvedPaymentId, resolvedPaymentMethod, attempt.id]);
 
         return;
       }
@@ -1290,7 +1302,7 @@ export async function processRazorpayWebhook({
             payment_method = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND status IN ('CREATED', 'PROCESSING', 'PENDING')
-      `, [paymentEntity.id, paymentEntity.method || 'razorpay', attempt.id]);
+      `, [resolvedPaymentId, resolvedPaymentMethod, attempt.id]);
 
       await logAuditEvent({
         userId: null,
@@ -1300,9 +1312,9 @@ export async function processRazorpayWebhook({
         details: {
           attemptId: attempt.id,
           orderId: attempt.order_id,
-          paymentId: paymentEntity.id,
+          paymentId: resolvedPaymentId,
           amount: currentBooking.calculated_fare,
-          paymentMethod: paymentEntity.method || 'razorpay'
+          paymentMethod: resolvedPaymentMethod
         },
         ipAddress
       });
@@ -1317,7 +1329,7 @@ export async function processRazorpayWebhook({
       WHERE id = ? AND status = 'PROCESSING' AND claim_token = ?
     `, [eventId, claimToken]);
 
-    return { status: 'PROCESSED', eventId, eventType, orderId, paymentId: paymentEntity.id };
+    return { status: 'PROCESSED', eventId, eventType, orderId, paymentId: resolvedPaymentId };
   } catch (processErr) {
     if (processErr.code !== 'LEASE_LOST') {
       await execute(`

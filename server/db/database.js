@@ -19,224 +19,6 @@ if (isTiDB) {
   try {
     tidbConn = connect({ url: ENV.DATABASE_URL.trim() });
     console.log('[DATABASE] Initialized TiDB Cloud connection (Serverless HTTP Driver)');
-    // Auto-create essential tables if not exist in TiDB Cloud
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        phone VARCHAR(64) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(32) NOT NULL DEFAULT 'customer',
-        area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
-        status VARCHAR(32) NOT NULL DEFAULT 'Active',
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_users_email (email),
-        INDEX idx_users_phone (phone)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB users auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS drivers (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        user_id VARCHAR(64) NOT NULL UNIQUE,
-        name VARCHAR(255) NOT NULL,
-        phone VARCHAR(64) NOT NULL,
-        license_number VARCHAR(64) NOT NULL UNIQUE,
-        hub_area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
-        experience_years VARCHAR(64) DEFAULT '5 Years',
-        specialization VARCHAR(255) DEFAULT 'Manual & Automatic Cars',
-        rating DECIMAL(3,2) DEFAULT 4.95,
-        trips_completed INT DEFAULT 0,
-        upi_id VARCHAR(255) DEFAULT NULL,
-        status VARCHAR(32) DEFAULT 'Active',
-        current_latitude DECIMAL(10, 7) NULL,
-        current_longitude DECIMAL(10, 7) NULL,
-        last_location_update DATETIME NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_drivers_phone (phone),
-        INDEX idx_drivers_license (license_number)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB drivers auto-init note:', err.message);
-    });
-
-    // Idempotent driver column migrations for existing TiDB databases
-    tidbConn.execute('ALTER TABLE drivers ADD COLUMN current_latitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE drivers ADD COLUMN current_longitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE drivers ADD COLUMN last_location_update DATETIME NULL;').catch(() => {});
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS password_reset_tokens (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        user_id VARCHAR(64) NOT NULL,
-        token_hash VARCHAR(64) NOT NULL UNIQUE,
-        expires_at DATETIME NOT NULL,
-        used_at DATETIME NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_prt_user (user_id),
-        INDEX idx_prt_hash (token_hash)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB password_reset_tokens auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS service_pricing (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        category VARCHAR(32) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        price DECIMAL(10,2) NOT NULL,
-        unit VARCHAR(64) NULL,
-        description TEXT NULL,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_pricing_category (category)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB service_pricing auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS bookings (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        user_id VARCHAR(64) NULL,
-        customer_name VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(64) NOT NULL,
-        customer_email VARCHAR(255) NULL,
-        booking_type VARCHAR(32) NOT NULL,
-        trip_type VARCHAR(64) NOT NULL,
-        service_name VARCHAR(255) NOT NULL,
-        pickup_area VARCHAR(255) NOT NULL,
-        drop_location TEXT NULL,
-        pickup_latitude DECIMAL(10, 7) NULL,
-        pickup_longitude DECIMAL(10, 7) NULL,
-        destination_latitude DECIMAL(10, 7) NULL,
-        destination_longitude DECIMAL(10, 7) NULL,
-        date VARCHAR(64) NOT NULL,
-        time VARCHAR(64) NOT NULL,
-        calculated_fare DECIMAL(10,2) NOT NULL,
-        payment_mode VARCHAR(64) DEFAULT 'cash',
-        status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-        cancellation_reason TEXT NULL,
-        assigned_driver_id VARCHAR(64) NULL,
-        assigned_driver_name VARCHAR(255) NULL,
-        assigned_driver_phone VARCHAR(64) NULL,
-        idempotency_key VARCHAR(128) NULL UNIQUE,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_bookings_user_id (user_id),
-        INDEX idx_bookings_phone (customer_phone),
-        INDEX idx_bookings_date_status (date, status),
-        INDEX idx_bookings_driver_slot (assigned_driver_id, date, time)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB bookings auto-init note:', err.message);
-    });
-
-    // Idempotent column migrations for existing TiDB databases
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN assigned_driver_name VARCHAR(255) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN assigned_driver_phone VARCHAR(64) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;').catch(() => {});
-    tidbConn.execute('ALTER TABLE drivers ADD COLUMN upi_id VARCHAR(255) DEFAULT NULL;').catch(() => {});
-
-    tidbConn.execute(`
-      CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings (assigned_driver_id, date, time);
-    `).catch(err => {
-      const isExpected = err?.message?.includes('Duplicate key') ||
-        err?.message?.includes('already exists') ||
-        err?.code === 'ER_DUP_KEYNAME' ||
-        err?.errno === 1061;
-      if (!isExpected) {
-        console.warn('[DATABASE] TiDB idx_bookings_driver_slot auto-init note:', err.message);
-      }
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS guest_access_tokens (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        booking_id VARCHAR(64) NOT NULL,
-        token_hash VARCHAR(64) NOT NULL UNIQUE,
-        secret_version VARCHAR(16) NOT NULL DEFAULT 'v1',
-        purpose VARCHAR(32) NOT NULL DEFAULT 'payment_link',
-        expires_at DATETIME NOT NULL,
-        revoked_at DATETIME NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_gat_token_hash (token_hash),
-        INDEX idx_gat_booking_id (booking_id),
-        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB guest_access_tokens auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS payment_attempts (
-        id VARCHAR(64) NOT NULL PRIMARY KEY,
-        booking_id VARCHAR(64) NOT NULL,
-        token_id VARCHAR(64) NULL,
-        order_id VARCHAR(64) NOT NULL UNIQUE,
-        amount DECIMAL(10, 2) NOT NULL,
-        currency VARCHAR(8) NOT NULL DEFAULT 'INR',
-        status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
-        idempotency_key VARCHAR(128) NULL UNIQUE,
-        payment_method VARCHAR(32) NULL,
-        gateway_provider VARCHAR(32) NOT NULL DEFAULT 'DUMMY_RAZORPAY_TEST',
-        gateway_payment_id VARCHAR(64) NULL,
-        error_code VARCHAR(64) NULL,
-        error_description TEXT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_pa_booking_id (booking_id),
-        INDEX idx_pa_order_id (order_id),
-        INDEX idx_pa_status (status),
-        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
-        FOREIGN KEY (token_id) REFERENCES guest_access_tokens(id) ON DELETE SET NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB payment_attempts auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS audit_logs (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        user_id VARCHAR(64) NULL,
-        action VARCHAR(128) NOT NULL,
-        resource_type VARCHAR(64) NOT NULL,
-        resource_id VARCHAR(64) NULL,
-        details TEXT NULL,
-        ip_address VARCHAR(64) NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_audit_created (created_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB audit_logs auto-init note:', err.message);
-    });
-
-    tidbConn.execute(`
-      CREATE TABLE IF NOT EXISTS payment_webhook_events (
-        id VARCHAR(128) NOT NULL PRIMARY KEY,
-        event_type VARCHAR(64) NOT NULL,
-        order_id VARCHAR(64) NULL,
-        payment_id VARCHAR(64) NULL,
-        status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED',
-        attempts INT NOT NULL DEFAULT 1,
-        claim_token VARCHAR(64) NULL,
-        error_message TEXT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        processed_at DATETIME NULL,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_pwe_order_id (order_id),
-        INDEX idx_pwe_status (status),
-        INDEX idx_pwe_created_at (created_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `).catch(err => {
-      console.warn('[DATABASE] TiDB payment_webhook_events auto-init note:', err.message);
-    });
   } catch (err) {
     console.error('[DATABASE] Failed to initialize TiDB Cloud connection:', err.message);
     throw err;
@@ -494,70 +276,269 @@ export function normalizeRows(rows) {
   return rows.map(normalizeRow);
 }
 
+export function isTableExistsError(err) {
+  if (!err) return false;
+  return err.code === 'ER_TABLE_EXISTS_ERROR' ||
+    err.errno === 1050 ||
+    Boolean(err.message && (
+      err.message.toLowerCase().includes('already exists')
+    ));
+}
+
+export function isDuplicateColumnError(err) {
+  if (!err) return false;
+  return err.code === 'ER_DUP_FIELDNAME' ||
+    err.errno === 1060 ||
+    Boolean(err.message && err.message.toLowerCase().includes('duplicate column'));
+}
+
+export function isDuplicateIndexError(err) {
+  if (!err) return false;
+  return err.code === 'ER_DUP_KEYNAME' ||
+    err.errno === 1061 ||
+    Boolean(err.message && (
+      err.message.toLowerCase().includes('duplicate key') ||
+      err.message.toLowerCase().includes('already exists')
+    ));
+}
+
+export const TIDB_TABLE_DDLS = [
+  `CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(64) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'customer',
+    area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+    status VARCHAR(32) NOT NULL DEFAULT 'Active',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_users_email (email),
+    INDEX idx_users_phone (phone)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS drivers (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(64) NOT NULL,
+    license_number VARCHAR(64) NOT NULL UNIQUE,
+    hub_area VARCHAR(255) NOT NULL DEFAULT 'Indiranagar',
+    experience_years VARCHAR(64) DEFAULT '5 Years',
+    specialization VARCHAR(255) DEFAULT 'Manual & Automatic Cars',
+    rating DECIMAL(3,2) DEFAULT 4.95,
+    trips_completed INT DEFAULT 0,
+    upi_id VARCHAR(255) DEFAULT NULL,
+    status VARCHAR(32) DEFAULT 'Active',
+    current_latitude DECIMAL(10, 7) NULL,
+    current_longitude DECIMAL(10, 7) NULL,
+    last_location_update DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_drivers_phone (phone),
+    INDEX idx_drivers_license (license_number)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_prt_user (user_id),
+    INDEX idx_prt_hash (token_hash)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS service_pricing (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    category VARCHAR(32) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    unit VARCHAR(64) NULL,
+    description TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_pricing_category (category)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS bookings (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    user_id VARCHAR(64) NULL,
+    customer_name VARCHAR(255) NOT NULL,
+    customer_phone VARCHAR(64) NOT NULL,
+    customer_email VARCHAR(255) NULL,
+    booking_type VARCHAR(32) NOT NULL,
+    trip_type VARCHAR(64) NOT NULL,
+    service_name VARCHAR(255) NOT NULL,
+    pickup_area VARCHAR(255) NOT NULL,
+    drop_location TEXT NULL,
+    pickup_latitude DECIMAL(10, 7) NULL,
+    pickup_longitude DECIMAL(10, 7) NULL,
+    destination_latitude DECIMAL(10, 7) NULL,
+    destination_longitude DECIMAL(10, 7) NULL,
+    date VARCHAR(64) NOT NULL,
+    time VARCHAR(64) NOT NULL,
+    calculated_fare DECIMAL(10,2) NOT NULL,
+    payment_mode VARCHAR(64) DEFAULT 'cash',
+    payment_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID',
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    cancellation_reason TEXT NULL,
+    assigned_driver_id VARCHAR(64) NULL,
+    assigned_driver_name VARCHAR(255) NULL,
+    assigned_driver_phone VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NULL UNIQUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_bookings_user_id (user_id),
+    INDEX idx_bookings_phone (customer_phone),
+    INDEX idx_bookings_status (status),
+    INDEX idx_bookings_payment_status (payment_status),
+    INDEX idx_bookings_date_status (date, status),
+    INDEX idx_bookings_driver_slot (assigned_driver_id, date, time)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS guest_access_tokens (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    booking_id VARCHAR(64) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    secret_version VARCHAR(16) NOT NULL DEFAULT 'v1',
+    purpose VARCHAR(32) NOT NULL DEFAULT 'payment_link',
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_gat_token_hash (token_hash),
+    INDEX idx_gat_booking_id (booking_id),
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS payment_attempts (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    booking_id VARCHAR(64) NOT NULL,
+    token_id VARCHAR(64) NULL,
+    order_id VARCHAR(64) NOT NULL UNIQUE,
+    amount DECIMAL(10, 2) NOT NULL,
+    currency VARCHAR(8) NOT NULL DEFAULT 'INR',
+    status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+    idempotency_key VARCHAR(128) NULL UNIQUE,
+    payment_method VARCHAR(32) NULL,
+    gateway_provider VARCHAR(32) NOT NULL DEFAULT 'DUMMY_RAZORPAY_TEST',
+    gateway_payment_id VARCHAR(64) NULL,
+    error_code VARCHAR(64) NULL,
+    error_description TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pa_booking_id (booking_id),
+    INDEX idx_pa_order_id (order_id),
+    INDEX idx_pa_status (status),
+    INDEX idx_pa_gateway_payment_id (gateway_payment_id),
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+    FOREIGN KEY (token_id) REFERENCES guest_access_tokens(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(64) NULL,
+    action VARCHAR(128) NOT NULL,
+    resource_type VARCHAR(64) NOT NULL,
+    resource_id VARCHAR(64) NULL,
+    details TEXT NULL,
+    ip_address VARCHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+  `CREATE TABLE IF NOT EXISTS payment_webhook_events (
+    id VARCHAR(128) NOT NULL PRIMARY KEY,
+    event_type VARCHAR(64) NOT NULL,
+    order_id VARCHAR(64) NULL,
+    payment_id VARCHAR(64) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED',
+    attempts INT NOT NULL DEFAULT 1,
+    claim_token VARCHAR(64) NULL,
+    error_message TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at DATETIME NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_pwe_order_id (order_id),
+    INDEX idx_pwe_status (status),
+    INDEX idx_pwe_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+];
+
+export const TIDB_COLUMN_MIGRATIONS = [
+  'ALTER TABLE drivers ADD COLUMN current_latitude DECIMAL(10, 7) NULL;',
+  'ALTER TABLE drivers ADD COLUMN current_longitude DECIMAL(10, 7) NULL;',
+  'ALTER TABLE drivers ADD COLUMN last_location_update DATETIME NULL;',
+  'ALTER TABLE drivers ADD COLUMN upi_id VARCHAR(255) DEFAULT NULL;',
+  'ALTER TABLE bookings ADD COLUMN assigned_driver_name VARCHAR(255) NULL;',
+  'ALTER TABLE bookings ADD COLUMN assigned_driver_phone VARCHAR(64) NULL;',
+  'ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;',
+  'ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;',
+  'ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;',
+  'ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;',
+  "ALTER TABLE bookings ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID';",
+  'ALTER TABLE payment_webhook_events ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;',
+  'ALTER TABLE payment_webhook_events ADD COLUMN claim_token VARCHAR(64) NULL;'
+];
+
+export const TIDB_INDEX_CREATIONS = [
+  'CREATE INDEX IF NOT EXISTS idx_bookings_driver_slot ON bookings (assigned_driver_id, date, time);',
+  'CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings (status);',
+  'CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings (payment_status);',
+  'CREATE INDEX IF NOT EXISTS idx_pa_gateway_payment_id ON payment_attempts (gateway_payment_id);'
+];
+
+export async function initializeTiDBSchema(conn = tidbConn) {
+  if (!conn) return;
+
+  // 1. Create essential tables in sequence
+  for (const ddl of TIDB_TABLE_DDLS) {
+    try {
+      await conn.execute(ddl);
+    } catch (err) {
+      if (!isTableExistsError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  // 2. Idempotent column migrations for existing databases
+  for (const sql of TIDB_COLUMN_MIGRATIONS) {
+    try {
+      await conn.execute(sql);
+    } catch (err) {
+      if (!isDuplicateColumnError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  // 3. Historical completed bookings payment_status backfill
+  try {
+    await conn.execute("UPDATE bookings SET payment_status = 'LEGACY_UNVERIFIED' WHERE status = 'COMPLETED' AND payment_status = 'UNPAID';");
+  } catch (err) {
+    throw err;
+  }
+
+  // 4. Idempotent index creation
+  for (const sql of TIDB_INDEX_CREATIONS) {
+    try {
+      await conn.execute(sql);
+    } catch (err) {
+      if (!isDuplicateIndexError(err)) {
+        throw err;
+      }
+    }
+  }
+}
+
 let tidbInitPromise = null;
+let isTestMockTiDB = false;
 
 export async function ensureDatabaseReady() {
-  if (!isTiDB || !tidbConn) return;
+  if ((!isTiDB && !isTestMockTiDB) || !tidbConn) return;
   if (!tidbInitPromise) {
     tidbInitPromise = (async () => {
-      const migrations = [
-        'ALTER TABLE bookings ADD COLUMN assigned_driver_name VARCHAR(255) NULL;',
-        'ALTER TABLE bookings ADD COLUMN assigned_driver_phone VARCHAR(64) NULL;',
-        'ALTER TABLE bookings ADD COLUMN pickup_latitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE bookings ADD COLUMN pickup_longitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE bookings ADD COLUMN destination_latitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE bookings ADD COLUMN destination_longitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE drivers ADD COLUMN current_latitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE drivers ADD COLUMN current_longitude DECIMAL(10, 7) NULL;',
-        'ALTER TABLE drivers ADD COLUMN last_location_update DATETIME NULL;',
-        'ALTER TABLE drivers ADD COLUMN upi_id VARCHAR(255) DEFAULT NULL;'
-      ];
-      for (const m of migrations) {
-        try {
-          await tidbConn.execute(m);
-        } catch (e) {
-          // Column already exists or duplicate column name
-        }
-      }
-
-      try {
-        await tidbConn.execute("ALTER TABLE bookings ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID';");
-        await tidbConn.execute("UPDATE bookings SET payment_status = 'LEGACY_UNVERIFIED' WHERE status = 'COMPLETED' AND payment_status = 'UNPAID';");
-        await tidbConn.execute("CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);");
-      } catch (err) {
-        if (err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060 && !err.message?.includes('Duplicate column')) {
-          console.error('[DATABASE] TiDB payment_status migration error:', err);
-          throw err;
-        }
-      }
-
-      try {
-        await tidbConn.execute(`
-          CREATE TABLE IF NOT EXISTS payment_webhook_events (
-            id VARCHAR(128) NOT NULL PRIMARY KEY,
-            event_type VARCHAR(64) NOT NULL,
-            order_id VARCHAR(64) NULL,
-            payment_id VARCHAR(64) NULL,
-            status VARCHAR(32) NOT NULL DEFAULT 'RECEIVED',
-            attempts INT NOT NULL DEFAULT 1,
-            claim_token VARCHAR(64) NULL,
-            error_message TEXT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            processed_at DATETIME NULL,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_pwe_order_id (order_id),
-            INDEX idx_pwe_status (status),
-            INDEX idx_pwe_created_at (created_at)
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        `);
-        await tidbConn.execute("ALTER TABLE payment_webhook_events ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;").catch(() => {});
-        await tidbConn.execute("ALTER TABLE payment_webhook_events ADD COLUMN claim_token VARCHAR(64) NULL;").catch(() => {});
-      } catch (err) {
-        if (!err.message?.includes('already exists') && err.errno !== 1050) {
-          console.error('[DATABASE] TiDB payment_webhook_events ensure error:', err);
-          throw err;
-        }
-      }
+      await initializeTiDBSchema(tidbConn);
     })().catch((err) => {
       tidbInitPromise = null;
       console.error('[DATABASE] TiDB schema ensure error:', err.message);
@@ -565,6 +546,18 @@ export async function ensureDatabaseReady() {
     });
   }
   return tidbInitPromise;
+}
+
+// Reset function for testing initialization state transitions
+export function _resetTiDBInitForTesting() {
+  tidbInitPromise = null;
+}
+
+// Allow test injection of mock TiDB connection
+export function _setTiDBConnForTesting(mockConn) {
+  tidbConn = mockConn;
+  isTestMockTiDB = Boolean(mockConn);
+  tidbInitPromise = null;
 }
 
 // Trigger initial ensure for TiDB Cloud
@@ -576,7 +569,7 @@ if (isTiDB) {
  * Execute a query returning a single row (or null if not found)
  */
 export async function queryOne(sql, params = []) {
-  if (isTiDB) {
+  if (isTiDB || isTestMockTiDB) {
     await ensureDatabaseReady();
     const rows = await tidbConn.execute(sql, params);
     return Array.isArray(rows) && rows.length > 0 ? normalizeRow(rows[0]) : null;
@@ -590,7 +583,7 @@ export async function queryOne(sql, params = []) {
  * Execute a query returning all matching rows as an array
  */
 export async function queryAll(sql, params = []) {
-  if (isTiDB) {
+  if (isTiDB || isTestMockTiDB) {
     await ensureDatabaseReady();
     const rows = await tidbConn.execute(sql, params);
     return Array.isArray(rows) ? normalizeRows(rows) : [];
@@ -604,7 +597,7 @@ export async function queryAll(sql, params = []) {
  * Execute an INSERT / UPDATE / DELETE statement
  */
 export async function execute(sql, params = []) {
-  if (isTiDB) {
+  if (isTiDB || isTestMockTiDB) {
     await ensureDatabaseReady();
     const res = await tidbConn.execute(sql, params, { fullResult: true });
     return {
@@ -626,7 +619,7 @@ export async function execute(sql, params = []) {
  * Direct statement execution
  */
 export async function exec(sql) {
-  if (isTiDB) {
+  if (isTiDB || isTestMockTiDB) {
     await ensureDatabaseReady();
     return await tidbConn.execute(sql);
   } else {
@@ -640,7 +633,7 @@ let sqliteTxMutex = Promise.resolve();
  * Execute operations within a transaction
  */
 export async function withTransaction(callback) {
-  if (isTiDB) {
+  if (isTiDB || isTestMockTiDB) {
     await ensureDatabaseReady();
     const tx = await tidbConn.begin();
     try {
