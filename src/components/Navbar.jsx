@@ -19,12 +19,7 @@ export default function Navbar({
   activePage,
   setActivePage,
   openBookingModal,
-  openCancelModal,
-  clientUser,
-  onLogout,
-  onOpenProfile,
-  onOpenAuth,
-  hasActiveBookingBadge: externalBadge
+  openCancelModal
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme, isDark } = useTheme();
@@ -69,12 +64,12 @@ export default function Navbar({
     <header className="sticky top-0 z-40 w-full bg-slate-950/95 backdrop-blur-md border-b border-slate-800 transition-colors">
       {/* Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
+        <div className="flex items-center justify-between lg:grid lg:grid-cols-3 h-16 sm:h-20 gap-2 sm:gap-4">
 
-          {/* Brand Logo - Responsive scaling across mobile, tablet, and desktop */}
+          {/* Section 1 (Left): Brand Logo - Responsive scaling across mobile, tablet, and desktop */}
           <div
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer group shrink-0 min-w-0"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group shrink-0 min-w-0 lg:justify-self-start"
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && handleNavClick('home')}
@@ -95,8 +90,8 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Desktop Navigation Links (Visible on Laptop/Desktop: lg and up) */}
-          <nav className="hidden lg:flex items-center gap-1 xl:gap-2" aria-label="Main Navigation">
+          {/* Section 2 (Center): Desktop Navigation Links - Centered relative to the navbar container */}
+          <nav className="hidden lg:flex items-center justify-center gap-1 xl:gap-2 lg:justify-self-center" aria-label="Main Navigation">
             {navItems.map((item) => {
               const isActive = activePage === item.id;
               return (
@@ -116,11 +111,8 @@ export default function Navbar({
             })}
           </nav>
 
-          {/* Action Items (Right Side): Adaptive for all screen sizes */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
-
-
-
+          {/* Section 3 (Right): Theme Toggle & Mobile Menu Trigger */}
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 md:gap-3 shrink-0 lg:justify-self-end">
             {/* Theme Toggle Button (Icon-Only as verified by tests) */}
             <button
               type="button"
@@ -195,8 +187,6 @@ export default function Navbar({
                 );
               })}
             </div>
-
-
 
             {/* Quick Booking CTA */}
             <div className="pt-3 border-t border-slate-800/80 flex flex-col gap-2">
