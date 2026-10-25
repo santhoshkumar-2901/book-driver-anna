@@ -237,9 +237,9 @@ export default function AdminUsersTab({
             }).length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-3">
               <Users className="w-12 h-12 text-slate-600 mx-auto" />
-              <h3 className="text-lg font-bold text-white">No Registered Clients Found</h3>
+              <h3 className="text-lg font-bold text-white">No Customers Found</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                No registered customers match your search query or area filter. Try changing your filters or add a new client.
+                No customers match your search query or area filter. Try changing your filters or add a new client.
               </p>
               <button
                 onClick={() => { setUserSearchQuery(''); setUserAreaFilter('All'); }}
@@ -278,26 +278,37 @@ export default function AdminUsersTab({
                           <h3 className="text-base font-extrabold text-white font-['Outfit'] group-hover:text-amber-400 transition-colors truncate min-w-0">
                             {user.name}
                           </h3>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap min-w-0">
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap min-w-0">
                             <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800 shrink-0">
                               {user.id}
                             </span>
-                            <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
-                              {user.status || 'Active'}
+                            {user.source === 'guest' ? (
+                              <span className="text-[10px] bg-sky-500/15 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
+                                Guest Customer
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
+                                Registered Account
+                              </span>
+                            )}
+                            <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
+                              {user.bookingCount !== undefined ? user.bookingCount : 0} {user.bookingCount === 1 ? 'Booking' : 'Bookings'}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Delete User Button (Icon Only) */}
-                      <button
-                        onClick={() => handleOpenDeleteUserModal(user)}
-                        title="Remove customer from DB"
-                        aria-label="Remove customer from DB"
-                        className="p-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer flex items-center justify-center shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Delete User Button (Only for registered customer accounts) */}
+                      {(user.source === 'registered' || (!user.source && !String(user.id).startsWith('GST-'))) ? (
+                        <button
+                          onClick={() => handleOpenDeleteUserModal(user)}
+                          title="Remove customer from DB"
+                          aria-label="Remove customer from DB"
+                          className="p-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ) : null}
                     </div>
 
                     {/* Contact & Location Details */}
@@ -307,7 +318,7 @@ export default function AdminUsersTab({
                           <Phone className="w-3.5 h-3.5 text-emerald-400" /> Phone:
                         </span>
                         <a href={`tel:${user.phone}`} className="font-bold hover:text-amber-400 font-mono truncate min-w-0">
-                          {user.phone}
+                          {user.phone || 'Not Provided'}
                         </a>
                       </div>
 
@@ -316,7 +327,7 @@ export default function AdminUsersTab({
                           <Mail className="w-3.5 h-3.5 text-blue-400" /> Email:
                         </span>
                         <span className="font-medium text-slate-200 truncate min-w-0" title={user.email}>
-                          {user.email}
+                          {user.email || 'Not Provided'}
                         </span>
                       </div>
 
@@ -329,9 +340,20 @@ export default function AdminUsersTab({
                         </span>
                       </div>
 
+                      {user.lastBookingDate && (
+                        <div className="flex items-center justify-between text-slate-300 text-xs pt-1 border-t border-slate-800/60 gap-2 min-w-0">
+                          <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400" /> Last Booked:
+                          </span>
+                          <span className="font-semibold text-amber-400 truncate">
+                            {toDDMMYYYY(user.lastBookingDate)}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/60 gap-2 min-w-0">
                         <span className="flex items-center gap-1.5 shrink-0">
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" /> Joined:
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" /> {user.source === 'guest' ? 'First Active:' : 'Joined:'}
                         </span>
                         <span className="truncate">{toDDMMYYYY(user.createdAt || '2026-09-01')}</span>
                       </div>

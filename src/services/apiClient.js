@@ -253,6 +253,7 @@ export const apiClient = {
   deleteAdminBooking: (bookingId) =>
     request(`/admin/bookings/${bookingId}`, { method: 'DELETE' }),
   getAdminUsers: () => request('/admin/users', { method: 'GET' }),
+  getAdminCustomers: () => request('/admin/customers', { method: 'GET' }),
   createAdminUser: (userData) => request('/admin/users', { method: 'POST', body: userData }),
   deleteAdminUser: (userId) => request(`/admin/users/${userId}`, { method: 'DELETE' }),
   getAdminDrivers: () => request('/admin/drivers', { method: 'GET' }),

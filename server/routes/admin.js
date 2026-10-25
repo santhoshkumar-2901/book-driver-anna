@@ -10,6 +10,7 @@ import { publishBookingAssignmentChange } from '../services/realtimeService.js';
 import { normalizeExperienceYears } from '../services/authService.js';
 import { getAllPricing, updateServicePricing, resetServicePricing } from '../services/pricingService.js';
 import { reissueAdminPaymentLink } from '../services/guestAccessService.js';
+import { getUnifiedAdminCustomers } from '../services/customerService.js';
 import { ENV } from '../config/env.js';
 
 const router = Router();
@@ -283,19 +284,32 @@ router.post('/bookings/:id/payment-link/reissue', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/users
+// GET /api/admin/users (Unified customer list: registered users + guest customers from bookings)
 router.get('/users', async (req, res, next) => {
   try {
-    const users = await queryAll(`
-      SELECT id, name, email, phone, role, area, status, created_at
-      FROM users
-      WHERE role = 'customer'
-      ORDER BY created_at DESC
-    `);
-
+    const customers = await getUnifiedAdminCustomers();
     res.json({
       success: true,
-      data: { users }
+      data: {
+        users: customers,
+        customers
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/customers (Dedicated alias for unified customer activity)
+router.get('/customers', async (req, res, next) => {
+  try {
+    const customers = await getUnifiedAdminCustomers();
+    res.json({
+      success: true,
+      data: {
+        customers,
+        users: customers
+      }
     });
   } catch (err) {
     next(err);

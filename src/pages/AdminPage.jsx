@@ -689,23 +689,21 @@ export default function AdminPage({ onReturnToClient }) {
               .map(u => ({
                 id: u.id,
                 name: u.name,
-                email: u.email,
+                email: u.email || '',
                 phone: u.phone,
-                area: u.area || 'Indiranagar',
+                area: u.area || 'Bangalore Central',
                 status: u.status || 'Active',
+                bookingCount: u.bookingCount !== undefined ? u.bookingCount : 0,
+                lastBookingDate: u.lastBookingDate || null,
+                source: u.source || 'registered',
                 createdAt: u.created_at || u.createdAt || new Date().toISOString().split('T')[0]
               }));
 
-            const cleanPrev = sanitizeClients(prev || []);
-            const map = new Map();
-            cleanPrev.forEach(u => map.set(u.id || u.phone || u.email, u));
-            serverUsers.forEach(u => {
-              const key = u.id || u.phone || u.email;
-              map.set(key, { ...(map.get(key) || {}), ...u });
-            });
-
-            const merged = sanitizeClients(Array.from(map.values()));
-            localStorage.setItem('bda_registered_clients', JSON.stringify(merged));
+            const localUnsynced = (prev || []).filter(u => u && u.id && String(u.id).startsWith('CLI-') && !serverUsers.some(s => s.id === u.id || (s.phone && u.phone && s.phone === u.phone)));
+            const merged = sanitizeClients([...serverUsers, ...localUnsynced]);
+            try {
+              localStorage.setItem('bda_registered_clients', JSON.stringify(merged));
+            } catch (e) {}
             return merged;
           });
         }
