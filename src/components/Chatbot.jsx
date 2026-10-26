@@ -10,12 +10,13 @@ import {
   getOfflineKnowledgeResponse, 
   getActiveApiKey 
 } from '../services/geminiService';
+import { usePricing } from '../context/PricingContext';
 
 const INITIAL_MESSAGES = [
   {
     id: 'welcome-1',
     sender: 'anna',
-    text: `Welcome to Book Driver Anna Support Desk.\n\nHow can we help you today?\n\n• **City Drivers** (Point-to-point distance-based fare starts @ ₹299)\n• **Outstation Drivers** (Distance-based tiers for Mysuru, Coorg, Ooty & more)\n• **Monthly Corporate Drivers** (Dedicated executive chauffeur)\n• **Vehicle Rentals** (Sedans, SUVs & Tempo Travellers)\n• **Driving Classes** (Doorstep 1-on-1 certified training)\n\nAsk any question about our services, routes, or coverage areas!`,
+    text: `Welcome to Book Driver Anna Support Desk.\n\nHow can we help you today?\n\n• **City Drivers** (Point-to-point distance-based driver for your car)\n• **Outstation Drivers** (Distance-based highway drivers for Mysuru, Coorg, Ooty & more)\n• **Monthly Corporate Drivers** (Dedicated executive chauffeur)\n• **Vehicle Rentals** (Sedans, SUVs, Tempo Travellers & Luxury Coaches)\n• **Driving Classes** (Doorstep 1-on-1 certified training)\n\nAsk any question about our services, routes, or coverage areas!`,
     timestamp: 'Just now',
     actions: [
       { label: 'Driving Classes', query: 'Tell me about driving classes and fees' },
@@ -28,6 +29,7 @@ const INITIAL_MESSAGES = [
 ];
 
 export default function Chatbot({ openBookingModal }) {
+  const { pricing } = usePricing();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
@@ -76,7 +78,7 @@ export default function Chatbot({ openBookingModal }) {
     try {
       // Send to live Gemini API via backend /api/chat proxy
       const history = [...messages, userMessage];
-      const geminiReply = await sendQueryToGemini(history);
+      const geminiReply = await sendQueryToGemini(history, pricing);
 
       const annaResponse = {
         id: 'anna-' + Date.now(),
@@ -92,7 +94,7 @@ export default function Chatbot({ openBookingModal }) {
     } catch (err) {
       console.warn('Gemini request encountered an issue:', err);
       // Fallback seamlessly to local knowledge base
-      const fallbackResult = getOfflineKnowledgeResponse(query);
+      const fallbackResult = getOfflineKnowledgeResponse(query, pricing);
 
       const annaResponse = {
         id: 'anna-' + Date.now(),

@@ -814,7 +814,7 @@ describe('Phase 19 — Comprehensive Security Hardening Suite', () => {
           bookingCategory: 'driver',
           pickupArea: 'Indiranagar',
           dropLocation: 'Whitefield',
-          date: '2026-10-25',
+          date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
           time: '10:00:00',
           // Malicious injections:
           userId: customerUserB.id, // spoof owner

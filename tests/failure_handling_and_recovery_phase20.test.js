@@ -517,7 +517,7 @@ describe('Phase 20 — Failure Handling & Recovery Suite', () => {
           customerName: 'Test Coord Failure',
           customerPhone: '+91 9876543210',
           bookingCategory: 'driver',
-          date: '2026-10-25',
+          date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
           time: '10:00:00',
           pickupLat: 'NOT_A_NUMBER',
           pickupLng: 77.5946
