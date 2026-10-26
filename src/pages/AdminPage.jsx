@@ -37,7 +37,7 @@ export const sanitizeDrivers = (list) => {
 export const normalizeDriverBooking = (b) => {
   if (!b) return b;
   const rawStatus = (b.status || 'Pending').toUpperCase();
-  const formattedStatus = 
+  const formattedStatus =
     rawStatus === 'ASSIGNED' ? 'Assigned' :
     rawStatus === 'CONFIRMED' ? 'Confirmed' :
     rawStatus === 'CANCELLED' ? 'Cancelled' :
@@ -183,7 +183,7 @@ export default function AdminPage({ onReturnToClient }) {
       resetAuthForm();
     };
   }, [isAdminLoggedIn, authMode]);
-  
+
   // Logged-in Admin Info
   const [loggedInAdminName, setLoggedInAdminName] = useState(() => {
     return localStorage.getItem('bda_admin_name') || 'Admin Anna';
@@ -191,6 +191,93 @@ export default function AdminPage({ onReturnToClient }) {
   const [loggedInAdminPhone, setLoggedInAdminPhone] = useState(() => {
     return localStorage.getItem('bda_admin_phone') || '+91 98765 00000';
   });
+
+  // Admin Seen Record IDs and Unseen Notification Dots State
+  const getAdminSeenStorageKey = () => {
+    const rawPhone = (loggedInAdminPhone || '').replace(/[^0-9]/g, '');
+    return rawPhone ? `bda_admin_seen_ids_${rawPhone}` : 'bda_admin_seen_ids';
+  };
+
+  const getAdminInitializedKey = () => {
+    const rawPhone = (loggedInAdminPhone || '').replace(/[^0-9]/g, '');
+    return rawPhone ? `bda_admin_initialized_${rawPhone}` : 'bda_admin_initialized';
+  };
+
+  const seenRecordIdsRef = useRef(new Set());
+  const hasInitializedSeenIdsRef = useRef(false);
+
+  // Initialize seen IDs from localStorage safely
+  const loadSeenIdsFromStorage = () => {
+    try {
+      const key = getAdminSeenStorageKey();
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return new Set(parsed.filter(Boolean).map(String));
+        }
+      }
+    } catch (e) {
+      console.warn('[ADMIN] Could not load seen record IDs from storage:', e);
+    }
+    return new Set();
+  };
+
+  const persistSeenIds = (idsSet) => {
+    try {
+      const key = getAdminSeenStorageKey();
+      const arr = Array.from(idsSet);
+      localStorage.setItem(key, JSON.stringify(arr));
+      localStorage.setItem(getAdminInitializedKey(), 'true');
+    } catch (e) {
+      console.warn('[ADMIN] Could not persist seen record IDs to storage:', e);
+    }
+  };
+
+  const [hasNewDriverBookings, setHasNewDriverBookings] = useState(false);
+  const [hasNewVehicleBookings, setHasNewVehicleBookings] = useState(false);
+  const [hasNewClassBookings, setHasNewClassBookings] = useState(false);
+  const [hasNewUsers, setHasNewUsers] = useState(false);
+
+  // Helper to mark records for a section as seen and clear its notification dot
+  const markSectionAsSeen = (sectionTab, recordIds = []) => {
+    let changed = false;
+    recordIds.forEach(id => {
+      if (id && !seenRecordIdsRef.current.has(String(id))) {
+        seenRecordIdsRef.current.add(String(id));
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      persistSeenIds(seenRecordIdsRef.current);
+    }
+
+    if (sectionTab === 'for-driver') {
+      setHasNewDriverBookings(false);
+    } else if (sectionTab === 'for-vehicle') {
+      setHasNewVehicleBookings(false);
+    } else if (sectionTab === 'for-class') {
+      setHasNewClassBookings(false);
+    } else if (sectionTab === 'users') {
+      setHasNewUsers(false);
+    }
+  };
+
+  // Helper to check for new records in incoming batches
+  const checkNewRecordsForSection = (sectionTab, items = [], getId = (item) => item?.id) => {
+    const validIds = items.map(getId).filter(Boolean).map(String);
+    if (!hasInitializedSeenIdsRef.current) return;
+
+    const hasUnseen = validIds.some(id => !seenRecordIdsRef.current.has(id));
+
+    if (hasUnseen) {
+      if (sectionTab === 'for-driver') setHasNewDriverBookings(true);
+      else if (sectionTab === 'for-vehicle') setHasNewVehicleBookings(true);
+      else if (sectionTab === 'for-class') setHasNewClassBookings(true);
+      else if (sectionTab === 'users') setHasNewUsers(true);
+    }
+  };
 
   // Sidebar Tab State (after login) - derived from URL path for full SPA experience
   const [activeTab, setActiveTab] = useState(() => {
@@ -322,7 +409,7 @@ export default function AdminPage({ onReturnToClient }) {
   const [classEnrollments, setClassEnrollments] = useState(() => {
     const saved = localStorage.getItem('bda_class_enrollments');
     if (saved) {
-      try { 
+      try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const hasCancelled = parsed.some(e => e.status === 'Cancelled');
@@ -374,6 +461,103 @@ export default function AdminPage({ onReturnToClient }) {
     return DEFAULT_REGISTERED_DRIVERS;
   });
 
+  // Seed historical records on initial load or restore unseen dots from existing tracking state
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    if (!hasInitializedSeenIdsRef.current) {
+      const isAlreadyInitialized = (() => {
+        try {
+          return localStorage.getItem(getAdminInitializedKey()) === 'true';
+        } catch (e) {
+          return false;
+        }
+      })();
+
+      const existingStoredSeen = loadSeenIdsFromStorage();
+
+      if (isAlreadyInitialized || existingStoredSeen.size > 0) {
+        // Established tracking state: load seen IDs and reconstruct unseen dots immediately from local records
+        seenRecordIdsRef.current = existingStoredSeen;
+
+        const unseenDrivers = (driverBookings || []).some(b => b?.id && !existingStoredSeen.has(String(b.id)));
+        const unseenVehicles = (vehicleBookings || []).some(b => b?.id && !existingStoredSeen.has(String(b.id)));
+        const unseenClasses = (classEnrollments || []).some(e => {
+          const id = e?.enrollmentId || e?.id;
+          return id && !existingStoredSeen.has(String(id));
+        });
+        const unseenUsers = [
+          ...(registeredUsers || []),
+          ...(registeredDrivers || [])
+        ].some(u => u?.id && !existingStoredSeen.has(String(u.id)));
+
+        // If the section is the currently active tab on load, mark its current records as seen immediately; otherwise set dot
+        if (activeTab === 'for-driver') {
+          const ids = (driverBookings || []).map(b => b?.id).filter(Boolean);
+          markSectionAsSeen('for-driver', ids);
+        } else if (unseenDrivers) {
+          setHasNewDriverBookings(true);
+        }
+
+        if (activeTab === 'for-vehicle') {
+          const ids = (vehicleBookings || []).map(b => b?.id).filter(Boolean);
+          markSectionAsSeen('for-vehicle', ids);
+        } else if (unseenVehicles) {
+          setHasNewVehicleBookings(true);
+        }
+
+        if (activeTab === 'for-class') {
+          const ids = (classEnrollments || []).map(e => e?.enrollmentId || e?.id).filter(Boolean);
+          markSectionAsSeen('for-class', ids);
+        } else if (unseenClasses) {
+          setHasNewClassBookings(true);
+        }
+
+        if (activeTab === 'users') {
+          const ids = [
+            ...(registeredUsers || []).map(u => u?.id),
+            ...(registeredDrivers || []).map(d => d?.id)
+          ].filter(Boolean);
+          markSectionAsSeen('users', ids);
+        } else if (unseenUsers) {
+          setHasNewUsers(true);
+        }
+      } else {
+        // Genuine first initialization on clean storage: seed all current records as historical seen
+        const initialIds = new Set();
+        (driverBookings || []).forEach(b => { if (b && b.id) initialIds.add(String(b.id)); });
+        (vehicleBookings || []).forEach(b => { if (b && b.id) initialIds.add(String(b.id)); });
+        (classEnrollments || []).forEach(e => { const id = e?.enrollmentId || e?.id; if (id) initialIds.add(String(id)); });
+        (registeredUsers || []).forEach(u => { if (u && u.id) initialIds.add(String(u.id)); });
+        (registeredDrivers || []).forEach(d => { if (d && d.id) initialIds.add(String(d.id)); });
+
+        seenRecordIdsRef.current = initialIds;
+        persistSeenIds(initialIds);
+      }
+      hasInitializedSeenIdsRef.current = true;
+    }
+  }, [isAdminLoggedIn]);
+
+  // When activeTab changes (opening a section), mark that section's current records as reviewed and clear its dot
+  useEffect(() => {
+    if (!hasInitializedSeenIdsRef.current) return;
+    if (activeTab === 'for-driver') {
+      const ids = (driverBookings || []).map(b => b?.id).filter(Boolean);
+      markSectionAsSeen('for-driver', ids);
+    } else if (activeTab === 'for-vehicle') {
+      const ids = (vehicleBookings || []).map(b => b?.id).filter(Boolean);
+      markSectionAsSeen('for-vehicle', ids);
+    } else if (activeTab === 'for-class') {
+      const ids = (classEnrollments || []).map(e => e?.enrollmentId || e?.id).filter(Boolean);
+      markSectionAsSeen('for-class', ids);
+    } else if (activeTab === 'users') {
+      const ids = [
+        ...(registeredUsers || []).map(u => u?.id),
+        ...(registeredDrivers || []).map(d => d?.id)
+      ].filter(Boolean);
+      markSectionAsSeen('users', ids);
+    }
+  }, [activeTab]);
+
   // Sub-Tab Switcher in Users Section: 'customers' | 'drivers'
   const [userSubTab, setUserSubTab] = useState('customers');
 
@@ -419,6 +603,12 @@ export default function AdminPage({ onReturnToClient }) {
       setClassEnrollments([]);
       setRegisteredUsers([]);
       setRegisteredDrivers([]);
+      seenRecordIdsRef.current = new Set();
+      persistSeenIds(new Set());
+      setHasNewDriverBookings(false);
+      setHasNewVehicleBookings(false);
+      setHasNewClassBookings(false);
+      setHasNewUsers(false);
       window.dispatchEvent(new CustomEvent('bda_booking_updated'));
       setIsPurgeModalOpen(false);
       triggerToast('All test bookings, dummy clients, and driver profiles permanently cleared. Ready for live Bangalore production.');
@@ -478,7 +668,7 @@ export default function AdminPage({ onReturnToClient }) {
     customDeletionReason.trim().length >= 5
   );
 
-  const canExecuteDelete = 
+  const canExecuteDelete =
     Boolean(userToDelete) &&
     Boolean(isReasonValid) &&
     hasNoActiveTrips &&
@@ -543,7 +733,7 @@ export default function AdminPage({ onReturnToClient }) {
       if (e?.detail?.bookingId) {
         const { bookingId, status, assignedDriver, assignedDriverPhone } = e.detail;
         const validDriverName = (assignedDriver && assignedDriver !== 'Pending Admin Acceptance' && !assignedDriver.includes('Assigned on Dispatch') && assignedDriver !== 'Driver Assigned') ? assignedDriver : undefined;
-        
+
         if (validDriverName || assignedDriverPhone) {
           setDriverInputState(prev => ({
             ...prev,
@@ -582,26 +772,44 @@ export default function AdminPage({ onReturnToClient }) {
 
       const savedDriver = localStorage.getItem('bda_driver_bookings');
       if (savedDriver) {
-        try { 
+        try {
           const list = JSON.parse(savedDriver);
-          setDriverBookings(Array.isArray(list) 
+          const sanitized = Array.isArray(list)
             ? list
                 .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
-                .map(normalizeDriverBooking) 
-            : []); 
+                .map(normalizeDriverBooking)
+            : [];
+          setDriverBookings(sanitized);
+          checkNewRecordsForSection('for-driver', sanitized, b => b?.id);
         } catch (e) {}
       }
       const savedVehicle = localStorage.getItem('bda_vehicle_bookings');
       if (savedVehicle) {
-        try { setVehicleBookings(JSON.parse(savedVehicle)); } catch (e) {}
+        try {
+          const list = JSON.parse(savedVehicle);
+          if (Array.isArray(list)) {
+            setVehicleBookings(list);
+            checkNewRecordsForSection('for-vehicle', list, b => b?.id);
+          }
+        } catch (e) {}
       }
       const savedClasses = localStorage.getItem('bda_class_enrollments');
       if (savedClasses) {
-        try { setClassEnrollments(JSON.parse(savedClasses)); } catch (e) {}
+        try {
+          const list = JSON.parse(savedClasses);
+          if (Array.isArray(list)) {
+            setClassEnrollments(list);
+            checkNewRecordsForSection('for-class', list, e => e?.enrollmentId || e?.id);
+          }
+        } catch (e) {}
       }
       const savedUsers = localStorage.getItem('bda_registered_clients');
       if (savedUsers) {
-        try { setRegisteredUsers(sanitizeClients(JSON.parse(savedUsers))); } catch (e) {}
+        try {
+          const list = sanitizeClients(JSON.parse(savedUsers));
+          setRegisteredUsers(list);
+          checkNewRecordsForSection('users', list, u => u?.id);
+        } catch (e) {}
       }
       const savedDrivers = localStorage.getItem('bda_registered_drivers');
       if (savedDrivers) {
@@ -641,7 +849,7 @@ export default function AdminPage({ onReturnToClient }) {
       window.removeEventListener('bda_driver_status_updated', handleDriverStatusSync);
       window.removeEventListener('storage', loadBookingsFromStorage);
     };
-  }, []);
+  }, [activeTab]);
 
   // Save driver bookings to localStorage whenever updated
   useEffect(() => {
@@ -744,197 +952,258 @@ export default function AdminPage({ onReturnToClient }) {
       });
   }, [isAdminLoggedIn]);
 
-  // Sync server bookings with admin dashboard when admin is logged in
+  // Sync server data (bookings and users) with admin dashboard and check for unseen records
+  const fetchAdminDataFromServer = async () => {
+    if (!isAdminLoggedIn) return;
+    try {
+      // 1. Fetch server bookings
+      const bookingsRes = await apiClient.getAdminBookings().catch(err => {
+        console.error('[ADMIN] Failed to fetch bookings from server:', err.message);
+        return null;
+      });
+
+      if (bookingsRes && bookingsRes.data && Array.isArray(bookingsRes.data.bookings)) {
+        const serverDriverBookings = [];
+        const serverVehicleBookings = [];
+        const serverClassEnrollments = [];
+
+        bookingsRes.data.bookings.forEach((b) => {
+          const rawStatus = (b.status || 'PENDING').toUpperCase();
+          const formattedStatus =
+            rawStatus === 'ASSIGNED' ? 'Assigned' :
+            rawStatus === 'CONFIRMED' ? 'Confirmed' :
+            rawStatus === 'CANCELLED' ? 'Cancelled' : 'Pending';
+
+          if (b.booking_type === 'vehicle') {
+            serverVehicleBookings.push({
+              id: b.id,
+              customerName: b.customer_name,
+              phone: b.customer_phone,
+              email: b.customer_email,
+              category: b.trip_type,
+              vehicleName: b.service_name,
+              pickupArea: b.pickup_area,
+              dropLocation: b.drop_location,
+              date: b.date,
+              time: b.time,
+              fare: b.calculated_fare,
+              paymentMode: b.payment_mode,
+              status: formattedStatus
+            });
+          } else if (b.booking_type === 'class' || (b.id && b.id.startsWith('BDA-CLS-'))) {
+            serverClassEnrollments.push({
+              enrollmentId: b.id,
+              fullName: b.customer_name,
+              mobileNumber: b.customer_phone,
+              emailAddress: b.customer_email,
+              address: b.pickup_area || '',
+              pickupLocation: b.pickup_area || '',
+              preferredStartDate: b.date,
+              preferredTime: b.time || 'Morning',
+              courseFee: b.calculated_fare,
+              status: formattedStatus,
+              assignedInstructor: b.assigned_driver_name || '',
+              assignedInstructorPhone: b.assigned_driver_phone || ''
+            });
+          } else {
+            const cleanDriverName = (b.assigned_driver_name && b.assigned_driver_name !== 'Driver Assigned on Dispatch' && b.assigned_driver_name !== 'Driver Assigned' && b.assigned_driver_name !== 'Pending Admin Acceptance') ? b.assigned_driver_name : '';
+            const cleanDriverPhone = (b.assigned_driver_phone && b.assigned_driver_phone !== '+91 80 2555 0199') ? b.assigned_driver_phone : '';
+
+            serverDriverBookings.push({
+              id: b.id,
+              customerName: b.customer_name,
+              phone: b.customer_phone,
+              email: b.customer_email,
+              tripType: b.trip_type,
+              tripTitle: b.service_name,
+              pickupArea: b.pickup_area,
+              dropLocation: b.drop_location,
+              date: b.date,
+              time: b.time,
+              fare: b.calculated_fare,
+              paymentMode: b.payment_mode,
+              status: formattedStatus,
+              assignedDriver: cleanDriverName,
+              assignedDriverPhone: cleanDriverPhone
+            });
+          }
+        });
+
+        if (serverDriverBookings.length > 0) {
+          setDriverBookings(prev => {
+            const map = new Map();
+            (prev || []).forEach(b => map.set(b.id, b));
+            serverDriverBookings.forEach(b => {
+              const existing = map.get(b.id);
+              let finalStatus = b.status || 'Pending';
+              if (b.status === 'Assigned' || existing?.status === 'Assigned') finalStatus = 'Assigned';
+              else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') finalStatus = 'Cancelled';
+              else if (b.status === 'Confirmed' || existing?.status === 'Confirmed') finalStatus = 'Confirmed';
+
+              const isInvalidName = (n) =>
+                !n ||
+                n === 'Pending Admin Acceptance' ||
+                n === 'Driver Assigned on Dispatch' ||
+                n === 'Driver Assigned' ||
+                n.includes('Assigned on Dispatch');
+
+              let validName = '';
+              if (!isInvalidName(b.assignedDriver)) validName = b.assignedDriver;
+              else if (!isInvalidName(existing?.assignedDriver)) validName = existing.assignedDriver;
+
+              let validPhone = '';
+              if (b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') validPhone = b.assignedDriverPhone;
+              else if (existing?.assignedDriverPhone && existing.assignedDriverPhone !== '+91 80 2555 0199') validPhone = existing.assignedDriverPhone;
+
+              if (validName || validPhone) {
+                setDriverInputState(inp => ({
+                  ...inp,
+                  [b.id]: {
+                    name: validName || inp[b.id]?.name || '',
+                    phone: validPhone || inp[b.id]?.phone || ''
+                  }
+                }));
+              }
+
+              map.set(b.id, {
+                ...(existing || {}),
+                ...b,
+                assignedDriver: validName,
+                assignedDriverPhone: validPhone,
+                status: finalStatus
+              });
+            });
+            const merged = Array.from(map.values())
+              .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
+              .map(normalizeDriverBooking);
+            localStorage.setItem('bda_driver_bookings', JSON.stringify(merged));
+            return merged;
+          });
+          checkNewRecordsForSection('for-driver', serverDriverBookings, b => b?.id);
+        }
+
+        if (serverVehicleBookings.length > 0) {
+          setVehicleBookings(prev => {
+            const map = new Map();
+            (prev || []).forEach(b => map.set(b.id, b));
+            serverVehicleBookings.forEach(b => {
+              const existing = map.get(b.id);
+              let finalStatus = b.status || 'Pending';
+              if (b.status === 'Confirmed' || existing?.status === 'Confirmed') finalStatus = 'Confirmed';
+              else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') finalStatus = 'Cancelled';
+              else if (b.status === 'Assigned' || existing?.status === 'Assigned') finalStatus = 'Assigned';
+              map.set(b.id, { ...(existing || {}), ...b, status: finalStatus });
+            });
+            const merged = Array.from(map.values());
+            localStorage.setItem('bda_vehicle_bookings', JSON.stringify(merged));
+            return merged;
+          });
+          checkNewRecordsForSection('for-vehicle', serverVehicleBookings, b => b?.id);
+        }
+
+        if (serverClassEnrollments.length > 0) {
+          setClassEnrollments(prev => {
+            const map = new Map();
+            (prev || []).forEach(e => map.set(e.enrollmentId, e));
+            serverClassEnrollments.forEach(e => {
+              const existing = map.get(e.enrollmentId);
+              let finalStatus = e.status || 'Pending';
+              if (e.status === 'Confirmed' || existing?.status === 'Confirmed') finalStatus = 'Confirmed';
+              else if (e.status === 'Cancelled' || existing?.status === 'Cancelled') finalStatus = 'Cancelled';
+              else if (e.status === 'In Training' || existing?.status === 'In Training') finalStatus = 'In Training';
+
+              map.set(e.enrollmentId, {
+                ...(existing || {}),
+                ...e,
+                status: finalStatus,
+                assignedInstructor: e.assignedInstructor || existing?.assignedInstructor || '',
+                assignedInstructorPhone: e.assignedInstructorPhone || existing?.assignedInstructorPhone || ''
+              });
+            });
+            const merged = Array.from(map.values());
+            localStorage.setItem('bda_class_enrollments', JSON.stringify(merged));
+            return merged;
+          });
+          checkNewRecordsForSection('for-class', serverClassEnrollments, e => e?.enrollmentId || e?.id);
+        }
+      }
+
+      // 2. Fetch server users
+      const usersRes = await apiClient.getAdminUsers().catch(err => {
+        console.error('[ADMIN] Failed to fetch users from server:', err.message);
+        return null;
+      });
+
+      if (usersRes && usersRes.data && Array.isArray(usersRes.data.users)) {
+        const serverUsers = usersRes.data.users
+          .filter(u => {
+            const email = (u.email || '').toLowerCase();
+            return (
+              !email.startsWith('newuser_') &&
+              !email.startsWith('brand_new_user_') &&
+              !email.startsWith('test_new_client_') &&
+              !email.startsWith('user_a_') &&
+              !email.startsWith('user_b_')
+            );
+          })
+          .map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email || '',
+            phone: u.phone,
+            area: u.area || 'Bangalore Central',
+            status: u.status || 'Active',
+            bookingCount: u.bookingCount !== undefined ? u.bookingCount : 0,
+            lastBookingDate: u.lastBookingDate || null,
+            source: u.source || 'registered',
+            createdAt: u.created_at || u.createdAt || new Date().toISOString().split('T')[0]
+          }));
+
+        setRegisteredUsers((prev) => {
+          const localUnsynced = (prev || []).filter(u => u && u.id && String(u.id).startsWith('CLI-') && !serverUsers.some(s => s.id === u.id || (s.phone && u.phone && s.phone === u.phone)));
+          const merged = sanitizeClients([...serverUsers, ...localUnsynced]);
+          try {
+            localStorage.setItem('bda_registered_clients', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
+
+        checkNewRecordsForSection('users', serverUsers, u => u?.id);
+      }
+    } catch (e) {
+      console.warn('[ADMIN] Background sync error:', e);
+    }
+  };
+
+  // Run initial server sync, set up 30-second polling fallback, and sync on tab focus
   useEffect(() => {
     if (!isAdminLoggedIn) return;
-    apiClient.getAdminBookings()
-      .then((res) => {
-        if (res && res.data && Array.isArray(res.data.bookings)) {
-          const serverDriverBookings = [];
-          const serverVehicleBookings = [];
-          const serverClassEnrollments = [];
 
-          res.data.bookings.forEach((b) => {
-            const rawStatus = (b.status || 'PENDING').toUpperCase();
-            const formattedStatus = 
-              rawStatus === 'ASSIGNED' ? 'Assigned' :
-              rawStatus === 'CONFIRMED' ? 'Confirmed' :
-              rawStatus === 'CANCELLED' ? 'Cancelled' : 'Pending';
+    fetchAdminDataFromServer();
 
-            if (b.booking_type === 'vehicle') {
-              serverVehicleBookings.push({
-                id: b.id,
-                customerName: b.customer_name,
-                phone: b.customer_phone,
-                email: b.customer_email,
-                category: b.trip_type,
-                vehicleName: b.service_name,
-                pickupArea: b.pickup_area,
-                dropLocation: b.drop_location,
-                date: b.date,
-                time: b.time,
-                fare: b.calculated_fare,
-                paymentMode: b.payment_mode,
-                status: formattedStatus
-              });
-            } else if (b.booking_type === 'class' || (b.id && b.id.startsWith('BDA-CLS-'))) {
-              serverClassEnrollments.push({
-                enrollmentId: b.id,
-                fullName: b.customer_name,
-                mobileNumber: b.customer_phone,
-                emailAddress: b.customer_email,
-                address: b.pickup_area || '',
-                pickupLocation: b.pickup_area || '',
-                preferredStartDate: b.date,
-                preferredTime: b.time || 'Morning',
-                courseFee: b.calculated_fare,
-                status: formattedStatus,
-                assignedInstructor: b.assigned_driver_name || '',
-                assignedInstructorPhone: b.assigned_driver_phone || ''
-              });
-            } else {
-              const cleanDriverName = (b.assigned_driver_name && b.assigned_driver_name !== 'Driver Assigned on Dispatch' && b.assigned_driver_name !== 'Driver Assigned' && b.assigned_driver_name !== 'Pending Admin Acceptance') ? b.assigned_driver_name : '';
-              const cleanDriverPhone = (b.assigned_driver_phone && b.assigned_driver_phone !== '+91 80 2555 0199') ? b.assigned_driver_phone : '';
+    const pollInterval = setInterval(() => {
+      fetchAdminDataFromServer();
+    }, 30000);
 
-              serverDriverBookings.push({
-                id: b.id,
-                customerName: b.customer_name,
-                phone: b.customer_phone,
-                email: b.customer_email,
-                tripType: b.trip_type,
-                tripTitle: b.service_name,
-                pickupArea: b.pickup_area,
-                dropLocation: b.drop_location,
-                date: b.date,
-                time: b.time,
-                fare: b.calculated_fare,
-                paymentMode: b.payment_mode,
-                status: formattedStatus,
-                assignedDriver: cleanDriverName,
-                assignedDriverPhone: cleanDriverPhone
-              });
-            }
-          });
+    const handleFocus = () => {
+      fetchAdminDataFromServer();
+    };
 
-          if (serverDriverBookings.length > 0) {
-            setDriverBookings(prev => {
-              const map = new Map();
-              (prev || []).forEach(b => map.set(b.id, b));
-              serverDriverBookings.forEach(b => {
-                const existing = map.get(b.id);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAdminDataFromServer();
+      }
+    };
 
-                // Authoritative status resolution:
-                // Server status takes precedence when server is Assigned, Confirmed, or Cancelled.
-                // If local status was Assigned or Cancelled, keep it if server is still Pending.
-                let finalStatus = b.status || 'Pending';
-                if (b.status === 'Assigned' || existing?.status === 'Assigned') {
-                  finalStatus = 'Assigned';
-                } else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') {
-                  finalStatus = 'Cancelled';
-                } else if (b.status === 'Confirmed' || existing?.status === 'Confirmed') {
-                  finalStatus = 'Confirmed';
-                }
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-                const isInvalidName = (n) => 
-                  !n || 
-                  n === 'Pending Admin Acceptance' || 
-                  n === 'Driver Assigned on Dispatch' || 
-                  n === 'Driver Assigned' || 
-                  n.includes('Assigned on Dispatch');
-
-                let validName = '';
-                if (!isInvalidName(b.assignedDriver)) {
-                  validName = b.assignedDriver;
-                } else if (!isInvalidName(existing?.assignedDriver)) {
-                  validName = existing.assignedDriver;
-                }
-
-                let validPhone = '';
-                if (b.assignedDriverPhone && b.assignedDriverPhone !== '+91 80 2555 0199') {
-                  validPhone = b.assignedDriverPhone;
-                } else if (existing?.assignedDriverPhone && existing.assignedDriverPhone !== '+91 80 2555 0199') {
-                  validPhone = existing.assignedDriverPhone;
-                }
-
-                if (validName || validPhone) {
-                  setDriverInputState(inp => ({
-                    ...inp,
-                    [b.id]: {
-                      name: validName || inp[b.id]?.name || '',
-                      phone: validPhone || inp[b.id]?.phone || ''
-                    }
-                  }));
-                }
-
-                map.set(b.id, { 
-                  ...(existing || {}), 
-                  ...b, 
-                  assignedDriver: validName,
-                  assignedDriverPhone: validPhone,
-                  status: finalStatus 
-                });
-              });
-              // Filter out any class enrollments and vehicle rentals that might have lingered, and normalize all fields
-              const merged = Array.from(map.values())
-                .filter(b => b.tripType !== 'class' && b.booking_type !== 'class' && b.tripType !== 'vehicle' && b.booking_type !== 'vehicle' && (!b.id || (!b.id.startsWith('BDA-CLS-') && !b.id.startsWith('BDA-VEH-'))))
-                .map(normalizeDriverBooking);
-              localStorage.setItem('bda_driver_bookings', JSON.stringify(merged));
-              return merged;
-            });
-          }
-
-          if (serverVehicleBookings.length > 0) {
-            setVehicleBookings(prev => {
-              const map = new Map();
-              (prev || []).forEach(b => map.set(b.id, b));
-              serverVehicleBookings.forEach(b => {
-                const existing = map.get(b.id);
-                let finalStatus = b.status || 'Pending';
-                if (b.status === 'Confirmed' || existing?.status === 'Confirmed') {
-                  finalStatus = 'Confirmed';
-                } else if (b.status === 'Cancelled' || existing?.status === 'Cancelled') {
-                  finalStatus = 'Cancelled';
-                } else if (b.status === 'Assigned' || existing?.status === 'Assigned') {
-                  finalStatus = 'Assigned';
-                }
-                map.set(b.id, { ...(existing || {}), ...b, status: finalStatus });
-              });
-              const merged = Array.from(map.values());
-              localStorage.setItem('bda_vehicle_bookings', JSON.stringify(merged));
-              return merged;
-            });
-          }
-
-          if (serverClassEnrollments.length > 0) {
-            setClassEnrollments(prev => {
-              const map = new Map();
-              (prev || []).forEach(e => map.set(e.enrollmentId, e));
-              serverClassEnrollments.forEach(e => {
-                const existing = map.get(e.enrollmentId);
-                let finalStatus = e.status || 'Pending';
-                if (e.status === 'Confirmed' || existing?.status === 'Confirmed') finalStatus = 'Confirmed';
-                else if (e.status === 'Cancelled' || existing?.status === 'Cancelled') finalStatus = 'Cancelled';
-                else if (e.status === 'In Training' || existing?.status === 'In Training') finalStatus = 'In Training';
-
-                map.set(e.enrollmentId, {
-                  ...(existing || {}),
-                  ...e,
-                  status: finalStatus,
-                  assignedInstructor: e.assignedInstructor || existing?.assignedInstructor || '',
-                  assignedInstructorPhone: e.assignedInstructorPhone || existing?.assignedInstructorPhone || ''
-                });
-              });
-              const merged = Array.from(map.values());
-              localStorage.setItem('bda_class_enrollments', JSON.stringify(merged));
-              return merged;
-            });
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('[ADMIN] Failed to fetch bookings from server:', err.message);
-      });
-  }, [isAdminLoggedIn]);
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAdminLoggedIn, activeTab]);
 
   // Search & Filters
   const [driverSearchQuery, setDriverSearchQuery] = useState('');
@@ -1018,6 +1287,12 @@ export default function AdminPage({ onReturnToClient }) {
     localStorage.removeItem('bda_admin_name');
     localStorage.removeItem('bda_admin_phone');
     setIsAdminLoggedIn(false);
+    hasInitializedSeenIdsRef.current = false;
+    seenRecordIdsRef.current = new Set();
+    setHasNewDriverBookings(false);
+    setHasNewVehicleBookings(false);
+    setHasNewClassBookings(false);
+    setHasNewUsers(false);
     setActiveTab('dashboard');
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/admin/dashboard');
@@ -1071,7 +1346,7 @@ export default function AdminPage({ onReturnToClient }) {
   const handleAcceptAndAssignDriver = async (bookingId, overrideName = null, overridePhone = null) => {
     const typedName = (overrideName !== null ? overrideName : driverInputState[bookingId]?.name)?.trim();
     const typedPhone = (overridePhone !== null ? overridePhone : driverInputState[bookingId]?.phone)?.trim();
-    
+
     if (!typedName || !typedPhone) {
       alert('⚠️ Cannot accept & assign driver without valid driver name and phone.');
       return false;
@@ -1250,7 +1525,7 @@ export default function AdminPage({ onReturnToClient }) {
   // Quick Action: Update driver booking status
   const handleUpdateDriverStatus = async (bookingId, newStatus) => {
     const dbStatus = newStatus === 'Assigned' ? 'ASSIGNED' : (newStatus === 'Cancelled' ? 'CANCELLED' : (newStatus === 'Pending' ? 'PENDING' : 'CONFIRMED'));
-    
+
     try {
       const cur = JSON.parse(localStorage.getItem('bda_driver_bookings') || '[]');
       const upd = cur.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
@@ -1273,7 +1548,7 @@ export default function AdminPage({ onReturnToClient }) {
   // Quick Action: Update vehicle booking status
   const handleUpdateVehicleStatus = async (bookingId, newStatus) => {
     const dbStatus = newStatus === 'Confirmed' ? 'CONFIRMED' : (newStatus === 'Cancelled' ? 'CANCELLED' : (newStatus === 'Pending' ? 'PENDING' : 'ASSIGNED'));
-    
+
     try {
       const cur = JSON.parse(localStorage.getItem('bda_vehicle_bookings') || '[]');
       const upd = cur.map(b => (b.id === bookingId ? { ...b, status: newStatus } : b));
@@ -1379,10 +1654,10 @@ export default function AdminPage({ onReturnToClient }) {
   const filteredDriverBookings = driverBookings
     .filter(b => {
       if (
-        b.tripType === 'class' || 
-        b.booking_type === 'class' || 
-        b.tripType === 'vehicle' || 
-        b.booking_type === 'vehicle' || 
+        b.tripType === 'class' ||
+        b.booking_type === 'class' ||
+        b.tripType === 'vehicle' ||
+        b.booking_type === 'vehicle' ||
         (b.id && (b.id.startsWith('BDA-CLS-') || b.id.startsWith('BDA-VEH-')))
       ) {
         return false;
@@ -1444,7 +1719,7 @@ export default function AdminPage({ onReturnToClient }) {
     setRegisteredUsers(updated);
     localStorage.setItem('bda_registered_clients', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('bda_client_registered'));
-    
+
     setNewUserName('');
     setNewUserPhone('');
     setNewUserEmail('');
@@ -1483,7 +1758,7 @@ export default function AdminPage({ onReturnToClient }) {
     setRegisteredDrivers(updated);
     localStorage.setItem('bda_registered_drivers', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('bda_driver_registered'));
-    
+
     setNewDriverName('');
     setNewDriverPhone('');
     setNewDriverDl('');
@@ -1563,6 +1838,10 @@ export default function AdminPage({ onReturnToClient }) {
         vehicleBookingsCount={vehicleBookings.length}
         classEnrollmentsCount={classEnrollments.length}
         usersCount={registeredUsers.length + registeredDrivers.length}
+        hasNewDriverBookings={hasNewDriverBookings}
+        hasNewVehicleBookings={hasNewVehicleBookings}
+        hasNewClassBookings={hasNewClassBookings}
+        hasNewUsers={hasNewUsers}
         isMobileSidebarOpen={isMobileSidebarOpen}
         setIsMobileSidebarOpen={setIsMobileSidebarOpen}
         handleLogout={handleLogout}
@@ -1668,7 +1947,7 @@ export default function AdminPage({ onReturnToClient }) {
             <div className="text-xs font-bold text-red-400">Database Purge Successful</div>
             <div className="text-xs text-slate-200">{userActionToast}</div>
           </div>
-          <button 
+          <button
             onClick={() => setUserActionToast(null)}
             className="text-slate-400 hover:text-white ml-2 p-1 cursor-pointer"
           >

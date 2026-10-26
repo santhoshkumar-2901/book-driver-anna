@@ -13,6 +13,10 @@ export default function AdminSidebar({
   vehicleBookingsCount,
   classEnrollmentsCount,
   usersCount,
+  hasNewDriverBookings = false,
+  hasNewVehicleBookings = false,
+  hasNewClassBookings = false,
+  hasNewUsers = false,
   isMobileSidebarOpen,
   setIsMobileSidebarOpen,
   handleLogout,
@@ -106,6 +110,13 @@ export default function AdminSidebar({
             <div className="flex items-center gap-3">
               <SteeringWheel className="w-4 h-4 shrink-0" />
               <span>For Driver</span>
+              {hasNewDriverBookings && (
+                <span
+                  data-testid="admin-dot-for-driver"
+                  className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                  title="New driver bookings"
+                />
+              )}
             </div>
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold ${
               activeTab === 'for-driver' 
@@ -128,6 +139,13 @@ export default function AdminSidebar({
             <div className="flex items-center gap-3">
               <Car className="w-4 h-4 shrink-0" />
               <span>For Vehicle</span>
+              {hasNewVehicleBookings && (
+                <span
+                  data-testid="admin-dot-for-vehicle"
+                  className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                  title="New vehicle bookings"
+                />
+              )}
             </div>
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold ${
               activeTab === 'for-vehicle' 
@@ -150,6 +168,13 @@ export default function AdminSidebar({
             <div className="flex items-center gap-3">
               <GraduationCap className="w-4 h-4 shrink-0" />
               <span>For Driving Class</span>
+              {hasNewClassBookings && (
+                <span
+                  data-testid="admin-dot-for-class"
+                  className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                  title="New driving class enrollments"
+                />
+              )}
             </div>
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold ${
               activeTab === 'for-class' 
@@ -172,6 +197,13 @@ export default function AdminSidebar({
             <div className="flex items-center gap-3">
               <Users className="w-4 h-4 shrink-0" />
               <span>Users</span>
+              {hasNewUsers && (
+                <span
+                  data-testid="admin-dot-users"
+                  className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                  title="New user registrations"
+                />
+              )}
             </div>
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold ${
               activeTab === 'users' 
@@ -320,6 +352,13 @@ export default function AdminSidebar({
           >
             <SteeringWheel className="w-3.5 h-3.5" />
             <span>For Driver</span>
+            {hasNewDriverBookings && (
+              <span
+                data-testid="mobile-strip-dot-for-driver"
+                className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                title="New driver bookings"
+              />
+            )}
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
               activeTab === 'for-driver' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
             }`}>
@@ -337,6 +376,13 @@ export default function AdminSidebar({
           >
             <Car className="w-3.5 h-3.5" />
             <span>For Vehicle</span>
+            {hasNewVehicleBookings && (
+              <span
+                data-testid="mobile-strip-dot-for-vehicle"
+                className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                title="New vehicle bookings"
+              />
+            )}
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
               activeTab === 'for-vehicle' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
             }`}>
@@ -354,6 +400,13 @@ export default function AdminSidebar({
           >
             <GraduationCap className="w-3.5 h-3.5" />
             <span>Classes</span>
+            {hasNewClassBookings && (
+              <span
+                data-testid="mobile-strip-dot-for-class"
+                className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                title="New driving class enrollments"
+              />
+            )}
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
               activeTab === 'for-class' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
             }`}>
@@ -371,6 +424,13 @@ export default function AdminSidebar({
           >
             <Users className="w-3.5 h-3.5" />
             <span>Users</span>
+            {hasNewUsers && (
+              <span
+                data-testid="mobile-strip-dot-users"
+                className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                title="New user registrations"
+              />
+            )}
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
               activeTab === 'users' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
             }`}>
@@ -490,6 +550,13 @@ export default function AdminSidebar({
                 <div className="flex items-center gap-3">
                   <SteeringWheel className="w-4 h-4 shrink-0" />
                   <span>For Driver</span>
+                  {hasNewDriverBookings && (
+                    <span
+                      data-testid="mobile-drawer-dot-for-driver"
+                      className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                      title="New driver bookings"
+                    />
+                  )}
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
                   activeTab === 'for-driver' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
@@ -509,6 +576,13 @@ export default function AdminSidebar({
                 <div className="flex items-center gap-3">
                   <Car className="w-4 h-4 shrink-0" />
                   <span>For Vehicle</span>
+                  {hasNewVehicleBookings && (
+                    <span
+                      data-testid="mobile-drawer-dot-for-vehicle"
+                      className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                      title="New vehicle bookings"
+                    />
+                  )}
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
                   activeTab === 'for-vehicle' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
@@ -528,6 +602,13 @@ export default function AdminSidebar({
                 <div className="flex items-center gap-3">
                   <GraduationCap className="w-4 h-4 shrink-0" />
                   <span>For Driving Class</span>
+                  {hasNewClassBookings && (
+                    <span
+                      data-testid="mobile-drawer-dot-for-class"
+                      className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                      title="New driving class enrollments"
+                    />
+                  )}
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
                   activeTab === 'for-class' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
@@ -547,6 +628,13 @@ export default function AdminSidebar({
                 <div className="flex items-center gap-3">
                   <Users className="w-4 h-4 shrink-0" />
                   <span>Users</span>
+                  {hasNewUsers && (
+                    <span
+                      data-testid="mobile-drawer-dot-users"
+                      className="w-2 h-2 rounded-full bg-red-500 shrink-0"
+                      title="New user registrations"
+                    />
+                  )}
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
                   activeTab === 'users' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'
