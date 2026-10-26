@@ -11,13 +11,16 @@ import { apiClient } from '../../services/apiClient';
 export default function LocationSearch({
   placeholder = 'Search area, street, or landmark...',
   onSelect,
+  value,
+  onChange,
   initialValue = '',
   className = '',
   id = 'location-search-input',
   biasCoords = null,
   mapContext = ''
 }) {
-  const [query, setQuery] = useState(initialValue);
+  const isControlled = value !== undefined;
+  const [query, setQuery] = useState(isControlled ? value : initialValue);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,6 +29,13 @@ export default function LocationSearch({
   const containerRef = useRef(null);
   const abortControllerRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  // Synchronize internal query with controlled value
+  useEffect(() => {
+    if (isControlled) {
+      setQuery(value ?? '');
+    }
+  }, [isControlled, value]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -108,6 +118,9 @@ export default function LocationSearch({
     const val = e.target.value;
     setQuery(val);
     setError(null);
+    if (onChange) {
+      onChange(val);
+    }
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -126,9 +139,13 @@ export default function LocationSearch({
   };
 
   const handleSelect = (item) => {
-    setQuery(item.displayName);
+    const selectedText = item.displayName;
+    setQuery(selectedText);
     setIsOpen(false);
     setResults([]);
+    if (onChange) {
+      onChange(selectedText);
+    }
     if (onSelect) {
       onSelect(item);
     }
@@ -139,6 +156,9 @@ export default function LocationSearch({
     setResults([]);
     setIsOpen(false);
     setError(null);
+    if (onChange) {
+      onChange('');
+    }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }

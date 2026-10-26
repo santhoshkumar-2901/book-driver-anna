@@ -448,6 +448,8 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     setLuggageCount('');
     setStreetAddress('');
     setSpecialInstructions('');
+    setPickupArea(initialData?.pickupArea || '');
+    setDropLocation(initialData?.dropLocation || '');
     setFormError('');
     setIsSubmitting(false);
   };
@@ -534,9 +536,19 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
     e.preventDefault();
     setFormError('');
 
-    if (bookingCategory === 'vehicle' && (!passengerCount || parseInt(passengerCount) < 1)) {
-      setFormError('Please enter the number of passengers traveling');
-      return;
+    if (bookingCategory === 'vehicle') {
+      if (!passengerCount || parseInt(passengerCount) < 1) {
+        setFormError('Please enter the number of passengers traveling');
+        return;
+      }
+      if (!pickupArea || !pickupArea.trim()) {
+        setFormError('Please enter a pickup location');
+        return;
+      }
+      if (!dropLocation || !dropLocation.trim()) {
+        setFormError('Please enter a drop location');
+        return;
+      }
     }
     if (!customerName.trim()) {
       setFormError('Please enter your full customer name');
@@ -1175,36 +1187,40 @@ export default function BookingModal({ isOpen, onClose, clientUser = null, initi
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 1. Pickup Area Dropdown */}
+                {/* 1. Pickup Location Input */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Pickup Area in Bangalore *
+                  <label htmlFor="vehicle-pickup-location" className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-amber-400" /> Pickup Location *
                   </label>
-                  <select
+                  <LocationSearch
+                    id="vehicle-pickup-location"
+                    placeholder="Enter pickup location"
                     value={pickupArea}
-                    onChange={(e) => setPickupArea(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                  >
-                    {BANGALORE_AREAS.map((a, i) => (
-                      <option key={i} value={a}>{a}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setPickupArea(val)}
+                    onSelect={(item) => {
+                      if (item?.displayName) {
+                        setPickupArea(item.displayName);
+                      }
+                    }}
+                  />
                 </div>
 
-                {/* 2. Drop Area Dropdown */}
+                {/* 2. Drop Location Input */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" /> Drop Location in Bangalore *
+                  <label htmlFor="vehicle-drop-location" className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-amber-400" /> Drop Location *
                   </label>
-                  <select
+                  <LocationSearch
+                    id="vehicle-drop-location"
+                    placeholder="Enter drop location"
                     value={dropLocation}
-                    onChange={(e) => setDropLocation(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                  >
-                    {BANGALORE_AREAS.map((a, i) => (
-                      <option key={i} value={a}>{a}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setDropLocation(val)}
+                    onSelect={(item) => {
+                      if (item?.displayName) {
+                        setDropLocation(item.displayName);
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>
